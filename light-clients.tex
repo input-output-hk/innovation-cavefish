@@ -61,6 +61,52 @@ What sets us apart?
 
 We use blind signatures \cite{blindsigs}
 
+\section{Related Work}
+
+Compare our approach  with :
+\begin{itemize}
+    \item "Free" websites monitoring the chain -- mention they lack long-term sustainability.
+    \item Bridges (trustless and trusted)
+    \item Payment channels 
+    \item LCs that operate on single-prover model (eg. with an established relationship via deposit)
+    \item LCs that operate on multi-prover model
+    \item LC SoK
+
+\subsection{Technical Background}
+\end{itemize}
+
+
+\section{Light Client Specification}
+ 
+ What is a light client?
+ \begin{itemize}
+ 
+ \item User - LC interface
+ 
+ \item LC characteristics/ limitations
+   \begin{itemize}
+\item What are the capabilities of a light client?
+
+\item Does it remember all addresses it has been paid at (tx history)?
+
+\item Is light client allowed to maintain state, and what state can they maintain if so? Secret key is the minimum state.
+\item Sanity test: if we dismiss all requirements we should recover a full client.
+\end{itemize}
+
+ \item LC - Full Node interactions
+  \begin{itemize}
+  \item Protocols to support user requests
+  \item Security reqs (protecting integrity/ privacy/ SPO revenue?)
+\end{itemize}
+ \end{itemize}
+ 
+Can we describe the differences between light wallets, bridges and light nodes in our framework? (Probably yes). 
+
+How can we formalize the intent of a light client without revealing secret key?
+
+Can we have viewing keys?
+
+
 \section{Threat Model}
 
 \begin{itemize}
@@ -70,36 +116,14 @@ We use blind signatures \cite{blindsigs}
 
 \end{itemize}
 
-\section{Light Client Specification}
- 
-What are the capabilities of a light client?
-
-Does it remember all addresses it has been paid at (tx history)?
-
-Is light client allowed to maintain state, and what state can they maintain if so?
-Secret key is the minimum state.
-
-How can we formalize the intent of a light client without revealing secret key?
-
-Can we have viewing keys?
 
 \section{Intent Specification}
-Intent (DSL or predicate to describe intent of the client, ie what they want to do to the ledger state)
+Intent (DSL or predicate to describe intent of the client, ie what they want to do to the ledger state).
 
-\section{Protocol}
+\section{Light Client Protocols}
 
 \section{Analysis}
 
-\section{Related Work}
-
-Compare our approach  with :
-\begin{itemize}
-    \item "Free" websites monitoring the chain
-    \item Bridges (trustless and trusted)
-    \item Payment channels 
-    \item LCs that operate on single-prover model (eg. with an established relationship via deposit)
-    \item LCs that operate on multi-prover model
-\end{itemize}
 
 \section{Conclusion}
 
