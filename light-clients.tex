@@ -57,8 +57,12 @@ What sets us apart?
     \item Model for (trustless) 2-party transaction construction rather than proving things about chain/ledger state
 
     \item Do not require establishing a relationship with SP or any other set-up
+    
+    \item inherent timeliness of transaction construction incentivized by SPs desired to earn 
+    their tip. This is in contrast with the possibility of stale info provided from old Mithril snapshots in other LC models
 \end{itemize}
 
+We claim that our work can be used by any UTxO or EUTxO blockchain (with some adjustments to the details of intent specification). 
 We use blind signatures \cite{blindsigs}
 
 \section{Related Work}
@@ -71,10 +75,15 @@ Compare our approach  with :
     \item LCs that operate on single-prover model (eg. with an established relationship via deposit)
     \item LCs that operate on multi-prover model
     \item LC SoK
+    \item Solver networks
 
 \subsection{Technical Background}
 \end{itemize}
 
+\section{Ledger Model}
+
+We take as our ledger model the UTxOma model, which is UTxO with multi-assets.
+Explain why we chose this over the basic UTxO and the full EUTxO models.
 
 \section{Light Client Specification}
  
@@ -88,6 +97,9 @@ Compare our approach  with :
 \item What are the capabilities of a light client?
 
 \item Does it remember all addresses it has been paid at (tx history)?
+
+\item Do we assume that viewing keys exist? Can we assume LC can generate first x addresses from its private key in a
+deterministic way? 
 
 \item Is light client allowed to maintain state, and what state can they maintain if so? Secret key is the minimum state.
 \item Sanity test: if we dismiss all requirements we should recover a full client.
@@ -114,6 +126,9 @@ Can we have viewing keys?
 
     \item SP lies to client about the UTxOs being spent by the tx, and tricks them into doing something they didn’t want to do (that’s why 0-knowledge proof that outputs were correctly specified)
 
+    \item Suboptimal transactions possibility : 
+    Do we want to let users specify what they want optimized for in their intents (e.g. minimize fee or find best price on exchange offer)? 
+    Can we assume that competition across SPs will enable client to get a better response?
 \end{itemize}
 
 
