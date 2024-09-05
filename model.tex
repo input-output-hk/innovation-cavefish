@@ -113,7 +113,7 @@ and $\fun{MOf}$ is given in \ref{fig:eutxo-types}.
 \begin{displaymath}
 \begin{array}{rlll}
   \applyScript{\_} &:& \Script \to ((\type{Set} \pubkey) \times (Slot \times Slot)) \to \B \\
-  \applyScript{\fun{RequireMOf}~n~ls} (\var{khs}, (t1, t2)) &=&  \fun{MOf}~0~ n ~\applyScript{\_} ~ls \\
+  \applyScript{\fun{RequireMOf}~n~ls} (\var{khs}, (t1, t2)) &=&  \fun{MOf}~0~ n ~(\applyScript{\_}~(\var{khs}, (t1, t2))) ~ls \\
   \applyScript{\fun{RequireSig}~k} (\var{khs}, (t1, t2)) &=& k~\in~\var{khs} \\
   \applyScript{\fun{RequireTimeStart}~t1'} (\var{khs}, (t1, t2)) &=& t1'~\leq~t1 \\
   \applyScript{\fun{RequireTimeExpire}~t2'} (\var{khs}, (t1, t2)) &=& t2~\leq~t2' 
