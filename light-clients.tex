@@ -32,6 +32,9 @@
 \newcommand{\tx}{\fun{tx}}
 \newcommand{\TxId}{\type{TxId}}
 \newcommand{\TxIn}{\type{TxIn}}
+\newcommand{\Header}{\type{Header}}
+\newcommand{\Block}{\type{Block}}
+\newcommand{\LState}{\type{LState}}
 \newcommand{\Tx}{\type{Tx}}
 \newcommand{\Slot}{\type{Slot}}
 \newcommand{\B}{\mathbb{B}}
@@ -200,7 +203,7 @@ Our approach is different from a more ``traditional'' (i.e., what commonly is re
 
 
 
-Most related works and ideas are \emph{intents and solver networks} that attempt to establish a relationship between solvers and users via their (light) clients~\cite{ethresearch_solvers}.
+Most related works and ideas are \emph{intents and solver networks} that attempt to establish a relationship between solvers and users via their (light) clients~\cite{ethresearch-solvers}.
 A light client issues an intent via as an abstracted transaction object and solvers process the intent incentivized by transaction fee or intent execution reward. The users are then free to accept or reject a solver’s proposal.
 Outsourcing transaction creation to a solver does not need for user to bridge assets cross-chain, as chains are abstracted away. In case the solvers are required to provide a deposit, slashing guarantees honest behavior of a rational actor.
 While concepts around solver networks are relatively new there is currently no universal standard governing the specification of intents processing of 

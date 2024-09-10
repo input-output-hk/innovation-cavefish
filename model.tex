@@ -7,19 +7,47 @@ The UTxO ledger model, such as the one used by BitCoin \cite{bitcoin}, Ergo \cit
 and Cardano~\cite{full-cardano}, maintains a record, called the \emph{UTxO set}, 
 of transaction outputs added 
 by transactions that have been applied throughout its history, but not yet spent by 
-subsequent transactions. For completeness, and in order to establish notation, 
+subsequent transactions. We chose the $\mathsf{UTxO}_{ma}$ ledger because it allows us to demonstrate 
+relevant usecases of our light client design (which would also work for a single-asset UTxO ledger),
+without introducing unnecessarily complexity of the Extended UTxO ledger. 
+For completeness, and in order to establish notation, 
 we include an overview of the $\mathsf{UTxO}_{ma}$ model. For additional notation 
 explanation, see Figure \ref{fig:notation:nonstandard}.
+
+\textbf{Blocks and Ledger States.} A block $\Block = \Header \times [\Tx]$ is a data 
+structure used to update the state of the ledger
+by applying a list of transactions $\var{lstx} \in [\Tx]$ contained in the block, 
+as well as doing some other 
+checks and updates we do not model here. 
+Among other data, the block header contains a slot number field $\fun{slot}~:~\Header \to \Slot$,
+which represents the blockchain time at which the block is produced. 
+
+The ledger state is a
+data structure which is updated by applying blocks incoming on the network.
+The ledger state $\LState$ contains (among other data we do not model here)
+the UTxO set field, $\fun{utxo}~:~\LState \to \UTxO$.
+It also contains the parameter $\fun{minfee}~:~\LState \in \N$, which is the minimum 
+fee a transaction must pay.
+A block $b$ can extend the blockchain (i.e. update the current state $s \in \LState$) whenever the function 
+
+\[ \fun{checkBlock}~:~\LState \times \Block \to \B \]
+
+applied as $\fun{checkBlock}~(s, b)$ returns $\true$. Then, the updated block state 
+is computed by $\fun{updateState}~(s, b)$. We do not give full specifications of 
+$\fun{checkBlock}$ or $\fun{updateState}$, as they are not required to model our light client approach.
+We assume that a \emph{full node} is one that is able to, given some verified state $s_0$ (e.g. a genesis state, 
+or a verified checkpoint state), and a list of blocks $[b_0, ..., b_k]$ that have been disseminated across the 
+network since the time of $s_0$, is able to compute the current state $s_{k-1}$ by applying 
+them in sequence, i.e. computing $s_{i+1} = \fun{updateState}~(s_i, b_i)$ for $0 \leq i < k$,
+and is able to determine if any of the blocks in the list are invalid. If all the 
+blocks result in valid updates (i.e. $\fun{checkBlock}~(s_i, b_i) = \true$), we say 
+that $[b_1, ..., b_k]$ forms a valid blockchain.
+
 
 \textbf{Multi-asset Support}. A ledger which supports transacting with not only the 
 primary currency, e.g. BitCoin on the BitCoin 
 platform, or Ada on Cardano, but also other types of currencies, is called 
-a \emph{multi-asset ledger}. In this work, we chose to build on a multi-asset 
-UTxO ledger model in order to demonstrate a broader range of usecases for our design.
-We do not, however, make use of the more expressive Extended UTxO ledger model \cite{eutxoma}.
-We later discuss how our design can be adjusted to both the basic UTxO model, and the 
-Extended UTxO with multi-assets model. 
-
+a \emph{multi-asset ledger}. 
 Each asset is uniquely identified by an $\AssetID \leteq \Policy \times \TokenName$.
 Arbitrary combinations of assets are specified using a finitely-supported map 
 $\Value \leteq \AssetID \mapsto \Quantity$, where, for a given $v \in \Value$,
@@ -31,8 +59,7 @@ the empty map $\emptyset$. In our model, all assets are user-defined, meaning th
 user can introduce any asset into circulation so long as minting of this asset is allowed 
 by its minting policy (which may be defined by the user themselves).
 
-\textbf{Ledger State and the UTxO Set.} The ledger state is a
-data structure which is updated by applying incoming transactions.
+\textbf{Ledger State and the UTxO Set.} 
 The state of a UTxO-based ledger 
 necessarily contains a UTxO set. While realistic ledgers often contain additional 
 information in their state, in our model, the ledger state is just the UTxO set.
@@ -47,6 +74,7 @@ A transaction updates the UTxO set by either adding and removing entries.
         & &\ \outputs: [\TxOut],\\
         & &\ \fun{validityInterval}: \Interval{\Tick},\\
         & &\ \mint: \Value,\\
+        & &\ \fun{fee}: \N \\
         & &\ \sigs: \Signature)
     \end{array}
 \end{displaymath}
@@ -66,23 +94,21 @@ $\var{tx}$ is used to construct a set of UTxO entries that will be added to the 
 that the unique identifier $\var{txin}$ of each output $o \in \outputs~\var{tx}$ consists of the 
 transaction hash $\fun{txid}~\var{tx}$, and the index of $o$ in the list $\outputs~\var{tx}$.
 The entires added to the UTxO set by $\var{tx}$ are computed in this way by $\fun{mkOuts}$, 
-see Figure \ref{fig:eutxo-types}.
+see Figure \ref{fig:eutxo-types}. 
 
-A slot number $s \in \Slot$ represents blockchain time, and is specified at the block level, 
-but we do not model the details of block application in this work. 
 The interval $\fun{validityInterval}$ specifies the range of slot numbers for which a transaction
 can be valid. The field $\sigs : \Signature \leteq \pubkey \mapsto \H $
 is a set of public keys, associated with their 
 signatures on the the transaction (excluding $\sigs$ itself). 
-
+The $\fun{fee}$ is the amount of primary currency a transaction pays as a system fee,
+which is checked to be at least the required fee $\fun{minfee}$.
 The $\mint$ field represents the assets being minted or burned by the transaction. 
 Assets with positive quantities are said to be minted, while those with negative quantities 
 are burned. When a transaction is applied, the constraints specified by every 
 $p \in \Policy \leteq \Script$ of each type of asset specified in this field are 
 checked to make sure minting/burning of this type and quantity of asset is allowed. 
 
-\textbf{Ledger State Update. } The ledger state is updated by transaction 
-application. Given a UTxO set $\var{utxo}$ and a transaction $\var{tx}$, the function 
+\textbf{Ledger State Update. } Given a UTxO set $\var{utxo}$ and a transaction $\var{tx}$, the function 
 $\fun{updateUTxO} : \UTxO \times \Tx \to \UTxO$
 computes the updated UTxO set by adding and removing the appropriate entries :
 
@@ -91,10 +117,18 @@ computes the updated UTxO set by adding and removing the appropriate entries :
 While an update to the UTxO set can be computed for any transaction, only transactions that are
 \emph{valid} for a given set are allowed to perform an update to the ledger state. For a given
 $\var{utxo}$ set, a transaction $\var{tx}$ 
-is valid whenever the function $\fun{checkTx} : \Slot \times \UTxO \times \Tx \to \B$,
-applied as $\fun{checkTx}~(\var{utxo},~\var{tx})$, returns $\True$. The $\fun{checkTx}$
+is valid whenever the function $\fun{checkTx} : (\Slot \times \N) \times \UTxO \times \Tx \to \B$,
+applied as $\fun{checkTx}~((\var{slot}, \var{fee}), \var{utxo},~\var{tx})$, returns $\True$. The $\fun{checkTx}$
 function is the conjunction of the constraints specified in Section \ref{sec:check-tx}.
-This includes checking that the constraints of every $\Script$ run by the transaction are satisfied. 
+For a given block $b$ and state $s$, the function $\fun{updateState}~(s, b)$ updates 
+$s$ with the list of transactions $\pi_2~b = [\var{tx}_1 ; ... ; \var{tx}_k ]$ in such a way that 
+the update to the UTxO set contained in $s$ is computed by applying the transactions in sequence, i.e.
+
+\[ \fun{updateUTxO}~(\fun{updateUTxO}~((... \fun{utxo}~s ...),~\var{tx}_{k-1}),~\var{tx}_k) = \fun{utxo}~(\fun{updateState}~(s, b)) \]
+
+For each transaction in the list, $\fun{checkTx}~((\fun{slot}~b, \fun{fee}~s), \var{utxo}_i,~\var{tx}_i) = \true$ is first checked, 
+and the entire block is considered invalid if this check fails.
+As part of checking transaction validity, constraints of every $\Script$ run by the transaction are checked. 
 The constructors and evaluation of $\Script$ is given in Figure \ref{fig:script}, 
 and $\fun{MOf}$ is given in \ref{fig:eutxo-types}.
 

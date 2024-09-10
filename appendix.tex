@@ -92,7 +92,7 @@ but we simplify here for clarity.)
   \[
   \var{tx}.\mint +
   \sum_{i \in~\var{tx}.\inputs,~(i~\mapsto~o) \in~\var{utxo}} \var{o}.\val =
-  \sum_{o \in~\var{tx}.\outputs} \var{o}.\val
+  \sum_{o \in~\var{tx}.\outputs} \var{o}.\val ~+~\fun{toValue}~(\var{tx}.\fun{fee})
   \]
     \item[(vii)] \textbf{All inputs validate:}
   \[
@@ -106,5 +106,9 @@ but we simplify here for clarity.)
     \item[(x)] \textbf{All signatures are correct:}
   \[
   \forall~ (pk \mapsto s) \in \var{tx}.\sigs,~ \checkSig (\var{tx}, pk, s) = \true
+  \]
+  \item[(i)] \textbf{The fee is sufficient:}
+  \[
+    \var{s}.\fun{minfee} \leq \var{tx}.\fun{fee} 
   \]
   \end{itemize}
