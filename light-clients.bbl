@@ -1,0 +1,39 @@
+\begin{thebibliography}{1}
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\urlprefix}{URL }
+\providecommand{\doi}[1]{https://doi.org/#1}
+
+\bibitem{full-cardano}
+{Cardano Team}: {Full Cardano Ledger}.
+  \url{https://intersectmbo.github.io/formal-ledger-specifications/pdfs/cardano-ledger.pdf}
+  (2024)
+
+\bibitem{utxoma}
+Chakravarty, M.M.T., Chapman, J., MacKenzie, K., Melkonian, O., M{\"{u}}ller,
+  J., Jones, M.P., Vinogradova, P., Wadler, P., Zahnentferner, J.:
+  {UTXO}$_{\textsf{ma}}$: {UTXO} with multi-asset support. In: Margaria, T.,
+  Steffen, B. (eds.) Leveraging Applications of Formal Methods, Verification
+  and Validation: Applications - 9th International Symposium on Leveraging
+  Applications of Formal Methods, ISoLA 2020, Rhodes, Greece, October 20-30,
+  2020, Proceedings, Part {III}. Lecture Notes in Computer Science, vol. 12478,
+  pp. 112--130. Springer (2020). \doi{10.1007/978-3-030-61467-6_9}
+
+\bibitem{ergo}
+{Ergo Team}: {Ergo: A Resilient Platform For Contractual Money}.
+  \url{https://whitepaper.io/document/753/ergo-1-whitepaper} (2019)
+
+\bibitem{blindsigs}
+Fuchsbauer, G., Wolf, M.: Concurrently secure blind schnorr signatures. In:
+  Joye, M., Leander, G. (eds.) Advances in Cryptology -- EUROCRYPT 2024. pp.
+  124--160. Springer Nature Switzerland, Cham (2024)
+
+\bibitem{bitcoin}
+Nakamoto, S.: {Bitcoin: A Peer-to-Peer Electronic Cash System}.
+  \url{https://bitcoin.org/en/bitcoin-paper} (October 2008)
+
+\bibitem{ethresearch-solvers}
+research, E.: A decentralised solver architecture for executing intents on evm
+  blockchain (2023),
+  \url{https://ethresear.ch/t/a-decentralised-solver-architecture-for-executing-intents-on-evm-blockchain/16608}
+
+\end{thebibliography}
