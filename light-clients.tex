@@ -199,16 +199,26 @@ We use blind signatures \cite{blindsigs}
 
 Our approach provides facilitates transaction submission for a light client that is not aware of the entire history of a blockchain. 
 Therefore, we compare our work with existing solutions for light clients as well as mechanisms that allow the interaction with a blockchain when in resource constrained operation.
-Our approach is different from a more ``traditional'' (i.e., what commonly is referred to) light client that has the primary goal of syncing to the blockchain in order to acquire the information necessary to interact with a smart contract such as to submit a transaction. We summarize here the most important concepts and works in the area of light clients below:
+Our approach is different from a more ``traditional'' (i.e., what commonly is referred to) light client that has the primary goal of syncing to the blockchain in order to acquire the information necessary to interact with a smart contract or to submit a transaction. 
+We summarize the most important concepts and works in the area of light clients below.
 
+We first describe the common idea of a light client and then outline concepts related to our work that complement light clients. 
 
+A summary of \textbf{light client research} can be found in~\cite{cryptoeprint:2021/1657}, listing the main functionalities a light client is expected to perform: (1) issue queries, such as for the balance of an account, or the state of a transaction, and (2) safeguard secrecy information and submit transactions to the blockchain.
+In order to implement these functionalities, light clients use several generic techniques, most notably: header verification and consensus evolution verification. Compared to a \emph{full node} a light client only verifies the headers of blocks and skips the verification of transactions and account balances, a technique made popular with SPV in Bitcoin~\cite{} and nearly adopted by most practical approaches for light clients, e.g.,~\cite{Ethereumlc}.
+In addition to that, consensus evolution verification is needed for proof-of-stake based blockchains as the validator set can change. 
+Another common technique is to compress blockchain and/or ledger state to reduce the information a light client has to download to verify proofs and synchronize to the blockchain (see, e.g.,~\cite{cryptoeprint:2019/226}).
+Some light clients use game-theoretic assumptions to implement the slashing of previously deposited collateral in case of misbehavior, for example~\cite{cryptoeprint:2020/844}.
+The main cryptographic building blocks that are used to realize those techniques are succinct representation and proofs, such as data accumulators (often Merkle trees) and commitments and SNARKs.
+Furthermore, suitable signatures and hash functions are needed, for example, aggregate signatures and threshold signatures. 
 
-Most related works and ideas are \emph{intents and solver networks} that attempt to establish a relationship between solvers and users via their (light) clients~\cite{ethresearch-solvers}.
+Most related works and ideas are \textbf{intents} and \textbf{solver networks} that attempt to establish a relationship between solvers and users via their (light) clients~\cite{ethresearch-solvers}.
 A light client issues an intent via as an abstracted transaction object and solvers process the intent incentivized by transaction fee or intent execution reward. The users are then free to accept or reject a solver’s proposal.
 Outsourcing transaction creation to a solver does not need for user to bridge assets cross-chain, as chains are abstracted away. In case the solvers are required to provide a deposit, slashing guarantees honest behavior of a rational actor.
-While concepts around solver networks are relatively new there is currently no universal standard governing the specification of intents processing of 
+While concepts around solver networks are relatively new there is currently no universal standard governing the specification for intents and abstract transaction objects. To the best of our knowledge, this is the first work describing 
 
-We also briefly cover \emph{payment channels}, which also constitute a concept similar to our approach:
+We also briefly cover \textbf{payment channels}, which also constitute a concept similar to our approach: 
+Payment channels describe a type of off-chain mechanism for blockchains. They allow to establish a private payment channel between two parties. The channel can be used to conduct a series of (similar) transactions without interacting with the main blockchain. The creation of a payment channel requires locking funds in a smart contract, which is used to conduct the transactions~\cite{10.1145/3133956.3134096}.
 
 
 
@@ -219,8 +229,6 @@ Compare our approach  with :
     \item Payment channels 
     \item LCs that operate on single-prover model (eg. with an established relationship via deposit)
     \item LCs that operate on multi-prover model
-    \item LC SoK
-    \item Solver networks
 
 \subsection{Technical Background}
 UTxO model
