@@ -9,6 +9,9 @@
 \usepackage{graphicx}
 \usepackage{stmaryrd}
 \usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{matrix,shapes,arrows,positioning,chains, calc}
+
 \usepackage{caption}
 \usepackage{xcolor}
 
@@ -279,8 +282,8 @@ consists of a one-time, no-setup atomic exchange of assets for services.
 \todobox{
 Compare our approach  with :
 \begin{itemize}
-    \item "Free" websites monitoring the chain -- mention they lack long-term sustainability.
-    \item Bridges (trustless and trusted)
+    \item "Free" websites monitoring the chain -- mention they lack long-term sustainability. mention big APIs. blockfrost, etc.
+    \item Bridges (trustless and trusted). only overview. maybe SOK paper. and describe how LC and bridge are related.
     \item Payment channels 
     \item LCs that operate on single-prover model (eg. with an established relationship via deposit)
     \item LCs that operate on multi-prover model
@@ -445,6 +448,35 @@ vector of attack."}
 
 \section{Light Client Protocols}
 \label{sec:protocols}
+
+\subsection{Protocol Description}
+\begin{tikzpicture}
+	\matrix (m)[matrix of nodes, column  sep=1.5cm,row  sep=7mm, nodes={draw=none, anchor=center,text depth=0pt} ]{
+		\textbf{Light Client} & & \textbf{Service Provider}\\[-4mm]
+		Generate intent & & \\[-7mm]
+		$\mathsf{int_{post}} \in \mathcal{I}_\mathsf{post}$ & & \\[-7mm]
+		and predicate $P(\ )$\\
+		& Send $P(\ ),\ \mathsf{int_{post}}$ & \\
+		& & Generate transaction $\mathsf{tx}$\\[-7mm]
+		& & and abstract transaction $\mathsf{tx}_A$  \\[-7mm]
+		& Send $\mathsf{tx}_A,\ h=(\mathsf{tx})$,\\[-7mm]
+		& ZK.proof($h=(\mathsf{tx}),\  P(\mathsf{tx})=1$) & \\
+		Validate proof and \\[-7mm]
+		sign abstract transaction\\[-7mm]
+		& send $s = \mathrm{sign}(\mathsf{tx}_A, sk_{\mathrm{client}})$\\
+		& & Validate signature and \\[-7mm]
+		& & post $\mathsf{tx}$ on\\[-7mm]
+		& & chain upon success.\\
+	};
+	
+	%\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-1.south east)--(m-1-1.south west);
+	%\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-3.south east)--(m-1-3.south west);
+	
+	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-5-2.south west)--(m-5-2.south east);
+	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-8-2.south east)--(m-8-2.south west);
+	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-12-2.south west)--(m-12-2.south east);
+\end{tikzpicture}
+
 
 \section{Analysis}
 
