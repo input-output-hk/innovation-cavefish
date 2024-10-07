@@ -44,7 +44,7 @@
 \newcommand{\LState}{\type{LState}}
 \newcommand{\Tx}{\type{Tx}}
 \newcommand{\Slot}{\type{Slot}}
-\newcommand{\TxData}{\type{TxData}}
+\newcommand{\TxAbs}{\type{TxAbs}}
 \newcommand{\B}{\mathbb{B}}
 \newcommand{\TxOut}{\type{TxOut}}
 \newcommand{\UTxO}{\type{UTxO}}
@@ -142,6 +142,7 @@
 \newcommand{\checkSig}{\type{checkSig}}
 
 \newcommand{\applyScript}[1]{\ensuremath{\llbracket#1\rrbracket}}
+\newcommand{\chkSpec}[1]{\ensuremath{\llbracket#1\rrbracket}_{\type{DSL}}}
 \newcommand{\applyMPScript}[1]{\ensuremath{\llbracket#1\rrbracket}}
 
 \newcommand{\true}{\type{True}}
@@ -257,9 +258,11 @@ to users, contracts, and tokens, available in that channel (i.e. locked by the c
 Due to the specifics of the channel setup process, and the limited nature of these interactions, payment channels 
 are capable of greatly improving scalability 
 and reducing transaction processing times. The target user base for our light client design, however, are ones 
-that do not wish to engage in establishing relationships with other chain users, or participating 
-in an on-chain setup process. They also may not have (or choose 
-not to disclose) information about intended future interactions. For these reasons, it does not make sense to limit themselves 
+that do not wish to engage in establishing relationships with other chain users, participating 
+in an on-chain setup process, or intend to make repeat or scheduled interactions with the same 
+users. The on-chain space- and cost-saving benefits of payment channels, 
+which are due to not posting every single transaction, are unlikely to be accessible to a user base which 
+we target with our low-commitment design. For these reasons, it does not make sense to limit themselves 
 to a specific payment channel. 
 
 \textbf{API and Explorer Services}. 
@@ -271,12 +274,14 @@ old, the worst-case scenario is that it will be rejected. This makes
 services such as blockchain explorers \footnote{\url{https://beta.explorer.cardano.org/}} or Blockfrost (API 
 as a service for accessing the Cardano blockchain) \footnote{\url{https://blockfrost.dev/}} are some of the 
 strongest competitors with our proposal, as they provide the data needed 
-for the LC to construct their transaction, often with a relatively high degree of reliability. 
-With this in mind, what sets our design apart is the SP compensation structure. Revenue from services such as those above is 
+for the LC to construct their transaction, often with a relatively high degree of reliability.
+One aspect that sets our design apart is the SP compensation structure. Revenue from services such as those above is 
 either ad-based, requires users to create an account paid for with fiat currency, or is free in order to 
 promote use of the specific service/blockchain. We, on the other hand, propose that SPs are compensated 
 in assets on the same blockchain as the one to which their transaction gets applied, and the payment structure 
-consists of a one-time, no-setup atomic exchange of assets for services.
+consists of a one-time, no-setup atomic exchange of assets for services. Since the SP in our design gets paid
+only once a transaction is successfully applied, all data for which payment they receive payment 
+is not just mostly reliable (as for existing services), but provably correct.  
 
 
 \todobox{
@@ -310,21 +315,91 @@ UTxO model
  Lastly, a light client is characterized in terms of restrictions placed on the resources it has available (without restrictions, we could treat a a full node of a chain as a light client). These restrictions can relate to the  communication cost to answer a series of queries, available storage, and assumptions about connectivity. On the other side, a particular light client design might limit the intents contained in $\mathcal{I}_\mathsf{read}$, $\mathcal{I}_\mathsf{post}$ to simplify its design.
 
 
- \subsection{Intent Specification}
-Intent (DSL or predicate to describe intent of the client, ie what they want to do to the ledger state).
+\subsection{Intent Specification}
+\label{sec:dsl}
+
+For the protocol definition we present in this work, we leave the following functions abstract, 
+and assume that each SP can have its own domain-specific language to express these :
+
+\begin{itemize}
+    \item[(i)] The function that construct a transaction based on the specification 
+    \[ \fun{mkToSpec} : \LState \times \mathcal{I}_\mathsf{post} \to \Tx \] 
+    \item[(ii)] The function that checks that a given abstract transaction matches the specification  
+    \[\fun{chkSpec}~(\mathcal{I}_\mathsf{post} \times \TxAbs) \to \B\]
+\end{itemize}
+
+However, for the purpose of discussing the usecases our design can have, we present an example DSL
+for defining these function. In a realistic system, more constraints need to be 
+included in the DSL, e.g. a way to limits transaction size. We define the checking function in 
+Figure \ref{fig:dsl}, and the transaction-building $\fun{mkToSpec}$ in Figure \ref{fig:mktospec}.
+
+\begin{figure}
+    \textsc{$\mathcal{I}_\mathsf{post}$ Constructors} 
+\begin{displaymath}
+\begin{array}{rlll}
+    \fun{MustMint}           &: \Value \to \mathcal{I}_\mathsf{post}\\
+    \fun{SpendFrom}         &: \Script \to \mathcal{I}_\mathsf{post}  \\
+    \fun{MaxInterval}   &: \Slot \to \mathcal{I}_\mathsf{post}  \\
+    \fun{PayTo}  &: (Script \times Value)  \to \mathcal{I}_\mathsf{post}  \\
+    \fun{MaxFee} &: \N  \to \mathcal{I}_\mathsf{post} \\
+    \fun{AndExps}  &: [\mathcal{I}_\mathsf{post}] \to \mathcal{I}_\mathsf{post} \\
+\end{array}
+\end{displaymath}
+\nextdef
+\textsc{Evaluation of $\mathcal{I}_\mathsf{post}$} 
+\begin{displaymath}
+\begin{array}{rlll}
+  \chkSpec{\_} &:& \mathcal{I}_\mathsf{post} \to \Tx \to \B \\
+  \chkSpec{\fun{MustMint}~v} (\var{tx}) &=&  v \leq \var{tx} . \mint \\
+  \chkSpec{\fun{SpendFrom}~s} (\var{tx}) &=& \applyScript{s}(\fun{dom}~(\var{tx} . \sigs), \var{tx}.\validityInterval) \\
+  \chkSpec{\fun{MaxInterval}~i} (\var{tx}) &=& (\var{tx}.\validityInterval)_2 - (\var{tx}.\validityInterval)_1 \leq i \\
+  \chkSpec{\fun{PayTo}~(s, v)} (\var{tx}) &=& (s, v) \in \var{tx} . \outputs  \\
+  \chkSpec{\fun{MaxFee}~f} (\var{tx}) &=&  \var{tx} . \fun{fee} \leq f \\
+  \chkSpec{\fun{AndExps}~[a1 ; a2 ; ... ; ak]} (\var{tx}) &=& (\chkSpec{a1}~\var{tx}) \wedge (\chkSpec{a2}~\var{tx}) \wedge ... \wedge (\chkSpec{ak}~\var{tx})
+\end{array}
+\end{displaymath}
+\caption{$\mathcal{I}_\mathsf{post}$ constructors and evaluation}
+\label{fig:dsl}
+\end{figure}
+
+Let us define two examples of intents :
+
+\begin{itemize}
+    \item[($i_1$)] Intent to mint some token $t$ within an interval of length $j$ and maximum fee $f$ :
+    \[ i_1 =  \fun{AndExps}~[ \fun{MustMint}~t ; \fun{MaxInterval}~j ; \fun{MaxFee}~f ]\] 
+
+    \item[($i_2$)] Intent to pay $x$ from outputs locked by $\fun{RequireSig}~k1$ to  $\fun{RequireSig}~k2$
+    \[ i_1 =  \fun{AndExps}~[ \fun{SpendFrom}~(\fun{RequireSig}~k1) ; \fun{PayTo}~(x,~\fun{RequireSig}~k2) ]\]    
+\end{itemize}
+
+The resulting transactions are given in Figure \ref{fig:txs}.
+
+\todobox{
+    define fig:txs, and fix fig:mktospec
+}
+
 
 \todobox{Give example of :
 
-\begin{itemize}
-    \item intent to mint some tokens before a deadline
-    \item intent to pay x from key k1 to k2 (ie script $\fun{RequireSig}~k1$ to $\fun{RequireSig}~k2$)
-\end{itemize}}
+Set of transactions - that satisfy the intent
+Examples 
+Assume there is some number client can generate that corresponds to how many public keys server should check - high communication complexity for some users
+Is the hash unpredictable?
+SPs can respond to queries with no proof , because LC will have to ask for tx construction to use that info anyways
+spv and Ethereumlc citations?
+SP can send the client the completed transaction as soon as the sP observes it being included into a block
+SPs can provide services for free in exchange for delegating to their stake pool 
+
+TxData - what is it? 
+DSL
+Security - somehow sign a whole class of transactions?}
+
  
  \subsection{Light Client Interactions}
  
 The light client interacts with a number of full nodes. We assume that all parties know the current time up to an allowable deviation $\delta_t$. We allow for protocols featuring a single or multiple full nodes, and (orthogonally) protocols that are supported by a smart contract at the cost of additional setup. An important difference between the single and multi-node model is that existential honesty trivialises the single-node case. As such, single-node protocols are usually required to operate under more stringent security assumptions.
  
-The end result of such protocols are typically one of the following: an update to the light client's state or the creation of a transaction to be posted on the blockchain.  In  Section \ref{sec:threats} we give an informal treatment of potential threats and in Section \ref{sec:protocols} we describe a number of such protocols and formalize the corresponding security notions.
+The end result of such protocols are typically one of the following: an update to the light client's state or the creation of a transaction to be posted on the blockchain.  In Section \ref{sec:threats} we give an informal treatment of potential threats and in Section \ref{sec:protocols} we describe a number of such protocols and formalize the corresponding security notions.
  
 \todobox{
  \begin{itemize}
@@ -351,25 +426,7 @@ deterministic way?
 \end{itemize}
  \end{itemize}}
  
- \textbf{Optimization Function}. We assume that all specification-meeting 
- transactions are acceptable to the LC. However, the LC may have a preferred optimization function 
- $\fun{opt} : \TxData \to \Z$  which they (optionally) send alongside their request 
- to the SP, such that a transaction $\var{tx}$ is \emph{optimal} in a set $S \in \type{Set}~\TxData$ when 
  
- \[ \fun{opt}~\var{tx} = \fun{min}~\{~\fun{opt}~\var{tx'}~\|~\var{tx'}~\in~S~\} \]
- 
- For example, an optimal transaction may be one that minimizes the total amount of primary tokens 
- spent by the transaction, i.e. $\fun{opt}~\var{tx} = \fun{coinValue}~(\sum_{o \in~\var{txd}.\fun{spentOuts}} \var{o}.\val)$.
- This optimization function cannot be part of the specification, since a proof of optimality is not 
- required.  The kind of 
- sophisticated optimization (such as what is required, e.g., for order-matching) is not a well-suited 
- task for an LC to outsource to an SP, and would require an entirely distinct set of tools for 
- demonstrating the optimality result. For example, such tools may include zero-knowledge proofs 
- that there are no better offers for a specific token available on the ledger. We do not assume that 
- either the SP or the LC are necessarily capable of performing or verifying (resp.) optimality according to the 
- function LC requested be optimized. One of the major obstacles to this is the difficulty of demonstrating that 
- the response is optimal in a non-stale ledger state (see Section \ref{sec:stale-state}).
-
 \todobox{Can we describe the differences between light wallets, bridges and light nodes in our framework? (Probably yes). 
 
 How can we formalize the intent of a light client without revealing secret key?
@@ -408,7 +465,7 @@ Arbitrary delay caused by SP: SP can offer to execute an intent and provide the 
 
 \textbf{Non-submission of Transactions.} A class of protocols deals with the joint creation of transactions by the light client and node, with the transaction submission being left to the full node. It is possible for the full node to not post such a transaction in a timely manner, potentially leading the user to retry at a different time. As intents are not necessarily satisfied by a unique transaction, it is possible that the first full node may be able to post the first transaction (which is purposefully delayed) after the posting of the second one. This can cause the user to e.g. double pay for a service as well as the full node fee.
 
-\textbf{Falsified or Unsafe Transaction Data}. SP lies to client about the UTxOs being spent by the tx, and tricks them into doing something they didn’t want to do (that’s why 0-knowledge proof that outputs were correctly specified)
+\textbf{Falsified or Unsafe Transaction Data}. SP lies to client about the UTxOs being spent by the tx, and tricks them into doing something they did not want to do (that is why 0-knowledge proof that outputs were correctly specified)
 
 \textbf{Data Leakage.} The 2-PC protocol we propose is one that has leakage. In particular, 
 the co-construction of a transaction by the LC and the SP allows the LC to learn certain information 
@@ -449,33 +506,105 @@ vector of attack."}
 \section{Light Client Protocols}
 \label{sec:protocols}
 
+The following computations are performed in the protocol
+
+\begin{itemize}
+    \item[(i)] See Section \ref{sec:dsl} intents that may be generated
+    \item[(ii)] Signature is generated as follows :
+    \[\var{sig} = \fun{sign}~(\var{int_{post}}, vk_{\mathrm{client}})\]
+    \item[(iii)] The signature is checked as follows : 
+    \[ \fun{checkSig} (\var{int_{post}}, sk_{\mathrm{client}}, \var{sig}) = \true \]
+    \item[(iv)] The transaction is generated as follows :
+    \[ \var{tx} = \fun{mkToSpec}~(\var{ls},~\var{int_{post}}) \]
+    \item[(v)] Abstract transaction is generated as : 
+    \[ \var{tx}_A = \fun{mkAbs}~\var{tx} : \TxAbs \]
+    \item[(vi)] Intent specification check (see Section \ref{sec:dsl}) :
+    \[ \chkSpec{(\var{int_{post}},~\var{tx}_A)} = \true \]
+    \item[(vii)] Blind signatures are computed by (see Section \ref{sec:blind} for details) :
+    \[ \var{sigs} = \{~(s,~\fun{blindSign}~(h,~\var{tx}_A,~ s)) \vert s \in sk_{\mathrm{client}} \cup \fun{dom}~(\var{tx} . \fun{sigs})~\} \]
+    \item[(vii)] Signatures are computed from blind signatures (see Section \ref{sec:blind} for details) :
+    \[ \var{sigs'} = \{~(s,~\fun{mkRealSig}~(s,~h,~\var{tx}_A,~k)) ~\vert~(s, k) \in \var{sigs}~\} \]
+    \item[(viii)] Signatures are added to the transaction 
+    \[ \var{tx'} = \fun{addSigs}~(\var{tx}, \var{sigs'}) \]
+\end{itemize}
+
 \subsection{Protocol Description}
 \begin{tikzpicture}
+    \label{fig:protocol}
 	\matrix (m)[matrix of nodes, column  sep=1.5cm,row  sep=7mm, nodes={draw=none, anchor=center,text depth=0pt} ]{
-		\textbf{Light Client} & & \textbf{Service Provider}\\[-4mm]
+		\textbf{Light Client (LC)} & & \textbf{Service Provider (SP)}\\[-4mm]
 		Generate intent & & \\[-7mm]
-		$\mathsf{int_{post}} \in \mathcal{I}_\mathsf{post}$ & & \\[-7mm]
-		and predicate $P(\ )$\\
-		& Send $P(\ ),\ \mathsf{int_{post}}$ & \\
-		& & Generate transaction $\mathsf{tx}$\\[-7mm]
-		& & and abstract transaction $\mathsf{tx}_A$  \\[-7mm]
-		& Send $\mathsf{tx}_A,\ h=(\mathsf{tx})$,\\[-7mm]
-		& ZK.proof($h=(\mathsf{tx}),\  P(\mathsf{tx})=1$) & \\
-		Validate proof and \\[-7mm]
-		sign abstract transaction\\[-7mm]
-		& send $s = \mathrm{sign}(\mathsf{tx}_A, sk_{\mathrm{client}})$\\
-		& & Validate signature and \\[-7mm]
-		& & post $\mathsf{tx}$ on\\[-7mm]
-		& & chain upon success.\\
+		(i) $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$, & & \\[-7mm]
+		(ii) generate signature $\var{sig}$  & & \\[-7mm]
+		% and predicate $\fun{opt} : \TxAbs \to \B$\\
+		&  $(\var{int_{post}}, sk_{\mathrm{client}}, \var{sig})$ & \\ %\fun{opt}(\ ),\
+		& & (iii) Check signature \\[-7mm]
+		& & (iv) Generate transaction  \\[-7mm]
+		& & and (v) abstract $\var{tx}_A$  \\[-7mm]
+		& $(\var{tx}_A,\ h=\fun{txid}~\var{tx})$ & \\
+		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
+		(vi) Check intent \\[-7mm]
+		% sign abstract transaction\\[-7mm]
+		& $\var{sigs}$\\
+		& & (viii) post $\var{tx'}$ \\[-7mm]
+		& & on-chain.\\
 	};
 	
 	%\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-1.south east)--(m-1-1.south west);
 	%\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-3.south east)--(m-1-3.south west);
 	
 	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-5-2.south west)--(m-5-2.south east);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-8-2.south east)--(m-8-2.south west);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-12-2.south west)--(m-12-2.south east);
+	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-9-2.south east)--(m-9-2.south west);
+	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-11-2.south west)--(m-11-2.south east);
 \end{tikzpicture}
+
+\todobox{
+define state is abstract :
+\begin{itemize}
+    \item $\fun{blindSign} : \H \times \TxAbs \times \pubkey \to \H$
+    \item $\fun{txid} : \Tx \to \TxId$
+    \item $\fun{sign} : (\_, \pubkey) \to \H$
+    \item $\fun{mkAbs} : \Tx \to \TxAbs$
+    \item $\fun{mkRealSig} : (\pubkey \times \TxId \times \TxAbs \times \H) \to \H$
+    \item $\fun{addSigs} : (\Tx \times \Signature) \to \Tx$
+
+\end{itemize}}
+
+\textbf{Single-SP vs Multi-SP Protocols. }
+We describe a basic protocol in which a single LC queries a single SP for constructing a 
+transaction matching LC's specification, and then eventually that transaction getting posted 
+after all protocol steps are completed. We assume that all specification-meeting 
+transactions are acceptable to the LC. However, we can also formulate a version of this 
+protocol where the LC instead sends the specification to multiple SPs, selecting the best 
+response, and engaging in the rest of the protocol only with that SP.
+
+To do this, let $\fun{opt} : \TxAbs \to \Z$ be a function that rates abstract 
+transactions to express LC's preferences. For example, the total amount of primary tokens 
+spent by the transaction can be such a function :
+$\fun{opt}~\var{tx} = \fun{coinValue}~(\sum_{o \in~\var{txd}.\fun{spentOuts}} \var{o}.\val)$. 
+A transaction $\var{tx}$ is \emph{optimal} in a set $S \in \type{Set}~\TxAbs$ when 
+ 
+ \[ \fun{opt}~\var{tx} = \fun{min}~\{~\fun{opt}~\var{tx'}~\vert~\var{tx'}~\in~S~\} \]
+
+To get a multi-SP protocol, the first step of the single-SP protocol in Figure \ref{fig:protocol}
+must be augmented, so that the pair $(\fun{opt}, \var{int_{post}}$ is sent to each SP instead of just
+sending $\var{int_{post}}$. 
+Upon receiving transactions $\var{tx}_{A,i}$, with $0\leq i < k$, from each of the $k$ SPs responding 
+to LC's query, LC will engage in the rest of the protocol only with the sender of $\var{tx}_{A,i}$. 
+
+ Note that the $\fun{opt}$ function and the specification serve different purposes in the protocol. 
+ The specification is checked, and any response transaction that does not satisfy it is discarded.
+ On the other hand, it is not required that a transaction be optimal across all possible 
+ specification-satisfying transactions.  The kind of 
+ sophisticated optimization (such as what is required, e.g., for optimized order-matching) would require 
+ an entirely distinct set of tools for demonstrating the optimality result, such as ZK proofs about 
+ the full blockchain state (rather than just the associated transaction), together with evidence that 
+ the proof is about state that is \emph{sufficiently current} (see Section \ref{sec:stale-state}). 
+ For example, a proof that 
+ that there were no better offers for a specific token available on the ledger at the time the SP 
+ produced a response to the LC. We do not assume that 
+ either the SP or the LC are necessarily capable of performing or verifying (resp.) optimality according to the 
+ function LC requested be optimized, but an LC is capable to comparing transactions using $\fun{opt}$.
 
 
 \section{Analysis}
@@ -484,11 +613,12 @@ vector of attack."}
 services in exchange for a fee. This fee may be either flat, or calculated on the basis of transaction size, 
 or complexity of transaction specification, etc. - the details of this fee calculation are dependent on the 
 specifics of the implementation of our protocol, the marketplace, and SPs preferences. 
-The fee may also be specified in either an amount of primary tokens, 
+The fee may also be specified in either an amount of primary asset tokens, 
 or some other user-defined tokens. A fee requirement in user-defined tokens could be useful in the case 
 of the SP service for LCs being associated with another type of service trading in such tokens, such as a 
 videogame token marketplace. Yet another option for SPs is to request non-monetary compensation 
-for their services, such as requiring engagement with a specific smart contract, voting for a specific update, 
+for their services, such as requiring engagement with a specific smart contract (i.e. SP does DApp fee 
+sponsorship), voting for a specific update, 
 delegating stake, etc. All these actions can be performed by the very transaction that SP constructed 
 according to LC's specification. 
 

@@ -140,3 +140,19 @@ but we simplify here for clarity.)
 \caption{$\Script$ constructors and evaluation}
 \label{fig:script}
 \end{figure}
+
+\begin{figure}
+\begin{displaymath}
+\begin{array}{rlll}
+\fun{mkToSpec} &:& (\LState \times \mathcal{I}_\mathsf{post} \times \Tx) \to \Tx \\
+\fun{mkToSpec}~l~(\fun{MustMint}~v) (\var{tx}) &=&  v \leq \var{tx} . \mint \\
+\fun{mkToSpec}~l~(\fun{SpendFrom}~s) (\var{tx}) &=& \applyScript{s}(\fun{dom}~(\var{tx} . \sigs), \var{tx}.\validityInterval) \\
+\fun{mkToSpec}~l~ (\fun{MaxInterval}~i) (\var{tx}) &=& (\var{tx}.\validityInterval)_2 - (\var{tx}.\validityInterval)_1 \leq i \\
+\fun{mkToSpec}~l~ (\fun{PayTo}~(s, v)) (\var{tx}) &=& (s, v) \in \var{tx} . \outputs  \\
+\fun{mkToSpec}~l~ (\fun{MaxFee}~f)~ (\var{tx}) &=&  \var{tx} . \fun{fee} \leq f \\
+\fun{mkToSpec}~l~ (\fun{AndExps}~[a1 ; a2 ; ... ; ak]) (\var{tx}) &=& (\chkSpec{a1}~\var{tx}) \wedge (\chkSpec{a2}~\var{tx}) \wedge ... \wedge (\chkSpec{ak}~\var{tx})
+\end{array}
+\end{displaymath}
+\caption{Building transactions according to the specific intent}
+\label{fig:mktospec}
+\end{figure}
