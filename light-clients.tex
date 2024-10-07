@@ -511,7 +511,7 @@ The following computations are performed in the protocol
 \begin{itemize}
     \item[(i)] See Section \ref{sec:dsl} intents that may be generated
     \item[(ii)] Signature is generated as follows :
-    \[\var{sig} = \fun{sign}~(\var{int_{post}}, vk_{\mathrm{client}})\]
+    \[\var{sig} = \fun{sign}~(\var{int_{post}}, sk_{\mathrm{client}})\]
     \item[(iii)] The signature is checked as follows : 
     \[ \fun{checkSig} (\var{int_{post}}, sk_{\mathrm{client}}, \var{sig}) = \true \]
     \item[(iv)] The transaction is generated as follows :
@@ -537,7 +537,7 @@ The following computations are performed in the protocol
 		(i) $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$, & & \\[-7mm]
 		(ii) generate signature $\var{sig}$  & & \\[-7mm]
 		% and predicate $\fun{opt} : \TxAbs \to \B$\\
-		&  $(\var{int_{post}}, sk_{\mathrm{client}}, \var{sig})$ & \\ %\fun{opt}(\ ),\
+		&  $(\var{int_{post}}, vk_{\mathrm{client}}, \var{sig})$ & \\ %\fun{opt}(\ ),\
 		& & (iii) Check signature \\[-7mm]
 		& & (iv) Generate transaction  \\[-7mm]
 		& & and (v) abstract $\var{tx}_A$  \\[-7mm]
@@ -569,6 +569,22 @@ define state is abstract :
     \item $\fun{addSigs} : (\Tx \times \Signature) \to \Tx$
 
 \end{itemize}}
+
+
+\begin{definition}[Correctness] A transaction building protocol is \textbf{correct} if for an honest light client, and service provider and any state $\LState$ and intent $\mathcal{I}_\mathsf{post}$ such that: if $\fun{mkToSpec}(\LState, \mathcal{I}_\mathsf{post}) \neq \bot$, then the protocol completes and the transaction $\TxAbs'$ produced by the SP is such that $\fun{txLCheck}(LState, \TxAbs')=1$. \end{definition}
+
+\todobox{ Does $\fun{txLCheck}(LState, \TxAbs'$ make sense ?? }
+
+
+\begin{definition}[Safety] A transaction building protocol is \textbf{safe} if for an honest light client and any service provider SP we have that: if transaction $\TxAbs'$ is produced by the SP is such that  $\fun{txLCheck}(LState, \TxAbs')=1$  
+%against the client's key (XXX note: maybe we can ommit this)
+, then it must be that $\fun{chkSpec}(\mathcal{I}_\mathsf{post} , \TxAbs')=1$. \end{definition}
+
+\begin{definition}[Private until posted] A transaction building protocol has the  \textbf{private until posted} property if a PPT adversarial client $C_\mathcal{A}$ cannot win the following experiment with probability significantly higher than $1\over 2$.
+
+For an honest service provider SP and any client $C_\mathcal{A}$ we have that: client provides 2 states $\LState_0, \LState_1$ and one intent $\mathcal{I}_\mathsf{post}$ such that for $i=0,1$ it is $ \fun{mkToSpec}(\LState_i, \mathcal{I}_\mathsf{post}) \neq \bot$.  The experiment flips a coin $d$ and runs the protocol between SP and C* using state $\LState_d$. $C_\mathcal{A}$ outputs $d^*$. The adversarial client wins iff $d=d^*$. \end{definition}
+
+
 
 \textbf{Single-SP vs Multi-SP Protocols. }
 We describe a basic protocol in which a single LC queries a single SP for constructing a 
