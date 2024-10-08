@@ -24,6 +24,14 @@ Figure~\ref{fig:notation:nonstandard} introduces non-standard syntax we use thro
     h :: t
     & :~[C]
     & \text{list with head $h$ and tail $t$}
+    \\
+    x \cup \fun{nothing}
+    & :~A^?
+    & \text{maybe type over $A$}
+    \\
+    a ~\{ ~\fun{field} = ~x~\}
+    & :~A
+    & \text{record of type A with $\fun{field}$ changed to $x$}
   \end{align*}
   \caption{Notation}
   \label{fig:notation:nonstandard}
@@ -142,15 +150,49 @@ but we simplify here for clarity.)
 \end{figure}
 
 \begin{figure}
+      \textsc{Trivial transaction $\var{tx}_t$} 
 \begin{displaymath}
 \begin{array}{rlll}
-\fun{mkToSpec} &:& (\LState \times \mathcal{I}_\mathsf{post} \times \Tx) \to \Tx \\
-\fun{mkToSpec}~l~(\fun{MustMint}~v) (\var{tx}) &=&  v \leq \var{tx} . \mint \\
-\fun{mkToSpec}~l~(\fun{SpendFrom}~s) (\var{tx}) &=& \applyScript{s}(\fun{dom}~(\var{tx} . \sigs), \var{tx}.\validityInterval) \\
-\fun{mkToSpec}~l~ (\fun{MaxInterval}~i) (\var{tx}) &=& (\var{tx}.\validityInterval)_2 - (\var{tx}.\validityInterval)_1 \leq i \\
-\fun{mkToSpec}~l~ (\fun{PayTo}~(s, v)) (\var{tx}) &=& (s, v) \in \var{tx} . \outputs  \\
-\fun{mkToSpec}~l~ (\fun{MaxFee}~f)~ (\var{tx}) &=&  \var{tx} . \fun{fee} \leq f \\
-\fun{mkToSpec}~l~ (\fun{AndExps}~[a1 ; a2 ; ... ; ak]) (\var{tx}) &=& (\chkSpec{a1}~\var{tx}) \wedge (\chkSpec{a2}~\var{tx}) \wedge ... \wedge (\chkSpec{ak}~\var{tx})
+  \var{tx}_t  &=& \{ ~\inputs = \emptyset,\\
+  & &\ \outputs = [~],\\
+  & &\ \fun{validityInterval} = (0, 0),\\
+  & &\ \mint = 0,\\
+  & &\ \fun{fee} = 0 \\
+  & &\ \sigs = \emptyset~ \}
+\end{array}
+\end{displaymath}
+\nextdef
+\textsc{Input selection function} 
+\begin{displaymath}
+\begin{array}{rlll}
+  \fun{mkIns}  &:& (\LState \times (\type{Set} \TxIn) \times \Value \times \Script) \to (\type{Set} \TxIn) \\
+  \fun{mkIns} ~(l,~i,~v,~s) &=& \fun{if}~\neg~(v \leq 0) ~ \fun{then} \\
+  & & ~~~~ \fun{if}~(v > 0)~\fun{then}~\\
+  & & ~~~~ ~~~~\fun{mkIns}~(l~\setminus~(\{j \mapsto \_\}),~i \cup j,~v~-~(u(j) . \val) ,~s) \\
+  & & ~~~~ \fun{else}~i\\
+  & & \fun{else } \\
+  & & ~~~~\fun{nothing} \\
+  & & \fun{where}~\\
+  & & ~~~j = \fun{pickInput}~l~s \\
+  & & ~~~u = \fun{utxo}~l
+\end{array}
+\end{displaymath}
+\nextdef
+\textsc{$\fun{mkToSpec}$ definition} 
+\begin{displaymath}
+\begin{array}{rlll}
+\fun{mkToSpec} &:& (\LState \times \mathcal{I}_\mathsf{post} \times \Tx) \to \Tx^? \\
+\fun{mkToSpec}~l~(\fun{MustMint}~v) (\var{tx}) &=&  \var{tx}~\{ \mint~=~v ~+~ \var{tx} . \mint \} \\
+\fun{mkToSpec}~l~(\fun{SpendFrom}~s) (\var{tx}) &=& \var{tx}~\{ \outputs~=~ \var{tx} . \inputs~\\
+& & ~~~~\cup~\fun{mkIns}~l~(\var{tx} . \inputs)~(\fun{produced} - \fun{consumed})~ s \}  \\
+\fun{mkToSpec}~l~ (\fun{MaxInterval}~i) (\var{tx}) &=& \var{tx}~\{ \validityInterval~=~(l . \fun{slot}, l . \fun{slot}~+~i) \}  \\
+\fun{mkToSpec}~l~ (\fun{PayTo}~(s, v)) (\var{tx}) &=& \var{tx}~\{ \outputs~=~ \var{tx} . \outputs~\cup~ (s, v) \}   \\
+\fun{mkToSpec}~l~ (\fun{ChangeTo}~s) (\var{tx}) &=& \fun{if}~ \fun{consumed} - \fun{produced} ~>~0 ~\\ 
+& & ~~~~\fun{then}~ \var{tx}~\{ \outputs~=~ \var{tx} . \outputs~\\
+& & ~~~~\cup~ \{(s,~ \fun{consumed} - \fun{produced})\} \} ~\fun{else}~\fun{nothing}   \\
+\fun{mkToSpec}~l~ (\fun{MaxFee}~f)~ (\var{tx}) &=&  \fun{if}~ \var{tx} . \fun{fee} \leq f~\\ 
+& & ~~~~\fun{then}~\var{tx}~\fun{else}~\fun{nothing} \\
+\fun{mkToSpec}~l~ (\fun{AndExps}~[a1 ; a2 ; ... ; ak]) (\var{tx}) &=& \fun{mkToSpec}~l~ak~(... ~(\fun{mkToSpec}~l~a2~(\fun{mkToSpec}~l~a1~\var{tx})))
 \end{array}
 \end{displaymath}
 \caption{Building transactions according to the specific intent}

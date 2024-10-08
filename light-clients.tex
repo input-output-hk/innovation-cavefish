@@ -340,7 +340,8 @@ Figure \ref{fig:dsl}, and the transaction-building $\fun{mkToSpec}$ in Figure \r
     \fun{MustMint}           &: \Value \to \mathcal{I}_\mathsf{post}\\
     \fun{SpendFrom}         &: \Script \to \mathcal{I}_\mathsf{post}  \\
     \fun{MaxInterval}   &: \Slot \to \mathcal{I}_\mathsf{post}  \\
-    \fun{PayTo}  &: (Script \times Value)  \to \mathcal{I}_\mathsf{post}  \\
+    \fun{PayTo}  &: (\Value \times \Script)  \to \mathcal{I}_\mathsf{post}  \\
+    \fun{ChangeTo} &: \Script \to \mathcal{I}_\mathsf{post}  \\
     \fun{MaxFee} &: \N  \to \mathcal{I}_\mathsf{post} \\
     \fun{AndExps}  &: [\mathcal{I}_\mathsf{post}] \to \mathcal{I}_\mathsf{post} \\
 \end{array}
@@ -349,11 +350,12 @@ Figure \ref{fig:dsl}, and the transaction-building $\fun{mkToSpec}$ in Figure \r
 \textsc{Evaluation of $\mathcal{I}_\mathsf{post}$} 
 \begin{displaymath}
 \begin{array}{rlll}
-  \chkSpec{\_} &:& \mathcal{I}_\mathsf{post} \to \Tx \to \B \\
+  \chkSpec{\_} &:& \mathcal{I}_\mathsf{post} \to \TxAbs \to \B \\
   \chkSpec{\fun{MustMint}~v} (\var{tx}) &=&  v \leq \var{tx} . \mint \\
   \chkSpec{\fun{SpendFrom}~s} (\var{tx}) &=& \applyScript{s}(\fun{dom}~(\var{tx} . \sigs), \var{tx}.\validityInterval) \\
   \chkSpec{\fun{MaxInterval}~i} (\var{tx}) &=& (\var{tx}.\validityInterval)_2 - (\var{tx}.\validityInterval)_1 \leq i \\
   \chkSpec{\fun{PayTo}~(s, v)} (\var{tx}) &=& (s, v) \in \var{tx} . \outputs  \\
+  \chkSpec{\fun{ChangeTo}~s} (\var{tx}) &=& (s, \fun{consumed}~-~\fun{produced}) \in \var{tx} . \outputs  \\  
   \chkSpec{\fun{MaxFee}~f} (\var{tx}) &=&  \var{tx} . \fun{fee} \leq f \\
   \chkSpec{\fun{AndExps}~[a1 ; a2 ; ... ; ak]} (\var{tx}) &=& (\chkSpec{a1}~\var{tx}) \wedge (\chkSpec{a2}~\var{tx}) \wedge ... \wedge (\chkSpec{ak}~\var{tx})
 \end{array}
@@ -369,7 +371,7 @@ Let us define two examples of intents :
     \[ i_1 =  \fun{AndExps}~[ \fun{MustMint}~t ; \fun{MaxInterval}~j ; \fun{MaxFee}~f ]\] 
 
     \item[($i_2$)] Intent to pay $x$ from outputs locked by $\fun{RequireSig}~k1$ to  $\fun{RequireSig}~k2$
-    \[ i_1 =  \fun{AndExps}~[ \fun{SpendFrom}~(\fun{RequireSig}~k1) ; \fun{PayTo}~(x,~\fun{RequireSig}~k2) ]\]    
+    \[ i_1 =  \fun{AndExps}~[ \fun{SpendFrom}~(\fun{RequireSig}~k1) ; \fun{PayTo}~(\fun{RequireSig}~k2,~x) ]\]    
 \end{itemize}
 
 The resulting transactions are given in Figure \ref{fig:txs}.
@@ -513,15 +515,15 @@ The following computations are performed in the protocol
     \item[(ii)] Signature is generated as follows :
     \[\var{sig} = \fun{sign}~(\var{int_{post}}, sk_{\mathrm{client}})\]
     \item[(iii)] The signature is checked as follows : 
-    \[ \fun{checkSig} (\var{int_{post}}, sk_{\mathrm{client}}, \var{sig}) = \true \]
+    \[ \fun{checkSig} (\var{int_{post}}, vk_{\mathrm{client}}, \var{sig}) = \true \]
     \item[(iv)] The transaction is generated as follows :
-    \[ \var{tx} = \fun{mkToSpec}~(\var{ls},~\var{int_{post}}) \]
+    \[ \var{tx} = \fun{mkToSpec}~(\var{ls},~\var{int_{post}},~\var{tx}_t) \]
     \item[(v)] Abstract transaction is generated as : 
-    \[ \var{tx}_A = \fun{mkAbs}~\var{tx} : \TxAbs \]
+    \[ \var{tx}_A = \fun{mkAbs}~\var{tx}  \]
     \item[(vi)] Intent specification check (see Section \ref{sec:dsl}) :
-    \[ \chkSpec{(\var{int_{post}},~\var{tx}_A)} = \true \]
-    \item[(vii)] Blind signatures are computed by (see Section \ref{sec:blind} for details) :
-    \[ \var{sigs} = \{~(s,~\fun{blindSign}~(h,~\var{tx}_A,~ s)) \vert s \in sk_{\mathrm{client}} \cup \fun{dom}~(\var{tx} . \fun{sigs})~\} \]
+    \[ \chkSpec{(\var{int_{post}})}(\var{tx}_A )= \true \]
+    \item[(vii)] Blind signatures are computed by (see Section \ref{sec:blind} for details), with $\var{vks} = \fun{getVKs}~\fun{dom}~(\var{tx} . \fun{sigs})$ :
+    \[ \var{sigs} = \{~(s,~\fun{blindSign}~(h,~\var{tx}_A,~ s)) \vert s \in vk_{\mathrm{client}} \cup ~\var{vks}~\} \]
     \item[(vii)] Signatures are computed from blind signatures (see Section \ref{sec:blind} for details) :
     \[ \var{sigs'} = \{~(s,~\fun{mkRealSig}~(s,~h,~\var{tx}_A,~k)) ~\vert~(s, k) \in \var{sigs}~\} \]
     \item[(viii)] Signatures are added to the transaction 
@@ -561,9 +563,10 @@ The following computations are performed in the protocol
 \todobox{
 define state is abstract :
 \begin{itemize}
+    \item $\TxAbs$
     \item $\fun{blindSign} : \H \times \TxAbs \times \pubkey \to \H$
     \item $\fun{txid} : \Tx \to \TxId$
-    \item $\fun{sign} : (\_, \pubkey) \to \H$
+    \item $\fun{sign} : (\H, \pubkey) \to \H$
     \item $\fun{mkAbs} : \Tx \to \TxAbs$
     \item $\fun{mkRealSig} : (\pubkey \times \TxId \times \TxAbs \times \H) \to \H$
     \item $\fun{addSigs} : (\Tx \times \Signature) \to \Tx$
