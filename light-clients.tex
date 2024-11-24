@@ -266,6 +266,28 @@ which are due to not posting every single transaction, are unlikely to be access
 we target with our low-commitment design. For these reasons, it does not make sense to limit themselves 
 to a specific payment channel. 
 
+Similarly, our design should be general enough to support any transaction or on-chain operation, irregardless of its monetary value or physical size.
+One potential problem in payment channels is liquidity. If one of the parties does not have sufficient liquidity in the channel, payments might fail or need to be routed through multiple channels\footnote{Payment networks attempt to address this issue by using multi-path payments, where the original payment is split into smaller parts, each routed through different channels, allowing for greater liquidity}, adding complexity and risk.
+Our construction does not suffer from those shortcommings while at the same time provinding the same level of atomicity expected from payment channels, i.e., payments are either fully successful or completely fail.
+
+Some existing proposals\cite{todo} suggest to augment payment channels with the ability to process any off-chain interaction, not just payments. Often those constructions are called state channels. Off-chain interactions that go beyond transaction do however entail increased complexity. The base/main chain needs to offer smart contract support. Hash Time-Locked contracts (as used in the Lightning Network) are not sufficient for complex off-chain interactions.
+
+Availability/Being online: Payment channels (and certain payment networks) require that the participants are ``always'' online and observe the main chain for updates (e.g., an updated smart contract).
+A possibly remedy for this inconvenience are watchers. They make sure that channels are fair by monitoring the state of the payment channels. They check if either participant tries to broadcast an invalid transaction--- such as an old state---in order to claim more funds than they are entitled to. If a participant tries to cheat, the watcher can detect this and, trigger a penalty transaction that punishes the dishonest participant by forfeiting their funds.
+Being always online is not mandatory for the user in our light client protocol. The user might observe the chain to verify if their transaction has been included and the funds have been transferred, however, not being online can never result in a scenario where a party wrongfully claims funds and active intervention on the user's part is required to prevent this.
+
+
+\todobox{
+some payment networks in the wild:\\
+Lightning network (Bitcoin)
+Raiden Network for Ethereum, which also utilizes payment channels for faster payments, or Liquid Network (a sidechain to Bitcoin)
+Celer Network?
+Stellar network?
+RippleNet?
+Celo network?
+}
+
+
 \textbf{API and Explorer Services}. 
 Many realistic UTxO ledger implementations (e.g. Ergo \footnote{\url{https://ergoplatform.org/}}, 
 Cardano \footnote{\url{https://cardano.org/}}, and BitCoin \footnote{\url{https://bitcoin.org/}}) are set up 
