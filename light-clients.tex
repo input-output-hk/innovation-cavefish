@@ -29,6 +29,13 @@
 \newcommand{\fun}[1]{\ensuremath{\mathsf{#1}}}
 \newcommand{\type}[1]{\ensuremath{\mathsf{#1}}}
 \renewcommand\H{\mathbb{H}}
+\newcommand\A{\ensuremath{\mathcal{A}}}
+
+\newcommand\BLD{\ensuremath{\mathsf{BLD}}}
+\newcommand\WBPS{\ensuremath{\mathsf{WBPS}}}
+\newcommand\WBPSP{\ensuremath{\mathsf{WBPS}[P]}}
+
+
 \newcommand{\Interval}[1]{\type{Interval}[#1]}
 \newcommand{\nextdef}{\ensuremath{\\[1em]}}
 \newcommand{\where}{\ensuremath{~ ~ \mathbf{where}~ ~ }}
@@ -696,9 +703,107 @@ to LC's query, LC will engage in the rest of the protocol only with the sender o
 
  
 
+\subsection{Weakly Blinded Predicate Signatures }
+
+We adapt the definitions of [XXX] to account for the weak variant of blindness.
+
+A WBPS scheme is parameterized by a family of polynomial-time-computable predicates,
+which are implemented by a p.t. algorithm $P$, the predicate compiler: on input a predicate
+description $prd \in {0, 1}$ and a message $m \in {0, 1}$, $P$ returns 1 or 0 indicating whether $m$
+satisfies $prd$.
+
+ A WBPS scheme WBPS$_[P]$ for $P$ is defined by the following algorithms. We focus on
+schemes with 2-round (i.e., 4-message) signing protocols for concreteness.
+
+\begin{itemize}
+\item $Setup(1^\lambda) \to par$: the setup algorithm, on input the security parameter, outputs public
+parameters $par$, which define a message space $\mathcal{M}_{par}$.
+\item $KeyGen(par) \to (sk, vk)$: the key generation algorithm, on input the parameters $par$, outputs
+a signing/verification key pair $(sk, vk)$, which implicitly contain $par$, i.e., $vk = (par, vk')$.
+–\item $\langle Sign(sk, prd),User(vk, prd, m) \rangle \to (b, \sigma)$: an interactive protocol with shared input $par$
+(implicit in $sk$ and $vk$) and a predicate $prd$ is run between the signer and user. The signer
+takes a secret key $sk$ as private input, the user’s private input is a verification key $vk$ and
+a message $m$. The signer outputs $b = 1$ if the interaction completes successfully and $b = 0$
+otherwise, while the user outputs a signature $\sigma$ if it terminates correctly, and $\bot$ otherwise.
+\item $Ver(vk, m, \sigma) \to 0/1$: the (deterministic) verification algorithm, on input a verification key
+$vk$, a message $m$ and a signature $\sigma$, outputs 1 if $\sigma$ is valid on $m$ under  $vk$ and 0 otherwise.
+\end{itemize}
+
+For a 2-round protocol the interaction $\langle Sign(sk, prd),User(vk, prd, m) \rangle \to (b, \sigma)$ can be realized by the following algorithms:
+\begin{align*}
+(txt_{U,0},st_{U,0}) \gets& User_0(vk, prd, m)\\
+(txt_{S,1},st_{S}) \gets& Sign_1(sk, prd, txt_{U,0}) \\
+(txt_{U,1},st_{U,1}) \gets& User_1(st_{U,0}, txt_{S,1})\\
+(txt_{S,2}, b) \gets& Sign_2(st_S, txt_{U,1}) \\
+\sigma \gets& User_2(st_{U,1}, txt_{S,2})
+\end{align*}
+We write $(b, \sigma) \gets  \langle Sign(sk, prd),User(vk, prd, m) \rangle$  as shorthand for the above sequence.
 
 
 
+\begin{definition}. A WBPS scheme $\WBPSP$ satisfies weak blindness if for all
+adversaries $\A$:
+
+$$Adv^{\mathsf{BLD}}_{\WBPSP,\mathcal{A}}(\lambda) := \Pr[   
+\BLD^{\A,1}_{\WBPSP}(\lambda) - \BLD^{\A,0}_{\WBPSP}(\lambda)]
+$$
+
+is negligible in $\lambda$.
+\end{definition}
+
+\begin{figure}[ht]
+    \fbox{
+ 
+ \begin{minipage}[t]{0.55\linewidth}
+$\BLD^{\A,b}_{\WBPSP}(\lambda)$
+\hrule
+
+$par \gets Setup(1^\lambda) $\\
+$(m_0,m_1,prd,vk',st) \gets \A_1(par)$\\
+\textbf{if} $P(prd,m_0) = 0$ \textbf{or} $P(prd,m_1) = 0$ 
+\textbf{then} \quad \textbf{return} 0\\
+$m \gets m_b$\\
+$vk \gets (par,vk')$
+$sess\gets \mathsf{init}$\\
+$b^*\gets\A_2^{\mathsf{ChalUser}}(st)$
+\end{minipage}%
+\hspace{0.5cm}%
+\begin{minipage}[t]{0.55\linewidth}
+$\mathsf{ChalUser}(txt=\emptyset)$
+\hrule
+
+
+
+
+
+\textbf{if} $sess=\mathsf{await}$\\
+\null\quad $sess\gets\mathsf{closed}$\\
+\null\quad $\sigma \gets User_2(st, txt)$
+
+
+
+\textbf{if} $sess=\mathsf{closed}$\\
+\null\quad $txt' \gets Ver(vk, m, \sigma)$
+
+\textbf{if} $sess=\mathsf{open}$\\
+\null\quad $sess\gets\mathsf{await}$\\
+\null\quad $(txt',st) \gets User_1(st, txt)$
+
+
+\textbf{if} $sess=\mathsf{init}$\\
+$\null\quad sess\gets\mathsf{open}$\\
+$\null\quad (txt',st) \gets User_0(vk, prd, m)$
+
+
+
+
+
+\textbf{return} $txt'$
+
+\end{minipage}
+}
+    \caption{Weak Blindness}    
+\end{figure}
 
 \section{Analysis}
 
