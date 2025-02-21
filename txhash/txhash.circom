@@ -41,7 +41,7 @@ template hashTx
     }
 
     component ht = Blake2b_bytes(ll) ; 
-    //ht.inp_bytes <== preimTx ;
+    ht.inp_bytes <== preimTx ;
      
     for(var i=0; i<32; i++) {
       hashedTx[i] <== ht.hash_bytes[i] ;
