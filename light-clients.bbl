@@ -30,6 +30,11 @@ Chaum, D., Pedersen, T.P.: Wallet databases with observers. In: Brickell, E.F. (
 \bibitem{blindsigs}
 Fuchsbauer, G., Wolf, M.: Concurrently secure blind schnorr signatures. In: Joye, M., Leander, G. (eds.) Advances in Cryptology -- EUROCRYPT 2024. pp. 124--160. Springer Nature Switzerland, Cham (2024)
 
+\bibitem{cryptoeprint:2017/823}
+Khalil, R., Gervais, A.: Revive: Rebalancing off-blockchain payment networks.
+  Cryptology {ePrint} Archive, Paper 2017/823 (2017),
+  \url{https://eprint.iacr.org/2017/823}
+
 \bibitem{superlight}
 Lu, Y., Tang, Q., Wang, G.: Generic superlight client for permissionless blockchains. Cryptology {ePrint} Archive, Paper 2020/844 (2020), \url{https://eprint.iacr.org/2020/844}
 

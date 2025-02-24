@@ -319,10 +319,10 @@ Compare our approach  with :
 \begin{itemize}
     \item "Free" websites monitoring the chain -- mention they lack long-term sustainability. mention big APIs. blockfrost, etc.
     \item Bridges (trustless and trusted). only overview. maybe SOK paper. and describe how LC and bridge are related.
-    \item Payment channels 
+    \item Payment channels (require upfront capital) + Payment networks~\cite{cryptoeprint:2017/823}
     \item LCs that operate on single-prover model (eg. with an established relationship via deposit)
     \item LCs that operate on multi-prover model
-
+	%\item Time lock micro payment channel~\cite{{10.1007/978-3-319-21741-3_1}
 \end{itemize}}
 \subsection{Technical Background}
 UTxO model
@@ -865,6 +865,22 @@ for their services, such as requiring engagement with a specific smart contract 
 sponsorship), voting for a specific update, 
 delegating stake, etc. All these actions can be performed by the very transaction that SP constructed 
 according to LC's specification. 
+
+
+\section{Implementation}
+To assess the efficiency of our construction we implement and benchmark the NArg component. Given today's implementations of zk-SNARKs, running NArg is expected to be the most time and resource intensive part of our assisted TX creation protocol.
+
+We base our tests on the trusted-setup zk-SNARK system \emph{Groth16}~\cite{cryptoeprint:2016/260} implemented by \emph{Iden3}~\cite{circom}.
+The circuits we constructed are inspired by the implementation of~\cite{blindsigs}
+We make them available in the domain-specific language of Circom.
+
+The NArg we instanciate captures proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1$ $\land \var{Com}(\var{tx};\rho)$ from the protocol in Section~\ref{}.
+
+\begin{equation}
+ \mathrm{R}_{\mathrm{WBPS}}((q, \mathbb{G}, G, \mathsf{H}),\ (X, R, c, \fun{chkSpec}(\var{int_{post}}, \cdot )),\ m)
+\end{equation}
+
+
 
 
 \section{Conclusion}
