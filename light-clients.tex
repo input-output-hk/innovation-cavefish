@@ -816,9 +816,9 @@ $\null\quad (txt',st_u) \gets User_0(vk, prd, m)$
     \label{fig:protocol-short}
 	\matrix (m)[matrix of nodes, column  sep=1.5cm,row  sep=7mm, nodes={draw=none, anchor=center,text depth=0pt} ]{
 		\textbf{Signer (LC)} & & \textbf{User (SP)}\\[-4mm]
-		& & Generate transaction $\var{tx}$ \\[-7mm]
+		& & Generate transaction $\var{tx}$, {\color{blue}note $\var{nt}$,} \\[-7mm]
 		& &  \\[-7mm]
-		&& with abstract $\var{tx}_A$ = $\var{Com}(\var{tx};\rho)$ \\[-7mm]
+		&& with abstract $\var{tx}_A$ = $\var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)$ \\[-7mm]
 		\phantom{x}& $\var{tx}_A$ & \\[-7mm]
 		%\ h=\fun{txid}~\var{tx}
 		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
@@ -826,8 +826,8 @@ $\null\quad (txt',st_u) \gets User_0(vk, prd, m)$
 			Sig. Commitment $\var{R}=g^r$ \\[-7mm]
 		% sign abstract transaction\\[-7mm]
 		& $\var{R}$\\[-7mm]
-		& & Produce challenge $c=H(R,X,\var{tx})$, and  \\[-7mm]
-		& & proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1$ $\land \var{Com}(\var{tx};\rho)$ \\[-7mm]
+		& & Produce challenge $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$, and  \\[-7mm]
+		& & proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1$ $\land \var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)$ \\[-7mm]
 		& $(c,\pi)$ & \\[-7mm]
 		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
 		 Check proof $\pi$ \\[-7mm]
@@ -836,7 +836,7 @@ $\null\quad (txt',st_u) \gets User_0(vk, prd, m)$
 		& $\var{bsig}$\\[-7mm]	
 		& & Produce signature $\sigma$\\[-7mm]
 		& & from s, where $\sigma = (R,s)$.\\[-7mm]
-		& & Post $(\var{tx},\sigma)$ on-chain.\\
+		& & Post $(\var{tx}{\color{blue}||\var{nt}},\sigma)$ on-chain.\\
 	};
 	
 	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-1.south east)--(m-1-1.south west);
