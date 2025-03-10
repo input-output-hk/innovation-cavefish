@@ -764,7 +764,8 @@ $par \gets Setup(1^\lambda) $\\
 $(m_0,m_1,prd,vk',st_\A) \gets \A_1(par)$\\
 \textbf{if} $P(prd,m_0) = 0$ \textbf{or} $P(prd,m_1) = 0$ 
 \textbf{then} \quad \textbf{return} 0\\
-$m \gets m_b$\\
+{\color{red}{$m_r \gets \{0,1\}^\lambda $}}\\
+$m \gets m_b{\color{red}||m_r}$\\
 $vk \gets (par,vk')$
 $sess\gets \mathsf{init}$\\
 $b^*\gets\A_2^{\mathsf{ChalUser}}(st_\A)$\\
