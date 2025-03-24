@@ -809,6 +809,50 @@ $\null\quad (txt',st_u) \gets User_0(vk, prd, m)$
     \caption{Weak Blindness}    
 \end{figure}
 
+\begin{figure}[ht]
+    \fbox{
+ 
+ \begin{minipage}[t]{0.55\linewidth}
+$\textsf{CMA}^{\A,b}_{\WBPSP}(\lambda)$
+\hrule
+
+$par \gets Setup(1^\lambda) $\\
+$ (sk, vk) \gets KeyGen(par) $\\
+$Q \gets 0$\\
+$S \gets 0$\\
+$P \gets 0$\\
+$(\vec{m},{\vec\sigma}) \gets \A^{OSig_1,OSig_2}(vk)$\\
+\textbf{if} $|m| > Q_m$ 
+\textbf{then} \quad \textbf{return} 0\\
+$ \textbf{return} \quad \prod_i Ver(vk,m_i^*,\sigma_i^*) $
+\end{minipage}%
+\hspace{0.5cm}%
+\begin{minipage}[t]{0.55\linewidth}
+$\mathsf{OSig_1}(prd, txt_{U,0})$
+\hrule
+
+%$(txt_{U,0},st_{U,0}) \gets User_0(vk, prd, m)$\\
+$S\gets S+1; P\gets P+1$\\
+$(txt,st_{S}) \gets Sign_1(sk, prd, txt_{U,0})$ \\
+\textbf{return} $txt$\\
+
+$\mathsf{OSig_2}(s,txt_{U,1})$ 
+\hrule 
+
+
+\textbf{If } $s>S$ \textbf{or} $st_s=\bot$ \textbf{ then } \textbf { return } $\bot$\\
+%$(txt_{U,1},st_{U,1}) \gets User_1(st_{U,0}, txt_{S,1})$ \\
+$(txt, d) \gets Sign_2(st_s, txt_{U,1})$ \\
+\textbf{If } $d=1$ \textbf{ then } $Q\gets Q+1$\\
+$P \gets P-1$\\
+$st_s \gets \bot$\\
+\textbf{return} $txt$
+
+\end{minipage}
+}
+    \caption{Chosen Message Unforgeability Experiment}    
+\end{figure}
+
 \subsection{Our WBPS scheme}
 
 \subsection{Protocol Description}
