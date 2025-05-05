@@ -948,7 +948,7 @@ We estimate the arithmetic complexity of the relation in~\ref{narg} in terms of 
 We note that message being signed in our relation is the hash of the transaction $\mathsf{H}(tx)$.
 Thus the witness--strictly speaking--only contains the transaction $tx$, but we list $\mathsf{H}(tx)$, for completeness as the message being signed is $m \equiv \mathsf{H}(tx)$.
 
-\todobox{Incorporate $\rho$. If we add enough entropy using the meta/text field then we don't necessarily need $\rho$?}
+\todobox{Incorporate $\rho$. If we add enough entropy using the meta/text field then we don't necessarily need $\rho$? Looks like we do need $\rho$ to be consistent with proof. Overhead of encryption is minimal too.}
 
 The parameters $(q, \mathbb{G}, G, \mathsf{H})$ can be interpreted as the global parameters for the Schnorr signature scheme used.
 We assume that our WBPS scheme is meant to extend an existing Schnorr signature scheme, in which case $(q, \mathbb{G}, G, \mathsf{H})$ are predefined, or, the parameters can be chosen to fit the underlying NIZK/SNARK system.
@@ -956,6 +956,17 @@ We assume that our WBPS scheme is meant to extend an existing Schnorr signature 
 We use BN254 as the curve for \emph{Groth16} to rely on. The relation is instantiated over an arithmetic circuit with modulus of 254 bits, i.e., the order of the group given by  BN254 has 254 bits.
 
 We encode the message that is to be signed in the Baby JubJub field spanned by
+
+
+We test and benchmark (1) partially blind and (2) predicate blind signatures for both, Bitcoin and Cardano.
+
+Partial blindness can be interpreted as a predicate and hence our scheme allows to combine partial blindness and other predicates.
+
+As the Narg can prove a combination of preciates our scheme is expressive in the sense that complex templates and abstract transaction can be defined.
+
+The most obvious choice is to blind/redact the UTxO references serving as the inputs to the transaction preventing a light client from constructing the transaction on its own, without the inclusion of the output that represents the tip/reimbursement to the service provider. If the light client posts the modified transaction on chain and thereby circumvents the service provider, no tip is due and the light client is able to obtain information that constitutes a valid transaction for free.
+
+\todobox{add results and benchmarks}
 
 \section{Conclusion}
 

@@ -1,4 +1,4 @@
-pragma circom  2.0.0;
+pragma circom  2.1.2;
 
 include "blake2b.circom";
 
@@ -26,7 +26,7 @@ template hashTx
     numMintAssets , 
     numSignatures ,
 
-    // lengths of fields in bytes
+    // lengths of fields in bits
     inputBitLen ,
     outputBitLen ,
     validityIntervalBitLen ,
@@ -46,7 +46,14 @@ template hashTx
     signal input sigs[numSignatures] ;
 
     // total number of bits/bytes in encoded transaction
-    var totLenghtBits = numInputs * inputBitLen + numOutputs * outputBitLen + validityIntervalBitLen * 2 + numMintAssets * (assetIdBitLen + quantityBitLen) + quantityBitLen + auxDataBitLen + (keyLen + signatureLen) * numSignatures ;
+    var totLenghtBits = numInputs * inputBitLen + 
+                        numOutputs * outputBitLen + 
+                        validityIntervalBitLen * 2 + 
+                        numMintAssets * (assetIdBitLen + quantityBitLen) + 
+                        quantityBitLen + 
+                        auxDataBitLen + 
+                        (keyLen + signatureLen) * numSignatures ;
+
     var totLengthBytes = totLenghtBits\8;
 
     var j = 0;
@@ -153,5 +160,21 @@ template hashTx
 }
 
 
-component main {public [inputs, outputs, validityInterval, mint, fee, auxData, sigs]} = hashTx (3, 3, 2, 2, 100, 100, 100, 100, 100, 100, 100, 100);
+component main {public [inputs, outputs, validityInterval, mint, fee, auxData, sigs]} = hashTx (3, 3, 0, 2, 256, 256, 100, 100, 100, 100, 100, 256);
+/*
+    // how may of each component of a Tx
+    numInputs ,
+    numOutputs ,
+    numMintAssets , 
+    numSignatures ,
 
+    // lengths of fields in bits
+    inputBitLen ,
+    outputBitLen ,
+    validityIntervalBitLen ,
+    assetIdBitLen ,
+    quantityBitLen ,
+    auxDataBitLen ,
+    keyLen ,
+    signatureLen 
+*/    

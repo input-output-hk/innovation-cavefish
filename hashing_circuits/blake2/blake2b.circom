@@ -3,7 +3,6 @@ pragma circom 2.0.0;
 include "blake2_common.circom";
 
 //------------------------------------------------------------------------------
-// https://github.com/bkomuves/hash-circuits/blob/master/circuits/blake2/blake2b.circom
 
 template IV() {
   signal output out[8];
@@ -148,7 +147,7 @@ template SingleRound(round_idx) {
   signal output out[16];
 
   var s[16];
-  s = SigmaBlake(round_idx);
+  s = Sigma(round_idx);
 
   component GS[8];
 
@@ -303,3 +302,4 @@ template Blake2b_bytes(ll) {
 }
 
 //------------------------------------------------------------------------------
+

@@ -1,11 +1,9 @@
 
-
 pragma circom 2.0.0;
 
 //------------------------------------------------------------------------------
-// https://github.com/bkomuves/hash-circuits/blob/master/circuits/blake2/blake2_common.circom
 
-function SigmaBlake(i0) {
+function Sigma(i0) {
 
   var out[16];
 

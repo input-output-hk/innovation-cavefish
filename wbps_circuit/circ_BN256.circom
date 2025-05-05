@@ -8,16 +8,16 @@ include "../circomlib/circuits/comparators.circom";
 include "../circomlib/circuits/multiplexer.circom";
 //include "../circomlib/circuits/babyjub.circom";
 include "../circomlib/circuits/escalarmulany.circom";
-include "../secp256k1_non_native_modP/bigint.circom";
-include "../secp256k1_non_native_modP/secp256k1.circom";
-include "../secp256k1_non_native_modP/bigint_func.circom";
-include "../secp256k1_non_native_modP/ecdsa_func.circom";
-include "../secp256k1_non_native_modP/ecdsa.circom";
-include "../secp256k1_non_native_modP/secp256k1_func.circom";
-include "../secp256k1_non_native_modP/secp256k1_utils.circom";
+//include "../secp256k1_non_native_modP/bigint.circom";
+//include "../secp256k1_non_native_modP/secp256k1.circom";
+//include "../secp256k1_non_native_modP/bigint_func.circom";
+//include "../secp256k1_non_native_modP/ecdsa_func.circom";
+//include "../secp256k1_non_native_modP/ecdsa.circom";
+//include "../secp256k1_non_native_modP/secp256k1_func.circom";
+//include "../secp256k1_non_native_modP/secp256k1_utils.circom";
 include "../circomlib/circuits/sha256/sha256.circom";
 
-include "blake2b.circom";
+include "../txhash/blake2b.circom";
 
 
 template SplitIntoChunks(n) {
@@ -244,4 +244,4 @@ template Main(n,k) {
 
 
 //component main {public [X,R,cc,pred,Cmsg,C0]}= Main(64,4);
-component main {public [X,R,cc,pred]}= Main(64,4);
+component main {public [X,R,cc,pred,Cmsg]}= Main(64,4);
