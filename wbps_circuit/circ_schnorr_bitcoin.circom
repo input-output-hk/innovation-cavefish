@@ -6,44 +6,19 @@ pragma circom 2.1.2;
 include "../circomlib/circuits/poseidon.circom";
 include "../circomlib/circuits/comparators.circom";
 include "../circomlib/circuits/multiplexer.circom";
-//include "../circomlib/circuits/babyjub.circom";
+include "../circomlib/circuits/babyjub.circom";
 include "../circomlib/circuits/escalarmulany.circom";
-//include "../secp256k1_non_native_modP/bigint.circom";
-//include "../secp256k1_non_native_modP/secp256k1.circom";
-//include "../secp256k1_non_native_modP/bigint_func.circom";
-//include "../secp256k1_non_native_modP/ecdsa_func.circom";
-//include "../secp256k1_non_native_modP/ecdsa.circom";
-//include "../secp256k1_non_native_modP/secp256k1_func.circom";
-//include "../secp256k1_non_native_modP/secp256k1_utils.circom";
 include "../circomlib/circuits/sha256/sha256.circom";
-
-include "../txhash/blake2b.circom";
-
-
-template SplitIntoChunks(n) {
-    signal input in;
-    signal output out[4];
-
-    out[0] <-- in % (1 << n);
-    var a = (in \ (1 << n)) ;
-    out[1] <-- a % (1 << n);
-    a = (a \ (1 << n)) ;
-    out[2] <-- a  % (1 << n);
-    a = (a \ (1 << n)) ;
-    out[3] <--  a  % (1 << n);
-
-    in === out[0] + out[1]* (1 << n) + out[2]* (1 << (n*2)) +   out[3]* (1 << (n*3)) ;
-}
 
 
 template Main(n,k) {
-    signal input X[2][k];   //public  (public key)
-    signal input R[2][k];   //public  (commitment R = rG provided by signer)
-    signal input cc[k];     //public   H(R,X,m)
-    signal input Cmsg;      //public
+    signal input X[2][k];
+    signal input R[2][k];
+    signal input cc[k];
+    signal input Cmsg;
     signal input ek[2];
-    signal input C0[2];     //public  consistency check for rho
-    signal input pred;      //public predicate
+    signal input C0[2]; 
+    signal input pred;
     signal input msgToSign;
     signal input witness[8];
     signal input rho;
@@ -89,8 +64,6 @@ template Main(n,k) {
     log("comparing value < pred:");
     log(leq.out);
     1 === leq.out;
-
-
     //ElGamal Enc
     // h^rho1 * msg == c1
     component n2b_rho1= Num2Bits(251);  //a field element has 254 bit, but we only care about the 251 first bits. Revisit this point and rethink
@@ -114,7 +87,6 @@ template Main(n,k) {
     C0[1] ===  g_pow_rho.out[1];
 
     
-
     //hash alpha and beta group elements to obtain uniform blinding factors
     component pEx = PoseidonEx(2, 3);
     pEx.initialState <== 0;  //Why setting it to 0.. need to read the paper
@@ -133,47 +105,6 @@ template Main(n,k) {
  
     Cmsg === msgToSign+pEx.out[2]; 
 
-    /*
-    component splitteralpha = SplitIntoChunks(64);
-    splitteralpha.in <== pEx.out[0];
-    component splitterbeta = SplitIntoChunks(64);
-    splitterbeta.in <== pEx.out[1];
-
-    //compute alpha *G 
-    component g_mult = ECDSAPrivToPub(n, k);
-    for (var idx = 0; idx < k; idx++) {
-        g_mult.privkey[idx] <== splitteralpha.out[idx];
-    }
-    // compute beta * X
-    component pubkey_mult = Secp256k1ScalarMult(n, k);
-    for (var idx = 0; idx < k; idx++) {
-        pubkey_mult.scalar[idx] <== splitterbeta.out[idx];
-        pubkey_mult.point[0][idx] <== X[0][idx];
-        pubkey_mult.point[1][idx] <== X[1][idx];
-    }
-    */
-
-    // compute S = alpha* G + beta * X
-    //Should we check that the points are unequal??
-    /*
-    component sum_res = Secp256k1AddUnequal(n, k);
-    for (var idx = 0; idx < k; idx++) {
-        sum_res.a[0][idx] <== g_mult.pubkey[0][idx];
-        sum_res.a[1][idx] <== g_mult.pubkey[1][idx];
-        sum_res.b[0][idx] <== pubkey_mult.out[0][idx];
-        sum_res.b[1][idx] <== pubkey_mult.out[1][idx];
-    }
-
-      // compute R' = S + R
-    component sum_res2 = Secp256k1AddUnequal(n, k);
-    for (var idx = 0; idx < k; idx++) {
-        sum_res2.a[0][idx] <== sum_res.out[0][idx];
-        sum_res2.a[1][idx] <== sum_res.out[1][idx];
-        sum_res2.b[0][idx] <== R[0][idx];
-        sum_res2.b[1][idx] <== R[1][idx];
-    }
-    */
-
 
     //prepare to create the Schnorr challenge c = H(R,X,m) using SHA256
     component hash = Sha256(bitLength*3);
@@ -183,7 +114,6 @@ template Main(n,k) {
     for (var idx = 0; idx < k; idx++) {
         R_x_bits[idx] = Num2Bits(n);    
         R[0][idx] ==> R_x_bits[idx].in;
-        //sum_res.out[0][idx] ==> R_x_bits[idx].in;
         for (var i=0; i<n; i++) {
             R_x_bits[idx].out[i] ==> hash.in[i+n*idx];
         }
@@ -204,7 +134,6 @@ template Main(n,k) {
     for  (var i=0; i<bitLength; i++) {
         msgbits.out[i] ==> hash.in[(bitLength*2)+i];
     }
-
  
     //split the hash output into 4x64 bit chuncks
     component fin[k];
@@ -215,33 +144,11 @@ template Main(n,k) {
         }
     }
     
-    /*
-        //NOTE that we mod the order, not the prime!
-    var q[100] = get_secp256k1_order(n, k);
-    //perform addition mod q
-    //TODO mod reduce.. 
-    component big_add = BigAddModP(n, k);
-    for (var i = 0; i < k; i++) {
-        big_add.a[i] <== fin[i].out;
-        big_add.b[i] <== splitterbeta.out[i];
-        big_add.p[i] <== q[i];
-    } 
-    */ 
-
-
-    //assert that statment cc ==  H(R,X,m) + beta mod p
-    //log(big_add.out[0]);
-    //log(big_add.out[1]);
-    //log(big_add.out[2]);
-    //log(big_add.out[3]);
     for (var idx = 0; idx < k; idx++) {        
-        //cc[idx] === big_add.out[idx];
         cc[idx] === fin[idx].out;
     }       
-
 }
 
 
 
-//component main {public [X,R,cc,pred,Cmsg,C0]}= Main(64,4);
-component main {public [X,R,cc,pred,Cmsg]}= Main(64,4);
+component main {public [X,R,cc,pred,Cmsg,C0]}= Main(64,4);
