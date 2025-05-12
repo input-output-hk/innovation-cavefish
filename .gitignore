@@ -7,3 +7,8 @@ light-clients.fls
 light-clients.fdb_latexmk
 light-clients.bbl
 light-clients.blg
+/circomlib
+/secp256k1
+/secp256k1_non_native_modP
+/wbps_circuit/circ_eddsa_cardano_js
+*.ptau
