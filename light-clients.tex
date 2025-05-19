@@ -313,6 +313,11 @@ consists of a one-time, no-setup atomic exchange of assets for services. Since t
 only once a transaction is successfully applied, all data for which payment they receive payment 
 is not just mostly reliable (as for existing services), but provably correct.  
 
+\subsection{Hierarchical Deterministic wallets and address discovery}
+UTXO based blockchains, including Bitcoin and Cardano use the concept of Hierarchical Deterministic (HD) wallets \cite{bip32} where child addresses can be created in a deterministic way using a public key of a keypair $sk,pk$, and some short auxiliary data (the chain code). Given a public key $pk$, chain code $c$ and requested index $i$ for a child key, a hash function is used to produce a scalar $s_i$ enablind the derivation of the child key as $sk_i=sk+s_i$. It is also possible to use $s_i$ without knowing $sk$ to directly derive the corresponding public key $pk_i=pk\cdot g^{s_i}$. The same method is used to produce a child chain code $c_i$, so that multiple generations of keys are possible.
+
+In our application, we can assume that a wallet can give the SPO a single public key and chain code, letting the SPO do address derivation and lookup on their side, using some agreed-upon bounds, or heuristics on the index depth. This keeps the communication cost from the light client to the SPO constant.
+
 
 \todobox{
 Compare our approach  with :
