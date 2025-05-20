@@ -1,4 +1,11 @@
-
+lc_main.synctex.gz
+lc_main.pdf
+lc_main.log
+lc_main.aux
+lc_main.fls
+lc_main.fdb_latexmk
+lc_main.bbl
+lc_main.blg
 light-clients.synctex.gz
 light-clients.pdf
 light-clients.log
@@ -12,3 +19,5 @@ light-clients.blg
 /secp256k1_non_native_modP
 /wbps_circuit/circ_eddsa_cardano_js
 *.ptau
+*.log
+*.bbl
