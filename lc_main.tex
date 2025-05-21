@@ -17,17 +17,18 @@
 
 
 \usepackage{stmaryrd}
-\usepackage{amsmath}
+%\usepackage{amsmath}
 \usepackage{tikz}
 \usetikzlibrary{matrix,shapes,arrows,positioning,chains,calc,fit}
 \usepackage{xcolor}
+\usepackage{booktabs}
 
 
 %\graphicspath{{./graphics/}}%helpful if your graphic files are in another directory
 
 \bibliographystyle{plainurl}% the mandatory bibstyle
 
-\title{Communication-Optimal Light Client for UTxO Ledgers in the Rational Model}
+\title{Communication-Optimal Light Client Protocol for UTxO Ledgers in the Rational Model}
 
 %\titlerunning{Dummy short title} %TODO optional, please use if title is longer than one line
 
@@ -214,22 +215,26 @@
 \maketitle
 
 \begin{abstract}
-Blockchain light clients (LCs) are platform users that do not have the capacity to locally maintain current,
-fully-validated ledger state. For this reason, light clients rely on service providers (SPs, which
-are full nodes) for obtaining the
-blockchain data they require, e.g. for transaction construction or running off-chain apps.
-This work focuses on a model in which a light client of a UTxO-style platform has the goal of submitting a
-transaction with minimal local state and minimal local processing. We propose a 2-party computation
-protocol between the LC and the SP. First, the light client creates a specification for the transaction
-they would like the SP to construct, then the SP builds such a transaction, including in it a payment to themselves.
-The SP sends the LC a modified version of this transaction for signing and checking. It is modified in a way
-that makes it impossible for the LC to use the data in this transaction to construct a distinct new (valid)
-transaction without guessing pre-images of transaction hashes, but has enough information to allow the LC to
-check that it meets their specification. Using a secure partially-blind
-signature scheme, the SP is able to obtain a signature on the original (unmodified) transaction,
-which is then submitted to the network for inclusion in a block. This 2-PC protocol constitutes a trustless
-interaction between the LC and the SP resulting in the LC's desired transaction being applied
-to the ledger state, and the SP receiving payment for their work.
+Blockchain light clients (LCs) are users with limited resources who cannot maintain a fully validated local copy of the ledger state. Consequently, they rely on service providers (SPs), typically full nodes, to access the data needed for tasks such as transaction construction or interacting with off-chain applications.
+In this work, we propose a protocol and model for UTxO-based platforms that enables LCs to submit transactions with minimal local storage and computation. Our solution is a two-party computation (2PC) protocol between an LC and an SP. The LC instructs the SP to create a transaction according to its specifications, but only a blinded version of the result is shared. The blinded form prevents the LC from altering the transaction or constructing a new (valid) transaction, while still allowing the LC to verify that the transaction satisfies their original specification.
+To achieve this, we introduce a secure predicate mechanism and a weakly blind signature scheme. This enables the SP to obtain a valid signature on the original (unblinded) transaction from the LC, which can then be submitted to the network. The result is a trustless interaction where the LC achieves their transaction goal, and the SP receives compensation for their work.
+To optimize communication and computational overhead, we design an extension of Secure Blind Schnorr Signatures called Weakly Blind Predicate Signatures, which relaxes the unlinkability requirement in standard blind signatures.
+Lastly, we implement and benchmark the Non-interactive Argument of Knowledge (NArg) component of our protocol on two major UTxO-based blockchain platforms. Despite this component being the most computationally intensive part, our evaluation demonstrates that proving and verification times, as well as associated circuit sizes, are well within practical bounds for real-world deployment.
+
+
+
+%Blockchain light clients (LCs) are platform users that do not have the capacity to locally maintain current,
+%fully-validated ledger state. For this reason, light clients rely on service providers (SPs, which are full nodes) for obtaining the blockchain data they require, e.g. for transaction construction or running off-chain apps.
+%In this paper, we propose protocol and model in which a light client of a UTxO-style platform has the goal of submitting a transaction with minimal local state and minimal local processing. We propose a 2-party computation protocol between the LC and the SP. First, the light client creates a specification for the transaction they would like the SP to construct, then the SP builds such a transaction, while including a small payment to cover the cost of computation.
+%The SP sends the LC a blinded version of the constructed transaction for signing and checking. It is modified such that it is impossible for the LC to use the provided data to construct a distinct new (valid) transaction without guessing pre-images of transaction hashes, but has enough information to allow the LC to
+%check that it meets their specification. Using a secure predicate and partially blind signature scheme, the SP is able to obtain a signature on the original (unmodified) transaction,
+%which is submitted to the network for inclusion in a block. This 2-PC protocol constitutes a trustless
+%interaction between the LC and the SP resulting in the LC's desired transaction being applied
+%to the ledger state, and the SP receiving compensation for their work.
+
+%In order to realize our light client protocol in a communication optimal way, we develop an adaptation of Secure Blind Schnorr Signatures that we call Weakly Blind Predicate Signatures, alleviating the unlinkability requirement of standard Blind Schnorr Signatures.
+
+%Finally, we implement and benchmark the Non-interactive Argument of Knowledge as part of our protocol and constitutes the most time and resource intensive component of our construction.
 \end{abstract}
 
 
@@ -962,11 +967,10 @@ according to LC's specification.
 
 
 \section{Implementation}
-To assess the efficiency of our construction we implement and benchmark the NArg component. Given today's implementations of zk-SNARKs, running NArg is expected to be the most time and resource intensive part of our assisted TX creation protocol.
+To assess the efficiency of our construction we implement and benchmark the NArg component. Given today's implementations of zk-SNARKs, running the NArg is expected to be the most time and resource intensive part of our assisted TX creation protocol.
 
 We base our tests on the trusted-setup zk-SNARK system \emph{Groth16}~\cite{cryptoeprint:2016/260} implemented by \emph{Iden3}~\cite{circom}.
-The circuits we constructed are inspired by the implementation of~\cite{blindsigs}.
-We make them available in the domain-specific language of Circom.
+The circuits we construct and benchmark are inspired by the implementation of~\cite{blindsigs} and written in the domain-specific language of Circom~2.1.
 
 The NArg we instanciate captures proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1$ $\land \var{Com}(\var{tx};\rho)$ from the protocol in Section~\ref{}.
 
@@ -976,12 +980,44 @@ The NArg we instanciate captures proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\
 \end{equation}
 
 
-We estimate the arithmetic complexity of the relation in~\ref{narg} in terms of contraints the resulting circuit contains.
+We estimate the arithmetic complexity of the relation in~\ref{narg} in terms of number of contraints, proving key size and proof size.
+ We also measure the time it takes to creat the resulting circuit, the proving time and the proof verification time.
+ The results are summarized in Table~\ref{table_results} for different scenarios we describe in the following. The experiments were executed on commodity hardware based on an Intel(R) Core(TM) i7-8750H CPU operating at 2.20GHz with 12 cores and 16GB of RAM.
+
+
+\subsection{Circuit construction}
+
+\subsection{Benchmarks for different scenarios}
+
+\begin{table}[h!]
+\centering
+\caption{Different scenarios for Bitcoin and Cardano. Predicate blindness and partial blindness.}
+\begin{tabular}{@{} lcccc @{}}
+\toprule
+  & Bitcoin & Cardano \\
+\midrule
+Curve        & Secp256k1   & Ed25519      & 85      \\
+Hash          & SHA-256   & SHA-512      & 79      \\
+\midrule
+Blindness type     & predicate & partial & predicate & partial \\
+ & Threshold for amount& & $TX.out \le t$  & 333b blinded\\
+Transaction size & 256B & &  285B\\
+\midrule
+Proving key size \\
+Proving key verification time \\
+Verification key size \\
+Proving time \\
+Proof size \\
+Proof verification time \\
+Number of constraints \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 We note that message being signed in our relation is the hash of the transaction $\mathsf{H}(tx)$.
 Thus the witness--strictly speaking--only contains the transaction $tx$, but we list $\mathsf{H}(tx)$, for completeness as the message being signed is $m \equiv \mathsf{H}(tx)$.
 
-\todobox{Incorporate $\rho$. If we add enough entropy using the meta/text field then we don't necessarily need $\rho$? Looks like we do need $\rho$ to be consistent with proof. Overhead of encryption is minimal too.}
+%\todobox{Incorporate $\rho$. If we add enough entropy using the meta/text field then we don't necessarily need $\rho$? Looks like we do need $\rho$ to be consistent with proof. Overhead of encryption is minimal too.}
 
 The parameters $(q, \mathbb{G}, G, \mathsf{H})$ can be interpreted as the global parameters for the Schnorr signature scheme used.
 We assume that our WBPS scheme is meant to extend an existing Schnorr signature scheme, in which case $(q, \mathbb{G}, G, \mathsf{H})$ are predefined, or, the parameters can be chosen to fit the underlying NIZK/SNARK system.
