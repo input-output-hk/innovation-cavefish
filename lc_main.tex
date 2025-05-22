@@ -919,14 +919,16 @@ $st_S \gets \bot$\\
 			Sig. Commitment $\var{R}=g^r$ \\[-7mm]
 		% sign abstract transaction\\[-7mm]
 		& $\var{R}$\\[-7mm]
-		& & Produce challenge $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$, and  \\[-7mm]
-		& & proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1$ $\land \var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)$ \\[-7mm]
+		& & Produce challenge $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$,\\[-7mm]
+		& & and proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1\ \land$\\[-7mm]
+	 	& & \quad\quad\quad $\var{tx}_A = \var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)\ \land$ \\[-7mm]
+		& & \quad\quad\quad $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$ \\[-7mm]
 		& $(c,\pi)$ & \\[-7mm]
 		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
 		 Check proof $\pi$ \\[-7mm]
 		Produce  $s=r+cx$ \\[-7mm]
 		% sign abstract transaction\\[-7mm]
-		& $\var{bsig}$\\[-7mm]
+		& $\var{s}$\\[-7mm]
 		& & Produce signature $\sigma$\\[-7mm]
 		& & from s, where $\sigma = (R,s)$.\\[-7mm]
 		& & Post $(\var{tx}{\color{blue}||\var{nt}},\sigma)$ on-chain.\\
@@ -937,8 +939,8 @@ $st_S \gets \bot$\\
 	%\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-6-2.south west)--(m-6-2.south east);
 	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-5-2.south east)--(m-5-2.south west);
 	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-8-2.south west)--(m-8-2.south east);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-11-2.south east)--(m-11-2.south west);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-14-2.south west)--(m-14-2.south east);
+	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-13-2.south east)--(m-13-2.south west);
+	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-16-2.south west)--(m-16-2.south east);
 	%\draw (m-10-2.north west) rectangle (m-19-2.south east);
 \end{tikzpicture}
 \subsection{Security}
@@ -976,8 +978,12 @@ The circuits we construct and benchmark are inspired by the implementation of~\c
 The NArg we instanciate captures proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1$ $\land \var{Com}(\var{tx};\rho)$ from the protocol in Section~\ref{}.
 \begin{equation}
 \label{narg}
- \mathrm{R}_{\mathrm{WBPS}}((q, \mathbb{G}, G, \mathsf{H}),\ (X, R, c, \fun{chkSpec}(\var{int_{post}}, \cdot )),\ (tx, \mathsf{H}(tx), \rho))
+\mathrm{R}_{\mathrm{WBPS}}
+	(\underbrace{(q, \mathbb{G}, G, \mathsf{H})}_{\text{public parameters}\ par},\
+	\overbrace{(X, R, \var{tx}_A, \fun{chkSpec}(\var{int_{post}}, \cdot ))}^{\text{known information}\ \theta}\ ,\
+	 \underbrace{(\var{tx}||\var{nt}, \rho)}_{\text{witness}\ \omega})
 \end{equation}
+
 We measure the arithmetic complexity of the relation in~\ref{narg} in terms of number of contraints, proving key size and proof size.
  We also measure the time it takes to creat the resulting circuit, the proving time and the proof verification time.
  The results are summarized in Table~\ref{table_results} for different scenarios we describe in the following. The experiments were executed on commodity hardware based on an Intel(R) Core(TM) i7-8750H CPU operating at 2.20GHz with 12 cores and 16GB of RAM.

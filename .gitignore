@@ -21,3 +21,12 @@ light-clients.blg
 *.ptau
 *.log
 *.bbl
+*.json
+*.js
+*.wasm
+*.zkey
+*.wtns
+*.r1cs
+*.sym
+*.out
+*.vtc
