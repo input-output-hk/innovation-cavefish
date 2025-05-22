@@ -905,43 +905,60 @@ $st_S \gets \bot$\\
 \subsection{Our WBPS scheme}
 
 \subsection{Protocol Description}
-\begin{tikzpicture}
+\tikzset{
+  leftArrowBelow/.style={
+    append after command={
+      (\tikzlastnode.south east) ++(0,0) edge[->, thick] ([yshift=0pt]\tikzlastnode.south west)
+    }
+  },
+  rightArrowBelow/.style={
+    append after command={
+      (\tikzlastnode.south east) ++(0,0) edge[<-, thick] ([yshift=0pt]\tikzlastnode.south west)
+    }
+  }
+}
+\begin{tikzpicture}[every node/.style={font=\small}]
     \label{fig:protocol-short}
-	\matrix (m)[matrix of nodes, column  sep=1.5cm,row  sep=7mm, nodes={draw=none, anchor=center,text depth=0pt} ]{
-		\textbf{Signer (LC)} & & \textbf{User (SP)}\\[-4mm]
-		& & Generate transaction $\var{tx}$, {\color{blue}note $\var{nt}$,} \\[-7mm]
-		& &  \\[-7mm]
-		&& with abstract $\var{tx}_A$ = $\var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)$ \\[-7mm]
-		\phantom{x}& $\var{tx}_A$ & \\[-7mm]
+	\matrix (m)[matrix of nodes, column  sep=0.1cm,row sep=0mm,
+			nodes={draw=none, anchor=center, 
+			minimum height=3mm},
+			column 1/.style={nodes={minimum width=5cm}}, 
+			column 3/.style={nodes={minimum width=5cm}}, 
+			column 2/.style={nodes={minimum width=2.0cm}} 
+			 ]{
+		\textbf{Signer (LC)} & & \textbf{User (SP)}\\
+		Generate intent $\var{int_{post}}$ \\ % \in \mathcal{I}_\mathsf{post}$, \\
+		& \node[rightArrowBelow] {$(\var{int_{post}}, vk_{\mathrm{client}})$};  \\
+		& & Determine required verif. key(s) $\var{X}$ \\
+		& & from $\var{int_{post}}, vk_{\mathrm{client}}$\\
+		& & Generate transaction $\var{tx}$, {\color{blue}note $\var{nt}$}, \\
+		&&  and $\var{tx}_A$ = $\var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)$ \\
+		& \node[leftArrowBelow] {$\var{tx}_A$}; & \\
 		%\ h=\fun{txid}~\var{tx}
 		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
-		Produce Blind.  \\[-7mm]
-			Sig. Commitment $\var{R}=g^r$ \\[-7mm]
+		Produce Blind.  \\
+			Sig. Commitment $\var{R}=g^r$ \\
 		% sign abstract transaction\\[-7mm]
-		& $\var{R}$\\[-7mm]
-		& & Produce challenge $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$,\\[-7mm]
-		& & and proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1\ \land$\\[-7mm]
-	 	& & \quad\quad\quad $\var{tx}_A = \var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)\ \land$ \\[-7mm]
-		& & \quad\quad\quad $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$ \\[-7mm]
-		& $(c,\pi)$ & \\[-7mm]
+		&  \node[rightArrowBelow] {$\var{R}$};\\
+		& & Produce challenge $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$,\\
+		& & and proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1\ \land$\\
+	 	& & \quad\quad\quad $\var{tx}_A = \var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)\ \land$\\
+		& & \quad\quad\quad $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$ \\
+		&  \node[leftArrowBelow] {$(c,\pi)$}; & \\
 		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
-		 Check proof $\pi$ \\[-7mm]
-		Produce  $s=r+cx$ \\[-7mm]
+		 Check proof $\pi$ \\
+		Produce  $s=r+cx$ \\
 		% sign abstract transaction\\[-7mm]
-		& $\var{s}$\\[-7mm]
-		& & Produce signature $\sigma$\\[-7mm]
-		& & from s, where $\sigma = (R,s)$.\\[-7mm]
-		& & Post $(\var{tx}{\color{blue}||\var{nt}},\sigma)$ on-chain.\\
+		&  \node[rightArrowBelow] {$\var{s}$}; \\
+		& & Produce signature $\sigma$\\
+		& & from s, where $\sigma = (R,s)$.\\
+		& & Post $(\var{tx}{\color{blue}||\var{nt}},\sigma)$ on chain.\\
 	};
 
-	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-1.south east)--(m-1-1.south west);
-	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-3.south east)--(m-1-3.south west);
-	%\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-6-2.south west)--(m-6-2.south east);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-5-2.south east)--(m-5-2.south west);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-8-2.south west)--(m-8-2.south east);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-13-2.south east)--(m-13-2.south west);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-16-2.south west)--(m-16-2.south east);
-	%\draw (m-10-2.north west) rectangle (m-19-2.south east);
+	\draw[thick] (m-1-1.south east)--(m-1-1.south west);
+	\draw[thick] (m-1-3.south east)--(m-1-3.south west);
+	\node[fit={(m-7-3.north west) (m-22-3.south east) (m-9-1.north west)},
+      ultra thick, dotted, inner xsep=15pt, inner ysep=0pt, rounded corners=1mm, draw=gray, label={[gray,align=center]270:WBPS Execution}]{};	
 \end{tikzpicture}
 \subsection{Security}
 
