@@ -515,6 +515,13 @@ Can we have viewing keys?}
 
 
 \section{Threat Model and Threat Mitigation}
+\subsection{Model Requirements}
+\paragraph{Rational Actors} For liveness, we assume that protocol participants are rational in the sense that they will opt to complete tasks that benefit them directly (i.e in the form of rewards, or in the form of a desired transaction being posted). For safety we assume parties can be fully malicious.
+
+\paragraph{Transaction Expiry} For safety, we require that transactions can be set to be valid only within a certain time window. This is to prevent trivial attacks where a malicious SPO delays posting a transaction indefinitely. The user could contact a different SPO to create a second transaction with similar parameters (e.g. by paying the same recipient with different coins) with the risk that the first SPO would also post their transaction, making the user pay twice.
+
+\paragraph{Idempotent Doublespends} For safety we also require that attempted double spends are idempotent, i.e. they are simply not valid transactions and do not penalize (slash) the user for signing them. 
+
 \label{sec:threats}
 
 
