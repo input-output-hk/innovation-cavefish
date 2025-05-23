@@ -364,7 +364,7 @@ Compare our approach  with :
 	%\item Time lock micro payment channel~\cite{{10.1007/978-3-319-21741-3_1}
 \end{itemize}}
 \subsection{Technical Background}
-UTxO model
+UTxO model \textcolor{orange}{mr: do we still need this subsection?}
 
 \input{model.tex}
 
@@ -381,7 +381,11 @@ UTxO model
 
  In order to provide answers to queries by the user, a light client participates in a number of protocols between itself and a set of full nodes. These protocols may be one to one or one to many, depending on the design of the light client. We will expand on the syntax and operation of such protocols in the following subsection.
 
- Lastly, a light client is characterized in terms of restrictions placed on the resources it has available (without restrictions, we could treat a a full node of a chain as a light client). These restrictions can relate to the  communication cost to answer a series of queries, available storage, and assumptions about connectivity. On the other side, a particular light client design might limit the intents contained in $\mathcal{I}_\mathsf{read}$, $\mathcal{I}_\mathsf{post}$ to simplify its design.
+ Lastly, a light client is characterized in terms of restrictions placed on the resources it has available (without restrictions, 
+ we could treat a full node of a chain as a light client). These restrictions can relate to the  
+ communication cost to answer a series of queries, available storage, and assumptions about connectivity. On the other hand,
+  a particular light client design might limit the intents contained in $\mathcal{I}_\mathsf{read}$, $\mathcal{I}_\mathsf{post}$
+  to simplify its design and limit its functionality.
 
 
 \subsection{Intent Specification}
@@ -609,53 +613,114 @@ The following computations are performed in the protocol
 \end{itemize}
 
 \subsection{Protocol Description}
-\begin{tikzpicture}
-    \label{fig:protocol}
-	\matrix (m)[matrix of nodes, column  sep=1.5cm,row  sep=7mm, nodes={draw=none, anchor=center,text depth=0pt} ]{
-		\textbf{Light Client (LC)} & & \textbf{Service Provider (SP)}\\[-4mm]
-		Generate intent & & \\[-7mm]
-		(i) $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$, & & \\[-7mm]
-		(ii) generate signature $\var{sig}$  & & \\[-7mm]
-		% and predicate $\fun{opt} : \TxAbs \to \B$\\
-		&  $(\var{int_{post}}, vk_{\mathrm{client}}, \var{sig})$ & \\[-7mm] %\fun{opt}(\ ),\
-		& & (iii) Check signature \\[-7mm]
-		& & (iv) Generate transaction  \\[-7mm]
-		& & and (v) initiate WBPS signing \\[-7mm]
-		&& with abstract $\var{tx}_A$  \\[-7mm]
-		\phantom{x}& $\var{tx}_A$ & \\[-7mm]
+\tikzset{
+  leftArrowBelow/.style={
+    append after command={
+      (\tikzlastnode.south east) ++(0,0) edge[->, thick] ([yshift=0pt]\tikzlastnode.south west)
+    }
+  },
+  rightArrowBelow/.style={
+    append after command={
+      (\tikzlastnode.south east) ++(0,0) edge[<-, thick] ([yshift=0pt]\tikzlastnode.south west)
+    }
+  }
+}
+\begin{figure}[ht]
+\begin{tikzpicture}[every node/.style={font=\small}]
+    \label{fig:protocol-short}
+	\matrix (m)[matrix of nodes, column  sep=0.1cm,row sep=0mm,
+			nodes={draw=none, anchor=center, 
+			minimum height=3mm},
+			column 1/.style={nodes={minimum width=4.5cm}}, 
+			column 3/.style={nodes={minimum width=5.5cm}}, 
+			column 2/.style={nodes={minimum width=2.0cm}} 
+			 ]{
+		\textbf{Signer (LC)} & & \textbf{User (SP)}\\
+    & & Obtain newest $\LState_t\ ls$\\
+		Generate intent $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$\\
+		& \node[rightArrowBelow] {$(\var{int_{post}}, vk_{\mathrm{client}})$};  \\
+		& & Determine verif. key(s) $\var{X}_{\mathrm{client}}$ \\
+		& & from $(\var{int_{post}}, vk_{\mathrm{client}})$\\
+		& & Generate $\var{tx} = \fun{mkToSpec}(\var{ls},\var{int_{post}})$, {\color{blue}note $\var{nt}$}, \\
+    & & $\var{tx}_A = \fun{mkAbs}(\var{tx})$, $com_\var{tx}$ = $\var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)$\\
+		& &  \\
+		& \node[leftArrowBelow] {$(com_\var{tx},\var{tx}_A)$}; & \\
 		%\ h=\fun{txid}~\var{tx}
 		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
-		(vi) Produce Blind.  \\[-7mm]
-			Sig. Commitment \\[-7mm]
+		Produce blind  \\
+			sig. Commitment $\var{R}=g^r$ \\
 		% sign abstract transaction\\[-7mm]
-		& $\var{R}$\\[-7mm]
-		& & (vii) Produce proof   \\[-7mm]
-		& & $\fun{chkSpec}(\var{int_{post}},\var{tx}_A) = 1$ \\[-7mm]
-		& $(c,\pi)$ & \\[-7mm]
+		&  \node[rightArrowBelow] {$\var{R}$};\\
+		& & Produce challenge $c=H(R,X_{\mathrm{client}},\var{tx}{\color{blue}||\var{nt}})$,\\
+		& & and proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1\ \land$\\
+	 	& & \quad\quad\quad $com_\var{tx} = \var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)\ \land$\\
+		& & \quad\quad\quad $c=H(R,X_{\mathrm{client}},\var{tx}{\color{blue}||\var{nt}})$ \\
+		&  \node[leftArrowBelow] {$(c,\pi)$}; & \\
 		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
-		(viii) Check proof \\[-7mm]
-		Produce pre signature \\[-7mm]
+		 Check proof $\pi$ \\
+		Produce  $s=r+cx$ \\
 		% sign abstract transaction\\[-7mm]
-		& $\var{bsig}$\\[-7mm]
-		& & (ix) Produce signature $\sigma$\\[-7mm]
-		& & from pre signature.\\[-7mm]
-		& & Post $(\var{tx'},\sigma)$ on-chain.\\
+		&  \node[rightArrowBelow] {$\var{s}$}; \\
+		& & Produce signature $\sigma$\\
+		& & from s, where $\sigma = (R,s)$.\\
+		& & Post $(\var{tx}{\color{blue}||\var{nt}},\sigma)$ on chain.\\
 	};
 
-	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-1.south east)--(m-1-1.south west);
-	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-3.south east)--(m-1-3.south west);
-	%\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-6-2.south west)--(m-6-2.south east);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-10-2.south east)--(m-10-2.south west);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-13-2.south west)--(m-13-2.south east);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-16-2.south east)--(m-16-2.south west);
-	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-19-2.south west)--(m-19-2.south east);
-	%\draw (m-10-2.north west) rectangle (m-19-2.south east);
-	\node[fit={(m-10-1.north west) (m-18-1.north west) (m-21-3.south east) (m-15-3.south east)},
-      ultra thick, inner sep=0pt, rounded corners=1mm,
-      draw=cyan, label={[cyan,align=center]270:WBPS Execution}]{};
+	\draw[thick] (m-1-1.south east)--(m-1-1.south west);
+	\draw[thick] (m-1-3.south east)--(m-1-3.south west);
+	\node[fit={(m-7-3.south west) (m-24-3.south east) (m-11-1.north west)},
+   ultra thick, dotted, inner xsep=15pt, inner ysep=0pt,
+    rounded corners=1mm, draw=gray, label={[gray,anchor=north west]north west:WBPS Execution}]{};	
 \end{tikzpicture}
+\caption{WBPS protocol execution between light client and service provider.}
+\end{figure}
 
-\newpage
+%\begin{tikzpicture}
+%    \label{fig:protocol}
+%	\matrix (m)[matrix of nodes, column  sep=1.5cm,row  sep=7mm, nodes={draw=none, anchor=center,text depth=0pt} ]{
+%		\textbf{Light Client (LC)} & & \textbf{Service Provider (SP)}\\[-4mm]
+%		Generate intent & & \\[-7mm]
+%		(i) $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$, & & \\[-7mm]
+%		(ii) generate signature $\var{sig}$  & & \\[-7mm]
+%		% and predicate $\fun{opt} : \TxAbs \to \B$\\
+%		&  $(\var{int_{post}}, vk_{\mathrm{client}}, \var{sig})$ & \\[-7mm] %\fun{opt}(\ ),\
+%		& & (iii) Check signature \\[-7mm]
+%		& & (iv) Generate transaction  \\[-7mm]
+%		& & and (v) initiate WBPS signing \\[-7mm]
+%		&& with abstract $\var{tx}_A$  \\[-7mm]
+%		\phantom{x}& $\var{tx}_A$ & \\[-7mm]
+%		%\ h=\fun{txid}~\var{tx}
+%		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
+%		(vi) Produce Blind.  \\[-7mm]
+%			Sig. Commitment \\[-7mm]
+%		% sign abstract transaction\\[-7mm]
+%		& $\var{R}$\\[-7mm]
+%		& & (vii) Produce proof   \\[-7mm]
+%		& & $\fun{chkSpec}(\var{int_{post}},\var{tx}_A) = 1$ \\[-7mm]
+%		& $(c,\pi)$ & \\[-7mm]
+%		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
+%		(viii) Check proof \\[-7mm]
+%		Produce pre signature \\[-7mm]
+%		% sign abstract transaction\\[-7mm]
+%		& $\var{bsig}$\\[-7mm]
+%		& & (ix) Produce signature $\sigma$\\[-7mm]
+%		& & from pre signature.\\[-7mm]
+%		& & Post $(\var{tx'},\sigma)$ on-chain.\\
+%	};
+%
+%	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-1.south east)--(m-1-1.south west);
+%	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-3.south east)--(m-1-3.south west);
+%	%\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-6-2.south west)--(m-6-2.south east);
+%	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-10-2.south east)--(m-10-2.south west);
+%	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-13-2.south west)--(m-13-2.south east);
+%	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-16-2.south east)--(m-16-2.south west);
+%	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-19-2.south west)--(m-19-2.south east);
+%	%\draw (m-10-2.north west) rectangle (m-19-2.south east);
+%	\node[fit={(m-10-1.north west) (m-18-1.north west) (m-21-3.south east) (m-15-3.south east)},
+%      ultra thick, inner sep=0pt, rounded corners=1mm,
+%      draw=cyan, label={[cyan,align=center]270:WBPS Execution}]{};
+%\end{tikzpicture}
+
 
 
 \begin{definition}[Correctness] A transaction building protocol is \textbf{correct} if for an honest light client, and service provider and any state $\LState$ and intent $\mathcal{I}_\mathsf{post}$ such that: if $\fun{mkToSpec}(\LState, \mathcal{I}_\mathsf{post}) \neq \bot$, then the protocol completes and the transaction $\Tx'$ produced by the SP is such that $\fun{\fun{checkTxL}~}(LState, \Tx')=1$. \end{definition}
@@ -902,64 +967,9 @@ $st_S \gets \bot$\\
     \caption{Chosen Message Unforgeability Experiment}
 \end{figure}
 
-\subsection{Our WBPS scheme}
 
-\subsection{Protocol Description}
-\tikzset{
-  leftArrowBelow/.style={
-    append after command={
-      (\tikzlastnode.south east) ++(0,0) edge[->, thick] ([yshift=0pt]\tikzlastnode.south west)
-    }
-  },
-  rightArrowBelow/.style={
-    append after command={
-      (\tikzlastnode.south east) ++(0,0) edge[<-, thick] ([yshift=0pt]\tikzlastnode.south west)
-    }
-  }
-}
-\begin{tikzpicture}[every node/.style={font=\small}]
-    \label{fig:protocol-short}
-	\matrix (m)[matrix of nodes, column  sep=0.1cm,row sep=0mm,
-			nodes={draw=none, anchor=center, 
-			minimum height=3mm},
-			column 1/.style={nodes={minimum width=5cm}}, 
-			column 3/.style={nodes={minimum width=5cm}}, 
-			column 2/.style={nodes={minimum width=2.0cm}} 
-			 ]{
-		\textbf{Signer (LC)} & & \textbf{User (SP)}\\
-		Generate intent $\var{int_{post}}$ \\ % \in \mathcal{I}_\mathsf{post}$, \\
-		& \node[rightArrowBelow] {$(\var{int_{post}}, vk_{\mathrm{client}})$};  \\
-		& & Determine required verif. key(s) $\var{X}$ \\
-		& & from $\var{int_{post}}, vk_{\mathrm{client}}$\\
-		& & Generate transaction $\var{tx}$, {\color{blue}note $\var{nt}$}, \\
-		&&  and $\var{tx}_A$ = $\var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)$ \\
-		& \node[leftArrowBelow] {$\var{tx}_A$}; & \\
-		%\ h=\fun{txid}~\var{tx}
-		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
-		Produce Blind.  \\
-			Sig. Commitment $\var{R}=g^r$ \\
-		% sign abstract transaction\\[-7mm]
-		&  \node[rightArrowBelow] {$\var{R}$};\\
-		& & Produce challenge $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$,\\
-		& & and proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1\ \land$\\
-	 	& & \quad\quad\quad $\var{tx}_A = \var{Com}(\var{tx}{\color{blue}||\var{nt}};\rho)\ \land$\\
-		& & \quad\quad\quad $c=H(R,X,\var{tx}{\color{blue}||\var{nt}})$ \\
-		&  \node[leftArrowBelow] {$(c,\pi)$}; & \\
-		% %& ZK.proof $p$ of $P (h,\  \var{tx}_A) = \true$ & \\
-		 Check proof $\pi$ \\
-		Produce  $s=r+cx$ \\
-		% sign abstract transaction\\[-7mm]
-		&  \node[rightArrowBelow] {$\var{s}$}; \\
-		& & Produce signature $\sigma$\\
-		& & from s, where $\sigma = (R,s)$.\\
-		& & Post $(\var{tx}{\color{blue}||\var{nt}},\sigma)$ on chain.\\
-	};
 
-	\draw[thick] (m-1-1.south east)--(m-1-1.south west);
-	\draw[thick] (m-1-3.south east)--(m-1-3.south west);
-	\node[fit={(m-7-3.north west) (m-22-3.south east) (m-9-1.north west)},
-      ultra thick, dotted, inner xsep=15pt, inner ysep=0pt, rounded corners=1mm, draw=gray, label={[gray,align=center]270:WBPS Execution}]{};	
-\end{tikzpicture}
+
 \subsection{Security}
 
 Blindness (initial sketch): If the commitments are perfectly hiding, then the first round does not reveal anything to the adversary. Likewise, the proof  can be simulated with no contradiction (there will always exist a correct witness to proceed with). However, the oracle query cannot be adversarially controlled: $(R,X,m_0)$ and $(R,X,m_1)$ are both known to the adversary. We thus need to replace $m\gets m_b$ with a weaker form.
@@ -996,8 +1006,8 @@ The NArg we instanciate captures proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\
 \begin{equation}
 \label{narg}
 \mathrm{R}_{\mathrm{WBPS}}
-	(\underbrace{(q, \mathbb{G}, G, \mathsf{H})}_{\text{public parameters}\ par},\
-	\overbrace{(X, R, \var{tx}_A, \fun{chkSpec}(\var{int_{post}}, \cdot ))}^{\text{known information}\ \theta}\ ,\
+	(\underbrace{(q, \mathbb{G}, G, \mathsf{H})}_{\text{parameters}\ par},\
+	\overbrace{(X, R, \var{tx}_A, \fun{chkSpec}(\var{int_{post}}, \cdot ))}^{\text{known statement}\ \theta}\ ,\
 	 \underbrace{(\var{tx}||\var{nt}, \rho)}_{\text{witness}\ \omega})
 \end{equation}
 
