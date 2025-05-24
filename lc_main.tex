@@ -17,12 +17,15 @@
 
 
 \usepackage{stmaryrd}
+\usepackage{bm}
+
 %\usepackage{amsmath}
 \usepackage{tikz}
 \usetikzlibrary{matrix,shapes,arrows,positioning,chains,calc,fit}
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage[normalem]{ulem}
 
 
 %\graphicspath{{./graphics/}}%helpful if your graphic files are in another directory
@@ -84,6 +87,23 @@
 \newcommand\BLD{\ensuremath{\mathsf{BLD}}}
 \newcommand\WBPS{\ensuremath{\mathsf{WBPS}}}
 \newcommand\WBPSP{\ensuremath{\mathsf{WBPS}[P]}}
+
+
+\newcommand\hash{\ensuremath{\mathsf{H}}}
+\newcommand\HGen{\ensuremath{\mathsf{HGen}}}
+
+\newcommand\Setup{\ensuremath{\mathsf{Setup}}}
+\newcommand\Keygen{\ensuremath{\mathsf{KeyGen}}}
+\newcommand\Ver{\ensuremath{\mathsf{Ver}}}
+\newcommand\Sign{\ensuremath{\mathsf{Sign}}}
+\newcommand\Request{\ensuremath{\mathsf{Request}}}
+
+\newcommand\GGen{\ensuremath{\mathsf{GGen}}}
+\newcommand\NArg{\ensuremath{\mathsf{NArg}}}
+\newcommand\Prove{\ensuremath{\mathsf{Prove}}}
+\newcommand\PKE{\ensuremath{\mathsf{PKE}}}
+\newcommand\Enc{\ensuremath{\mathsf{Enc}}}
+\newcommand\Dec{\ensuremath{\mathsf{Dec}}}
 
 
 \newcommand{\Interval}[1]{\type{Interval}[#1]}
@@ -176,6 +196,8 @@
 
 \newcommand{\N}{\mathbb{N}}
 \newcommand{\Z}{\mathbb{Z}}
+\newcommand{\G}{\mathbb{G}}
+
 
 \newcommand{\Quantity}{\type{Quantity}}
 \newcommand{\TokenName}{\type{TokenName}}
@@ -840,7 +862,7 @@ which are implemented by a p.t. algorithm $P$, the predicate compiler: on input 
 description $prd \in {0, 1}$ and a message $m \in {0, 1}$, $P$ returns 1 or 0 indicating whether $m$
 satisfies $prd$.
 
- A WBPS scheme WBPS$_[P]$ for $P$ is defined by the following algorithms. We focus on
+ A WBPS scheme \WBPSP for predicate $P$ is defined by the following algorithms. We focus on
 schemes with 2-round (i.e., 4-message) signing protocols for concreteness.
 
 \begin{itemize}
@@ -989,6 +1011,72 @@ $st_S \gets \bot$\\
     \caption{Chosen Message Unforgeability Experiment}
 \end{figure}
 
+
+\subsection{Our Scheme}
+\begin{figure}[ht]
+%\centering
+
+\fbox{%
+  \begin{minipage}{0.95\textwidth}
+    % Top minipage
+    
+    \begin{minipage}[t]{0.05\textwidth}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.4\textwidth}
+    
+ \textbf{\uline{\bm{$\WBPS.\Setup$}}}\\[0.5ex]
+$(q,\G,g) \gets \GGen(1^\lambda)\\$
+$\hash\gets  \HGen(q)\\$
+$sp \gets (q,\G,g,\hash)\\$
+$(crs,\tau)\gets \NArg.\Setup(sp)\\$
+$(ek,dk)\gets \PKE.\Keygen(1^\lambda)\\$
+$par \gets (crs,ek)\\$
+$\textbf{return } par\\$
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.30\textwidth}
+      \textbf{\uline{\bm{$\WBPS.\Keygen (par)$}}}\\[0.5ex]
+$(q,\G,g) :\subseteq par\\$
+$x\gets \Z_q; X\gets g^x \\$
+$sk\gets(par,x)\\ vk\gets (par,X)\\$
+$\textbf{return } (sk,vk)\\$\\
+
+
+%\vspace{.5cm}
+       \textbf{\uline{\bm{$\WBPS.\Ver(vk,m,\sigma)$}}}\\[0.5ex]
+$(q,\G,g,\hash,X):\subseteq vk$\\
+$(R,s)\gets \sigma$\\
+$c\gets \hash(R,X,m)$\\
+$\textbf{return } (g^s==R\cdot X^c)$
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.1\textwidth}
+    \end{minipage}
+
+    \vspace{2em}
+
+    % Bottom minipage with invisible table
+    \begin{center}
+      \begin{tabular}{>{\raggedright\arraybackslash}p{0.3\textwidth} p{0.15\textwidth} >{\raggedright\arraybackslash}p{0.3\textwidth}}
+        \textbf{\uline{\bm{$\WBPS.\Sign(sk,prd)$}}} & & \textbf{\uline{\bm{$\WBPS.\Request(vk,prd,m)$}}} \\
+        $(q,\G,g,crs,ek,x):\subseteq sk$ &  &  $(q,\G,g,\hash,crs,ek,X):\subseteq vk$ \\
+         & $\xleftarrow{\quad C \quad}$  & $C\gets \PKE.\Enc(ek,m;\rho)$ \\
+         $r\gets \Z_q; R\gets g^r $& $\xrightarrow{\quad R \quad}$ &$c\gets \hash(R,X,m)$\\
+         && $ \theta \gets (X,R,c,C,prd,ek)$\\
+         && $w\gets (m,\rho)$\\
+         & $\xleftarrow{\quad c,\pi \quad}$ & $\pi \gets \NArg.\Prove(crs,\theta,w)$\\
+         \textbf{if } $\NArg.\Ver(crs,\theta,\pi) == 0:$ &&\\
+         \textbf{return } $0$ &&\\
+         $s\gets (r+c\cdot x) \mod q$ & $\xrightarrow{\quad s \quad}$ & $\textbf{if }g^s \neq R\cdot X^c : \textbf{return } \bot$ \\
+          \textbf{return } $1$ && $ \textbf{return } \sigma\gets(R,s)$
+      \end{tabular} 
+    \end{center}
+  \end{minipage}%
+}
+
+\caption{The weakly blind predicate Schnorr signature scheme \WBPSP}
+\end{figure}
 
 
 
