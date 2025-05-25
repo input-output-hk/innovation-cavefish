@@ -26,6 +26,10 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage[normalem]{ulem}
+\usepackage{amsthm}
+
+\theoremstyle{definition} % For upright text
+\newtheorem{assumption}{Assumption}
 
 
 %\graphicspath{{./graphics/}}%helpful if your graphic files are in another directory
@@ -102,6 +106,8 @@
 \newcommand\NArg{\ensuremath{\mathsf{NArg}}}
 \newcommand\Prove{\ensuremath{\mathsf{Prove}}}
 \newcommand\PKE{\ensuremath{\mathsf{PKE}}}
+\newcommand\SDS{\ensuremath{\mathsf{SDS}}}
+\newcommand\DS{\ensuremath{\mathsf{DS}}}
 \newcommand\Enc{\ensuremath{\mathsf{Enc}}}
 \newcommand\Dec{\ensuremath{\mathsf{Dec}}}
 
@@ -405,11 +411,11 @@ A public key encryption scheme $\PKE$ comprises a set of polynomial time algorit
 \end{itemize}
 
 \begin{definition} A public key encryption scheme $\PKE$ is \emph{correct} if 
-$$\Pr[ (ek,dk) \gets \Keygen(1^\lambda); m\gets \mathcal{M}:\Dec(sk,\Enc(pk,m))=m ] =1.$$
+$$\Pr[ (ek,dk) \gets \PKE.\Keygen(1^\lambda); m\gets \mathcal{M}:\PKE.\Dec(sk,\PKE.\Enc(pk,m))=m ] =1.$$
 \end{definition}
 
 \begin{definition} A public key encryption scheme $\PKE$ is \emph{IND-CPA secure} if for all stateful p.p.t. adversaries \A, the difference
-$$\left| \Pr[ (ek,dk) \gets \Keygen(1^\lambda); (m_0,m_1)\gets A(ek);d\gets\{0,1\}; c^*\gets \Enc(ek,m_d):A(c^*)=d ] - {1\over2} \right|$$
+$$\left| \Pr[ (ek,dk) \gets \PKE.\Keygen(1^\lambda); (m_0,m_1)\gets A(ek);d\gets\{0,1\}; c^*\gets \PKE.\Enc(ek,m_d):A(c^*)=d ] - {1\over2} \right|$$
 is negligible in $\lambda$.
 \end{definition}
 
@@ -418,6 +424,21 @@ The security of the Schnorr signature scheme has been well studied in the random
 
 \begin{definition} A hash function generator $\HGen(n) \to \hash$, on input $n\in \N$ generates a hash function $\hash : \{0,1\}^* \to \Z_n$.
 \end{definition}
+
+
+\begin{definition} The Schnorr digital signature scheme $\SDS$ is defined for a group generator $\GGen$ and a hash function generator $\HGen$ and operates as shown on figure \ref{fig:schnorr}.\end{definition}
+
+
+\begin{definition} A digital signature scheme $\DS$ is \emph{correct} if 
+$$\Pr[sp\gets \DS.\Setup(1^\lambda); (sk,vk) \gets \DS.\Keygen(sp); m\gets \mathcal{M_{S}}:\DS.\Ver(vk,m,Sign(sk,m))=1 ] =1.$$
+\end{definition}
+
+\begin{definition} A digital signature scheme $\DS$ is \emph{strongly existentially unforgeable against chosen message attacks}  (sEUF-CMA)  if for all p.p.t.  adversaries \A, we have  
+$$\Pr[\textsf{GsEUF-CMA}^{\A}_{\DS}(1^\lambda)] $$
+is negligible in $\lambda$ where the game $\textsf{GsEUF-CMA}^{\A}_{\DS}$ is defined in figure \ref{fig:seufcma}. \label{def:seufcma}
+\end{definition}
+
+\begin{assumption} \cite{XXX} There exists a group generator $\GGen$ and hash function generator $\HGen$ such that the Schnorr signature scheme $\SDS$ is strongly unforgeable under definition \ref{def:seufcma}. \end{assumption}
 
 \input{model.tex}
 
