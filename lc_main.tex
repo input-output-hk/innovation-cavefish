@@ -105,6 +105,8 @@
 \newcommand\GGen{\ensuremath{\mathsf{GGen}}}
 \newcommand\NArg{\ensuremath{\mathsf{NArg}}}
 \newcommand\Prove{\ensuremath{\mathsf{Prove}}}
+\newcommand\SimProve{\ensuremath{\mathsf{SimProve}}}
+
 \newcommand\PKE{\ensuremath{\mathsf{PKE}}}
 \newcommand\SDS{\ensuremath{\mathsf{SDS}}}
 \newcommand\DS{\ensuremath{\mathsf{DS}}}
@@ -203,6 +205,8 @@
 \newcommand{\N}{\mathbb{N}}
 \newcommand{\Z}{\mathbb{Z}}
 \newcommand{\G}{\mathbb{G}}
+\newcommand{\Lang}{\mathcal{L}}
+\newcommand{\crs}{\text{crs}}
 
 
 \newcommand{\Quantity}{\type{Quantity}}
@@ -426,7 +430,57 @@ The security of the Schnorr signature scheme has been well studied in the random
 \end{definition}
 
 
-\begin{definition} The Schnorr digital signature scheme $\SDS$ is defined for a group generator $\GGen$ and a hash function generator $\HGen$ and operates as shown on figure \ref{fig:schnorr}.\end{definition}
+\begin{definition} The Schnorr digital signature scheme $\SDS$ is defined for a group generator $\GGen$ and a hash function generator $\HGen$ and operates as shown on Figure \ref{fig:schnorr}.\end{definition}
+
+
+\begin{figure}[ht]
+\fbox{%
+  \begin{minipage}{0.95\textwidth}
+    % Top minipage
+    
+    \begin{minipage}[t]{0.05\textwidth}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.4\textwidth}
+    
+ \textbf{\uline{\bm{$\SDS.\Setup(1^\lambda)$}}}\\[0.5ex]
+$(\G,g,q) \gets \GGen(1^\lambda)\\$
+$\hash\gets  \HGen(q)\\$
+$sp \gets (\G,g,q,\hash)\\$
+$\textbf{return } sp\\$
+
+
+      \textbf{\uline{\bm{$\SDS.\Sign (sk,m)$}}}\\[0.5ex]
+$(\G,g,q,\hash,x):\subseteq sk$\\
+$r\gets \Z_q; R\gets g^x ; c\gets \hash(R,X,m) \\$
+$s\gets (r+c\cdot x) \mod q\\$
+$\textbf{return } \sigma \gets(R,s)\\$\\
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.40\textwidth}
+      \textbf{\uline{\bm{$\SDS.\Keygen (sp)$}}}\\[0.5ex]
+$(\G,g,q) :\subseteq sp\\$
+$x\gets \Z_q; X\gets g^x \\$
+$sk,vk \gets (par,x),(par,X)\\$
+$\textbf{return } (sk,vk)\\$\\
+
+
+%\vspace{.5cm}
+       \textbf{\uline{\bm{$\SDS.\Ver(vk,m,\sigma)$}}}\\[0.5ex]
+$(\G,g,q,\hash,X):\subseteq vk$\\
+$(R,s)\gets \sigma; c\gets \hash(R,X,m)$\\
+$\textbf{return } (g^s=R\cdot X^c)$
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.1\textwidth}
+    \end{minipage}
+
+  \end{minipage}%
+}
+
+\caption{The  Schnorr signature scheme \SDS, with group and hash generators \GGen,   \HGen.}\label{fig:schnorr}
+
+\end{figure}
 
 
 \begin{definition} A digital signature scheme $\DS$ is \emph{correct} if 
@@ -435,10 +489,56 @@ $$\Pr[sp\gets \DS.\Setup(1^\lambda); (sk,vk) \gets \DS.\Keygen(sp); m\gets \math
 
 \begin{definition} A digital signature scheme $\DS$ is \emph{strongly existentially unforgeable against chosen message attacks}  (sEUF-CMA)  if for all p.p.t.  adversaries \A, we have  
 $$\Pr[\textsf{GsEUF-CMA}^{\A}_{\DS}(1^\lambda)] $$
-is negligible in $\lambda$ where the game $\textsf{GsEUF-CMA}^{\A}_{\DS}$ is defined in figure \ref{fig:seufcma}. \label{def:seufcma}
+is negligible in $\lambda$ where the game $\textsf{GsEUF-CMA}^{\A}_{\DS}$ is defined in Figure \ref{fig:seufcma}. \label{def:seufcma}
 \end{definition}
 
+
+\begin{figure}[ht]
+\fbox{%
+  \begin{minipage}{0.95\textwidth}
+    % Top minipage
+    
+    \begin{minipage}[t]{0.05\textwidth}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.5\textwidth}
+
+      \textbf{\uline{\bm{$\textsf{GsEUF-CMA}^{\A}_{\DS}(1^\lambda)$}}}\\[0.5ex]
+$sp \gets \DS.\Setup(1^\lambda); Q\gets \emptyset$\\
+$(sk,vk)\gets \DS.\Keygen(sp)\\ (m^*,\sigma^*)\gets \A^{\textsf{OSig}}(vk)$\\
+$\textbf{return } (m^*,\sigma^*)\neq Q \land \DS.\Ver(vk,m^*,\sigma^*)$
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.35\textwidth}
+      \textbf{\uline{\bm{$\textsf{OSig}(m)$}}}\\[0.5ex]
+$\sigma \gets \DS.\Sign(skk,m)$\\
+$Q \gets Q\cup \{(m,s)\}$\\
+$\textbf{return } \sigma$
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.1\textwidth}
+    \end{minipage}
+
+  \end{minipage}%
+}
+
+\caption{The security game $\textsf{GsEUF-CMA}^{\A}_{\DS}$ and supporting oracle $\textsf{OSig}$.}\label{fig:seufcma}
+
+\end{figure}
+
+
 \begin{assumption} \cite{XXX} There exists a group generator $\GGen$ and hash function generator $\HGen$ such that the Schnorr signature scheme $\SDS$ is strongly unforgeable under definition \ref{def:seufcma}. \end{assumption}
+
+\subsubsection{Parametrized Non-Interactive Zero Knowledge Arguments}
+
+Following \cite[xxx], we define non-interactive zero knowledge arguments with regards to \emph parametrized polynomial relations $\mathcal{P}: \{0,1\}^* \times \{0,1\}^* \times \{0,1\}^*  \to \{0,1\}$, where the first argument represents a parameter set $par$ (e.g. a group description). Given a value of $par$, we say that $w$ is a witness for statement $\theta$ if $\mathcal{P}(par,\theta,w)=1$, i.e. $R=R_{par}(\theta,w):=\mathcal{P}(par,\theta,w)$ is an NP-relation, and $\Lang=\Lang_{par}$ is an NP-language. A NIZK for a relation  $\mathcal{P}$ operates as follows:
+\begin{itemize}
+
+\item $\mathsf{Rel}(1^\lambda) \to par$. Generates a parameter set $par$ that defines $R$ and $\Lang$.
+\item $\Setup(par)\to (\crs,\tau)$. Generates a common reference string (CRS) and trapdoor $\tau$ used by the simulator. We assume the CRS contains a description of $R$.
+\item $\Prove(\crs,\theta,w)\to \pi$. Given a CRS $\crs$, statement $\theta$ and witness $w$ for $\theta$, produces a proof $\pi$.  
+\item $\Ver(\crs,\theta,\pi)\to \{0,1\}$. Given a CRS $\crs$, a statement $\theta$ and a  proof $\pi$ outputs 1 or 0, accepting or rejecting the proof.
+\item $\SimProve(\crs,\theta,\tau)$. Given a CRS $\crs$, statement $\theta$ and traproor $\tau$ for $\crs$, produces a simulated proof $\pi$.
+\end{itemize}
 
 \input{model.tex}
 
@@ -1080,9 +1180,9 @@ $st_S \gets \bot$\\
 $(\G,g,q) \gets \GGen(1^\lambda)\\$
 $\hash\gets  \HGen(q)\\$
 $sp \gets (\G,g,q,\hash)\\$
-$(crs,\tau)\gets \NArg.\Setup(sp)\\$
+$(\crs,\tau)\gets \NArg.\Setup(sp)\\$
 $(ek,dk)\gets \PKE.\Keygen(1^\lambda)\\$
-$par \gets (crs,ek)\\$
+$par \gets (\crs,ek)\\$
 $\textbf{return } par\\$
     \end{minipage}
     \hfill
@@ -1112,13 +1212,13 @@ $\textbf{return } (g^s=R\cdot X^c)$
     \begin{center}
       \begin{tabular}{>{\raggedright\arraybackslash}p{0.3\textwidth} p{0.15\textwidth} >{\raggedright\arraybackslash}p{0.3\textwidth}}
         \textbf{\uline{\bm{$\WBPS.\Sign(sk,prd)$}}} & & \textbf{\uline{\bm{$\WBPS.\Request(vk,prd,m)$}}} \\
-        $(\G,g,q,crs,ek,x):\subseteq sk$ &  &  $(\G,g,q,\hash,crs,ek,X):\subseteq vk$ \\
+        $(\G,g,q,\crs,ek,x):\subseteq sk$ &  &  $(\G,g,q,\hash,\crs,ek,X):\subseteq vk$ \\
          & $\xleftarrow{\quad C \quad}$  & $C\gets \PKE.\Enc(ek,m;\rho)$ \\
          $r\gets \Z_q; R\gets g^r $& $\xrightarrow{\quad R \quad}$ &$c\gets \hash(R,X,m)$\\
          && $ \theta \gets (X,R,c,C,prd,ek)$\\
          && $w\gets (m,\rho)$\\
-         & $\xleftarrow{\quad c,\pi \quad}$ & $\pi \gets \NArg.\Prove(crs,\theta,w)$\\
-         \textbf{if } $\NArg.\Ver(crs,\theta,\pi) = 0:$ &&\\
+         & $\xleftarrow{\quad c,\pi \quad}$ & $\pi \gets \NArg.\Prove(\crs,\theta,w)$\\
+         \textbf{if } $\NArg.\Ver(\crs,\theta,\pi) = 0:$ &&\\
          \textbf{return } $0$ &&\\
          $s\gets (r+c\cdot x) \mod q$ & $\xrightarrow{\quad s \quad}$ & $\textbf{if }g^s \neq R\cdot X^c : \textbf{return } \bot$ \\
           \textbf{return } $1$ && $ \textbf{return } \sigma\gets(R,s)$
