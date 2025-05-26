@@ -393,30 +393,39 @@ In our application, we can assume that a wallet can give the SPO a single public
 
 
 \subsection{Schnorr Blind Signatures}
-Schnorr signatures~\cite{10.1007/0-387-34805-0_22} have gained significant adoption as soon as their patent expired in 2008, 
+As soon as their patent expired in 2008, Schnorr signatures~\cite{10.1007/0-387-34805-0_22} have been gaining significant adoption,
 replacing RSA in many scenarios due to their smaller size and faster verification.
 Compared to (EC)DSA, Schnorr offers similar efficiency and guarantees,
 but (EC)DSA security proofs are most likely not possible without 
 strong idealization~\cite{cryptoeprint:2023/914}.
-As a result, EdDSA~\cite{cryptoeprint:2011/368}, a popular variant of the
+As a consequence, EdDSA~\cite{cryptoeprint:2011/368}, a popular variant of the
  Schnorr scheme, is currently under consideration by NIST for standardization.
-The security or Schnorr signaatures is based on the discrete 
+The security of Schnorr signaatures is based on the discrete 
 logarithm assumption~\cite{jofc-2000-14276},
 with proofs in the random oracle model (ROM) as well as in 
 the algebraic group model (AGM) and the ROM~\cite{10.1007/978-3-030-45724-2_3}.
 
-Standard Schnorr signatures are now widely used in blockchains such as Bitcoin, Bitcoin Cash, Litecoin, and Polkadot, 
-where Monero, Zcash, and Cardano use the EdDSA variant.
+Standard Schnorr signatures are now widely used in blockchains such as Bitcoin, Bitcoin Cash, Litecoin, and Polkadot.
+Monero, Zcash, and Cardano use the EdDSA variant.
 The adption of Schnorr and EdDSA signatures is driven by privacy~\cite{cryptoeprint:2022/1636} and
  scalability gains~\cite{10.1007/s10623-019-00608-x}
 but also the straightforward extension to \emph{blind Schnorr signatures}~\cite{10.1007/3-540-48071-4_7}.
+Most Schnorr-based blind signature schemes
+require multiple rounds~\cite{10.1007/3-540-48071-4_7,,}, which can make the protocol suceptible to denial-of-service attacks.
+Research has thus been focusing on making blind signatures \emph{concurrently} secure where more than one session can be interwined~\cite{}. % as well as round-optimal schemes~\cite{}.
 
+Our construction hinges on the the concurrently secure blind and partially blind signing protocol
+for standard Schnorr signatures found in~\cite{blindsigs} by Fuchsbauer, et al.---the first work stating rigorous security guarantees for a practical blind signature scheme based on Schnorr signatures.
+Unlike schemes that had been presented before,~\cite{blindsigs} is not vulnerable to the attacks described in~\cite{} which showed that the hardness-assumption existing schemes relied on for concurrent security can be solved in polynomial-time.
 
-Our construction hinges on the the practical concurrently secure blind and partially blind signing protocol
-for standard Schnorr signatures, found in~\cite{blindsigs},
-the first work stating rigorous security guarantees for a practical blind signature
-scheme based on Schnorr signatures.
+As our light client protocol is based on~\cite{blindsigs}, it also provides partial and predicate blindness, two properties that allow us to describe a transaction in an abstract way featuring ``redacted'' parts.
+We briefly outline the construction of Fuchsbauer et al.~\cite{blindsigs} in the following.
+The scheme is equivalent to the blind signature scheme~\cite{10.1007/3-540-48071-4_7} by Chaum and Pedersen but, in order to make the protocol concurrently secure, adds a commitment phase at the beginning where the user sends an encrypted version of the message $m$ and blinding values $(\alpha,\beta)$ to the signer.
+In addition to that, the second message by the user includes a zero-knowledge proof alongside the Schnorr challenge $c$.
+The zero-knowledge proof asserts to the signer that the initial (encrypted) commitment and $c$ have been derived from the same $m, \alpha, \beta$.
 
+In addition to obtining concurrent security, one can leverage the zero-knowledge proof to assert additional facts, most notably, the user can prove to the signer that certain predicate(s) over message $m$ holds. This effectively turns the fully blind scheme into a predicate blind scheme.
+Furthermore, support for predicate blindness implies partial blindness~\cite{blindsigs} since constructing a predicate that checks equality for parts of $m$ can be used to assert to the user that parts of the message correspond to the expected value(s).
 
 \todobox{
 Compare our approach  with :
