@@ -11,8 +11,8 @@ To satisfy both parties we rely on cryptographic tools as well as some establish
 
 \begin{definition}[Correctness] A transaction building protocol is \textbf{correct} if for an honest light client, and service provider and any state $\LState$ and intent $\mathcal{I}_\mathsf{post}$ such that: if $\fun{mkToSpec}(\LState, \mathcal{I}_\mathsf{post}) \neq \bot$, then the protocol completes and the transaction $\Tx'$ produced by the SP is such that $\fun{\fun{checkTxL}~}(LState, \Tx')=1$. \end{definition}
 
-\todobox{ Let ${\fun{checkTxL}~}(LState, \Tx)$  be shorthand for  $\fun{checkTx}~((\var{slot}, \var{fee}), \var{utxo},~\var{tx})$ }.
-
+\todobox{ Let ${\fun{checkTxL}~}(l, tx)$  be shorthand for  $\fun{checkTx}~((\var{slot}, \var{fee}), \var{utxo},~\var{tx})$, with ledger state $l$ 
+containing UTxO state $\fun{utxo}$ and current slot number $\fun{slot}$ and minimum fee $\fun{fee}$}.
 
 \begin{definition}[Safety] A transaction building protocol is \textbf{safe} if for an honest light client and any service provider SP we have that: if transaction $\Tx'$ is produced by the SP is such that  $\fun{\fun{checkTxL}~}(LState, \Tx')=1$
 %against the client's key (XXX note: maybe we can ommit this)

@@ -156,7 +156,7 @@ but we simplify here for clarity.)
       \textsc{Trivial transaction $\var{tx}_t$} 
 \begin{displaymath}
 \begin{array}{rlll}
-  \var{tx}_t  &=& \{ ~\inputs = \emptyset,\\
+  \fun{initTx}  &=& \{ ~\inputs = \emptyset,\\
   & &\ \outputs = [~],\\
   & &\ \fun{validityInterval} = (0, 0),\\
   & &\ \mint = 0,\\
@@ -182,21 +182,29 @@ but we simplify here for clarity.)
 \end{array}
 \end{displaymath}
 \nextdef
+\textsc{Auxiliary $\fun{mkToSpec'}$ definition} 
+\begin{displaymath}
+\begin{array}{rlll}
+\fun{mkToSpec'} &:& \LState \to \mathcal{I}_\mathsf{post} \to \Tx \to \Tx^? \\
+\fun{mkToSpec'}~l~(\fun{MustMint}~v) (\var{tx}) &=&  \var{tx}~\{ \mint~=~v ~+~ \var{tx} . \mint \} \\
+\fun{mkToSpec'}~l~(\fun{SpendFrom}~s) (\var{tx}) &=& \var{tx}~\{ \outputs~=~ \var{tx} . \inputs~\\
+& & ~~~~\cup~\fun{mkIns}~l~(\var{tx} . \inputs)~(\fun{produced} - \fun{consumed})~ s \}  \\
+\fun{mkToSpec'}~l~ (\fun{MaxInterval}~i) (\var{tx}) &=& \var{tx}~\{ \validityInterval~=~(l . \fun{slot}, l . \fun{slot}~+~i) \}  \\
+\fun{mkToSpec'}~l~ (\fun{PayTo}~(s, v)) (\var{tx}) &=& \var{tx}~\{ \outputs~=~ \var{tx} . \outputs~\cup~ (s, v) \}   \\
+\fun{mkToSpec'}~l~ (\fun{ChangeTo}~s) (\var{tx}) &=& \fun{if}~ \fun{consumed} - \fun{produced} ~>~0 ~\\ 
+& & ~~~~\fun{then}~ \var{tx}~\{ \outputs~=~ \var{tx} . \outputs~\\
+& & ~~~~\cup~ \{(s,~ \fun{consumed} - \fun{produced})\} \} ~\fun{else}~\fun{nothing}   \\
+\fun{mkToSpec'}~l~ (\fun{MaxFee}~f)~ (\var{tx}) &=&  \fun{if}~ \var{tx} . \fun{fee} \leq f~\\ 
+& & ~~~~\fun{then}~\var{tx}~\fun{else}~\fun{nothing} \\
+\fun{mkToSpec'}~l~ (\fun{AndExps}~[a1 ; a2 ; ... ; ak]) (\var{tx}) &=& \fun{mkToSpec'}~l~ak~(... ~(\fun{mkToSpec'}~l~a2~(\fun{mkToSpec'}~l~a1~\var{tx})))
+\end{array}
+\end{displaymath}
+\nextdef 
 \textsc{$\fun{mkToSpec}$ definition} 
 \begin{displaymath}
 \begin{array}{rlll}
-\fun{mkToSpec} &:& (\LState \times \mathcal{I}_\mathsf{post} \times \Tx) \to \Tx^? \\
-\fun{mkToSpec}~l~(\fun{MustMint}~v) (\var{tx}) &=&  \var{tx}~\{ \mint~=~v ~+~ \var{tx} . \mint \} \\
-\fun{mkToSpec}~l~(\fun{SpendFrom}~s) (\var{tx}) &=& \var{tx}~\{ \outputs~=~ \var{tx} . \inputs~\\
-& & ~~~~\cup~\fun{mkIns}~l~(\var{tx} . \inputs)~(\fun{produced} - \fun{consumed})~ s \}  \\
-\fun{mkToSpec}~l~ (\fun{MaxInterval}~i) (\var{tx}) &=& \var{tx}~\{ \validityInterval~=~(l . \fun{slot}, l . \fun{slot}~+~i) \}  \\
-\fun{mkToSpec}~l~ (\fun{PayTo}~(s, v)) (\var{tx}) &=& \var{tx}~\{ \outputs~=~ \var{tx} . \outputs~\cup~ (s, v) \}   \\
-\fun{mkToSpec}~l~ (\fun{ChangeTo}~s) (\var{tx}) &=& \fun{if}~ \fun{consumed} - \fun{produced} ~>~0 ~\\ 
-& & ~~~~\fun{then}~ \var{tx}~\{ \outputs~=~ \var{tx} . \outputs~\\
-& & ~~~~\cup~ \{(s,~ \fun{consumed} - \fun{produced})\} \} ~\fun{else}~\fun{nothing}   \\
-\fun{mkToSpec}~l~ (\fun{MaxFee}~f)~ (\var{tx}) &=&  \fun{if}~ \var{tx} . \fun{fee} \leq f~\\ 
-& & ~~~~\fun{then}~\var{tx}~\fun{else}~\fun{nothing} \\
-\fun{mkToSpec}~l~ (\fun{AndExps}~[a1 ; a2 ; ... ; ak]) (\var{tx}) &=& \fun{mkToSpec}~l~ak~(... ~(\fun{mkToSpec}~l~a2~(\fun{mkToSpec}~l~a1~\var{tx})))
+\fun{mkToSpec} &:& (\LState \times \mathcal{I}_\mathsf{post}) \to \Tx^? \\
+\fun{mkToSpec}~(l , i) &=& \fun{mkToSpec'}~l~i~\fun{initTx}
 \end{array}
 \end{displaymath}
 \caption{Building transactions according to the specific intent}

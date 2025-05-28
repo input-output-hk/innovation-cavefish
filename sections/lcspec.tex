@@ -69,10 +69,10 @@ following functions, given in Figure~\ref{fig:dsl}, and Figure~\ref{fig:mktospec
 \label{fig:dsl}
 \end{figure}
 
-These functions are defined such that for any $l,~i$, where $\fun{mkToSpec}~l~i~\var{tx}_t \neq \fun{nothing}$,
-necessarily $\chkSpec{i}~(\fun{mkAbs}~(\fun{mkToSpec}~l~i~\var{tx}_t))$,
-see Appendix~\ref{sec:appendix} for a proof sketch.\textcolor{orange}{mr: don't think we provide a proof? We need to motivate the DSL?}
-Depending on the functionality of the light client, more constraints need to be
+These functions are defined such that for any $l,~i$, where $\fun{mkToSpec}~(l,~i) \neq \fun{nothing}$,
+necessarily $\chkSpec{i}~(\fun{mkAbs}~(\fun{mkToSpec}~(l,~i)))$. The design of the DSL is minimal, 
+and is meant only to showcase the operation of the light client protocol.
+To expand the functionality of the light client, more constraints need to be
 included in the DSL, e.g., a way to limit transaction size, or support for specifying
 desired token exchanges. We showcase two examples in the following:
 \begin{itemize}

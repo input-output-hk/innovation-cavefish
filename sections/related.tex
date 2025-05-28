@@ -1,21 +1,24 @@
 % !TEX root = ../lc_main.tex
 \section{Background and Related Work}
 
-\textbf{Light clients and off-chain payments.}
-Our approach facilitates transaction submission for a light client that is not aware of the history of a blockchain.
+\subsection{Light clients, off-chain payments, and chain explorer services}
+
+\textbf{Light clients.}
+Our approach facilitates transaction submission for a light client that is not aware of the history of a blockchain. Instead, it operates more like a single-chain intent-resolution protocol.
 Therefore, we compare our work with existing solutions for light clients as well as mechanisms that allow the interaction with a blockchain when in resource constrained operation.
 Our approach is different from a more ``traditional'' (i.e., what commonly is referred to) light client that has the primary goal of syncing to the blockchain in order to acquire the information necessary to interact with a smart contract or to submit a transaction.
-We summarize the most important concepts and works in the area of light clients below.
 We first describe the common idea of a light client and then outline concepts related to our work that complement light clients.
 
 There is existing work analyzing light client functionality \cite{committee} \cite{soklc}. The majority of light client designs include the following main functionalities it is expected to perform: (1) issue queries, such as for the balance of an account, or the state of a transaction, and (2) safeguard secret information and submit transactions to the blockchain. 
-In order to implement these functionalities, light clients use several generic techniques, most notably: header verification and consensus evolution verification. Unlike a \emph{full node}, a light client \emph{only verifies the headers of blocks}, and skips the verification of transactions and account balances \cite{committee}. This technique was made popular with SPV in Bitcoin~\cite{bitcoin} and nearly universally adopted by most practical approaches for light clients, e.g.,~\cite{ethereum}.
+In order to implement these functionalities, light clients use several generic techniques, most notably: header verification and consensus evolution verification. Unlike a \emph{full node}, a light client \emph{only verifies the headers of blocks}, and skips the verification of transactions and account balances \cite{committee}. The light client is able to trust the resulting chain state if the data is signed by a sufficiently large set of full nodes (a multi-prover approach). The technique was made popular with SPV in Bitcoin~\cite{bitcoin} and nearly universally adopted by most practical approaches for light clients, e.g.,~\cite{ethereum}, along with its variations \cite{lazy}. 
 Because the validator set can change, consensus evolution verification is needed for blockchains running on proof-of-stake.
-Another common technique is to compress the blockchain and/or ledger state in order to reduce the information a light client need for functioning reliably (see, e.g.,~\cite{flyclient}).
+Another common technique is to compress the blockchain and/or ledger state in order to reduce the information a light client need for functioning reliably (see, e.g.,~\cite{flyclient}). 
 
-Some light clients \cite{lazy} use game-theoretic assumptions, e.g. to implement the slashing of previously deposited collateral in case of misbehavior, for example~\cite{superlight}.
-The main cryptographic building blocks that are used to realize those techniques are succinct representation and proofs, such as data accumulators (often Merkle trees) and commitments and SNARKs.
-Suitable signatures and hash functions are needed for certain light client designs. Examples of these include aggregate signatures and threshold signatures \cite{mithril} \cite{committee}. Yet other designs propose building networks for identity-based light payments that are not fully untrusted \cite{celo}.
+Some light clients use game-theoretic approaches to eliminate the need for a trusted committee (a single-prover model), e.g. by implementing the slashing of previously deposited collateral in case of misbehavior~\cite{superlight}.
+Our model is both single-prover and does not require a deposit to be made, as neither the service provider nor the light client risk their assets during the protocol execution. Moreover, our design is independent of the underlying consensus, relying, instead, on the ledger model.
+
+The main cryptographic building blocks that are used to realize those techniques are succinct representation and proofs, such as data accumulators (often Merkle trees) and commitments and SNARKs (e.g. used to aggregate multi-signatures \cite{celo}).
+Suitable signatures and hash functions are needed for certain light client designs. Examples of these include aggregate signatures and threshold signatures \cite{mithril , committee}. 
 
 \textbf{Intents}.
 We also consider \emph{intents} and \emph{solver networks} to be related work. These designs attempt to establish a relationship between solvers and users via their (light) clients~\cite{ethresearch-solvers}. 
@@ -30,9 +33,9 @@ Some protocol designs choose to resolve intents on-chain directly \cite{khalani}
 other offer both layer-1 and layer-2 options \cite{anoma}. Yet another designs is a consensus protocol
 relying on on minimal trust assumptions while conforming to the interledger standard \cite{ripple}. 
 Focusing on a single chain allows 
-us to construct a simple low-communication protocol which makes use of the unique features of the 
+us to construct a protocol which makes use of the unique features of the 
 underlying blockchain, and requires reduced little communication (only 
-between two parties). In its simplicity, our protocol is more similar to payment channels. 
+between two parties). In its simplicity and limited communication, our protocol also resembles payment channels. 
 
 \textbf{Payment channels}.
 The concept of \emph{payment channels}, and the related notion of \emph{state channels}, also bear similarities
@@ -124,15 +127,4 @@ The zero-knowledge proof asserts to the signer that the initial (encrypted) comm
 
 In addition to obtining concurrent security, one can leverage the zero-knowledge proof to assert additional facts, most notably, the user can prove to the signer that certain predicate(s) over message $m$ holds. This effectively turns the fully blind scheme into a predicate blind scheme.
 Furthermore, support for predicate blindness implies partial blindness~\cite{blindsigs} since constructing a predicate that checks equality for parts of $m$ can be used to assert to the user that parts of the message correspond to the expected value(s).
-
-\todobox{
-Compare our approach  with :
-\begin{itemize}
-    \item "Free" websites monitoring the chain -- mention they lack long-term sustainability. mention big APIs. blockfrost, etc.
-    \item Bridges (trustless and trusted). only overview. maybe SOK paper. and describe how LC and bridge are related.
-    \item Payment channels (require upfront capital) + Payment networks~\cite{cryptoeprint:2017/823}
-    \item LCs that operate on single-prover model (eg. with an established relationship via deposit)
-    \item LCs that operate on multi-prover model
-	%\item Time lock micro payment channel~\cite{{10.1007/978-3-319-21741-3_1}
-\end{itemize}}
 
