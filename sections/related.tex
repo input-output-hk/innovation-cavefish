@@ -1,93 +1,88 @@
 % !TEX root = ../lc_main.tex
 \section{Background and Related Work}
 
-\subsection{Light clients and off-chain payments}
+\textbf{Light clients and off-chain payments.}
 Our approach facilitates transaction submission for a light client that is not aware of the history of a blockchain.
 Therefore, we compare our work with existing solutions for light clients as well as mechanisms that allow the interaction with a blockchain when in resource constrained operation.
 Our approach is different from a more ``traditional'' (i.e., what commonly is referred to) light client that has the primary goal of syncing to the blockchain in order to acquire the information necessary to interact with a smart contract or to submit a transaction.
 We summarize the most important concepts and works in the area of light clients below.
-
 We first describe the common idea of a light client and then outline concepts related to our work that complement light clients.
 
-A summary of \textbf{light client research} can be found in~\cite{soklc}, listing the main functionalities a light client is expected to perform: (1) issue queries, such as for the balance of an account, or the state of a transaction, and (2) safeguard secrecy information and submit transactions to the blockchain.
-In order to implement these functionalities, light clients use several generic techniques, most notably: header verification and consensus evolution verification. Compared to a \emph{full node} a light client only verifies the headers of blocks and skips the verification of transactions and account balances, a technique made popular with SPV in Bitcoin~\cite{spv} and nearly adopted by most practical approaches for light clients, e.g.,~\cite{Ethereumlc}.
-In addition to that, consensus evolution verification is needed for proof-of-stake based blockchains as the validator set can change.
-Another common technique is to compress blockchain and/or ledger state to reduce the information a light client has to download to verify proofs and synchronize to the blockchain (see, e.g.,~\cite{flyclient}).
-Some light clients use game-theoretic assumptions to implement the slashing of previously deposited collateral in case of misbehavior, for example~\cite{superlight}.
-The main cryptographic building blocks that are used to realize those techniques are succinct representation and proofs, such as data accumulators (often Merkle trees) and commitments and SNARKs.
-Furthermore, suitable signatures and hash functions are needed, for example, aggregate signatures and threshold signatures.
+There is existing work analyzing light client functionality \cite{committee} \cite{soklc}. The majority of light client designs include the following main functionalities it is expected to perform: (1) issue queries, such as for the balance of an account, or the state of a transaction, and (2) safeguard secret information and submit transactions to the blockchain. 
+In order to implement these functionalities, light clients use several generic techniques, most notably: header verification and consensus evolution verification. Unlike a \emph{full node}, a light client \emph{only verifies the headers of blocks}, and skips the verification of transactions and account balances \cite{committee}. This technique was made popular with SPV in Bitcoin~\cite{bitcoin} and nearly universally adopted by most practical approaches for light clients, e.g.,~\cite{ethereum}.
+Because the validator set can change, consensus evolution verification is needed for blockchains running on proof-of-stake.
+Another common technique is to compress the blockchain and/or ledger state in order to reduce the information a light client need for functioning reliably (see, e.g.,~\cite{flyclient}).
 
-Most related works and ideas are \textbf{intents} and \textbf{solver networks} that attempt to establish a relationship between solvers and users via their (light) clients~\cite{ethresearch-solvers}.
-A light client issues an intent via as an abstracted transaction object and solvers process the intent incentivized by transaction fee or intent execution reward. The users are then free to accept or reject a solver’s proposal.
-Outsourcing transaction creation to a solver does not need for user to bridge assets cross-chain, as chains are abstracted away. In case the solvers are required to provide a deposit, slashing guarantees honest behavior of a rational actor.
-While concepts around solver networks are relatively new there is currently no universal standard governing the specification for intents and abstract transaction objects.
- To the best of our knowledge, this is the first work describing an intent-based light client protocol.
+Some light clients \cite{lazy} use game-theoretic assumptions, e.g. to implement the slashing of previously deposited collateral in case of misbehavior, for example~\cite{superlight}.
+The main cryptographic building blocks that are used to realize those techniques are succinct representation and proofs, such as data accumulators (often Merkle trees) and commitments and SNARKs.
+Suitable signatures and hash functions are needed for certain light client designs. Examples of these include aggregate signatures and threshold signatures \cite{mithril} \cite{committee}. Yet other designs propose building networks for identity-based light payments that are not fully untrusted \cite{celo}.
+
+\textbf{Intents}.
+We also consider \emph{intents} and \emph{solver networks} to be related work. These designs attempt to establish a relationship between solvers and users via their (light) clients~\cite{ethresearch-solvers}. 
+A light client issues an intent via as an abstracted transaction object. Then, solvers process the intent, incentivized by transaction fee or intent execution reward. The users are then free to accept or reject a solver’s proposal. In case the solvers are required to provide a deposit, slashing incentivizes honest behavior of a rational actor.
+Since concepts around solver networks are relatively new, there is currently no universal standard governing the specification for intents and abstract transaction objects. To the best of our knowledge, this is the first work describing an intent-based light client protocol taking advantage of specific features of the UTxO ledger model that both minimizes communication and offers built-in incentive structure. 
+
+\textbf{Cross-chain intents.}
+A lot of work on intents applies is focused on building cross-chain intent resolution, which 
+requires more sophisticated protocols that are able to communicate with 
+multiple chains at once \cite{celer} .
+Some protocol designs choose to resolve intents on-chain directly \cite{khalani}, while 
+other offer both layer-1 and layer-2 options \cite{anoma}. Yet another designs is a consensus protocol
+relying on on minimal trust assumptions while conforming to the interledger standard \cite{ripple}. 
+Focusing on a single chain allows 
+us to construct a simple low-communication protocol which makes use of the unique features of the 
+underlying blockchain, and requires reduced little communication (only 
+between two parties). In its simplicity, our protocol is more similar to payment channels. 
 
 \textbf{Payment channels}.
-We also briefly cover \textbf{payment channels} (also called \textbf{state channels}), which also constitute
-a concept similar to our approach:
-payment channels describe a type of off-chain mechanism for blockchains. They allow to establish a private payment
-channel between two parties. The channel can be used to conduct a series of (similar) transactions without interacting
-with the main blockchain. The creation of a payment channel requires locking funds in a smart contract, which is used
-to conduct the transactions~\cite{payment-channel}. Some state channels, such as Hydra \cite{hydra}, not only allow
-for simple payments between users, but simulate the majority of the on-chain transaction processing mechanism internally.
+The concept of \emph{payment channels}, and the related notion of \emph{state channels}, also bear similarities
+to our approach.
+Payment channels are a type of off-chain mechanism for blockchains. Payment channels allow users to establish a private payment
+channel between two parties, e.g. \cite{lightning} \cite{raiden} \cite{ethereum}. 
+A payment channel can be used to conduct a series of transactions without interacting
+with the main blockchain. The creation of a payment channel requires first locking funds in an on-chain smart contract ~\cite{payment-channel}. 
+Some channels, such as Hydra \cite{hydra}, not only allow
+simple payments between users, but can simulate the majority of the on-chain transaction processing mechanism internally 
+that are within the user base and liquidity limits of the channel.
+This type of channel is usually called a \emph{state channel}. 
 
-Participation in a payment channel usually presumes that a user is able to predict, to some degree, the nature of the
-anticipated payments they will send or receive, and accepts that interactions within the channel will be limited
-to users, contracts, and tokens, available in that channel (i.e. locked by the channel's smart contract).
-Due to the specifics of the channel setup process, and the limited nature of these interactions, payment channels
-are capable of greatly improving scalability
-and reducing transaction processing times. The target user base for our light client design, however, are ones
-that do not wish to engage in establishing relationships with other chain users, participating
+Generally, interactions in state and payment channels are limited to a pre-determined set of participants, liquidity, and 
+types of actions users can perform. \footnote{Payment networks attempt to address this issue
+by using multi-path payments, where the original payment is split into smaller parts,
+each routed through different channels, allowing for greater liquidity, adding complexity and risk}
+The limits of our proposed design to support 
+different actions is dictated by the language used for request specification, which may be augmented in future work. 
+At the same time, our design provides the same level of atomicity expected from payment channels, 
+i.e., payments are either fully successful or completely fail.
+
+After the initial on-chain setup has been completed, payment and state channels
+are capable of greatly reducing both transaction processing times and fees.
+The target user base for our light client design, however, are users
+that either do not wish to (or are not capable of) engaging in establishing relationships with other chain users, participating
 in an on-chain setup process, or intend to make repeat or scheduled interactions with the same
-users. The on-chain space- and cost-saving benefits of payment channels,
-which are due to not posting every single transaction, are unlikely to be accessible to a user base which
-we target with our low-commitment design. For these reasons, it does not make sense to limit themselves
-to a specific payment channel.
-
-Similarly, our design should be general enough to support any transaction or on-chain operation, irregardless of its monetary value or physical size.
-One potential problem in payment channels is liquidity. If one of the parties does not have sufficient 
-liquidity in the channel, payments might fail or need to be routed
- through multiple channels\footnote{Payment networks attempt to address this issue
-  by using multi-path payments, where the original payment is split into smaller parts,
-   each routed through different channels, allowing for greater liquidity}, adding complexity and risk.
-Our construction does not suffer from those shortcommings while at the same time provinding the same level of atomicity expected from payment channels, i.e., payments are either fully successful or completely fail.
-
-Some existing proposals\cite{todo} suggest to augment payment channels with the ability to process any off-chain interaction, not just payments. Often those constructions are called state channels. Off-chain interactions that go beyond transaction do however entail increased complexity. The base/main chain needs to offer smart contract support. Hash Time-Locked contracts (as used in the Lightning Network) are not sufficient for complex off-chain interactions.
-
-Availability/Being online: Payment channels (and certain payment networks) require that the participants are ``always'' online and observe the main chain for updates (e.g., an updated smart contract).
-A possibly remedy for this inconvenience are watchers. They make sure that channels are fair by monitoring the state of the payment channels. They check if either participant tries to broadcast an invalid transaction--- such as an old state---in order to claim more funds than they are entitled to. If a participant tries to cheat, the watcher can detect this and, trigger a penalty transaction that punishes the dishonest participant by forfeiting their funds.
-Being always online is not mandatory for the user in our light client protocol. The user might observe the chain to verify if their transaction has been included and the funds have been transferred, however, not being online can never result in a scenario where a party wrongfully claims funds and active intervention on the user's part is required to prevent this.
-
-
-\todobox{
-some payment networks in the wild:\\
-Lightning network (Bitcoin)
-Raiden Network for Ethereum, which also utilizes payment channels for faster payments, or Liquid Network (a sidechain to Bitcoin)
-Celer Network?
-Stellar network?
-RippleNet?
-Celo network?
-}
+users. For this reason, the on-chain space- and cost-saving benefits of payment channels,
+are unlikely to be accessible to a user base which
+we target with our low-commitment design.
 
 
 \textbf{API and Explorer Services}.
 Many realistic UTxO ledger implementations (e.g. Ergo \footnote{\url{https://ergoplatform.org/}},
 Cardano \footnote{\url{https://cardano.org/}}, and BitCoin \footnote{\url{https://bitcoin.org/}}) are set up
-in a way that a badly constructed transaction will, in many cases, not result in any update to the ledger
-state. So, even if a transaction is constructed by an LC based on ledger or block data that is incorrect or
-old, the worst-case scenario is that it will be rejected. This makes
+in a way that an invalid transaction will, in most cases, not result in any update to the ledger
+state, getting rejected instead. This makes
 services such as blockchain explorers \footnote{\url{https://beta.explorer.cardano.org/}} or Blockfrost (API
-as a service for accessing the Cardano blockchain) \footnote{\url{https://blockfrost.dev/}} are some of the
+as a service for accessing the Cardano blockchain) \footnote{\url{https://blockfrost.dev/}} some of the
 strongest competitors with our proposal, as they provide the data needed
 for the LC to construct their transaction, often with a relatively high degree of reliability.
-One aspect that sets our design apart is the SP compensation structure. Revenue from services such as those above is
+Such services currently do not appear to have the infrastructure required to perform the construction of transactions
+for the light client. Along with providing access to such a service, 
+the design we propose also includes a compensation structure for the service provider. 
+Revenue from explorer services services such as those above is
 either ad-based, requires users to create an account paid for with fiat currency, or is free in order to
-promote use of the specific service/blockchain. We, on the other hand, propose that SPs are compensated
+promote use of the specific service/blockchain. We, on the other hand, propose a protocol 
+in which service providers are compensated
 in assets on the same blockchain as the one to which their transaction gets applied, and the payment structure
-consists of a one-time, no-setup atomic exchange of assets for services. Since the SP in our design gets paid
-only once a transaction is successfully applied, all data for which they receive payment
-is not just reliable (as for existing services), but provably correct.
+consists of a one-time, no-setup atomic exchange of assets for services. 
 
 \subsection{Hierarchical Deterministic wallets and address discovery}
 UTXO based blockchains, including Bitcoin and Cardano use the concept of Hierarchical Deterministic (HD) wallets \cite{bip32} where child addresses can be created in a deterministic way using a public key of a keypair $sk,pk$, and some short auxiliary data (the chain code). Given a public key $pk$, chain code $c$ and requested index $i$ for a child key, a hash function is used to produce a scalar $s_i$ enablind the derivation of the child key as $sk_i=sk+s_i$. It is also possible to use $s_i$ without knowing $sk$ to directly derive the corresponding public key $pk_i=pk\cdot g^{s_i}$. The same method is used to produce a child chain code $c_i$, so that multiple generations of keys are possible.
@@ -114,8 +109,8 @@ The adption of Schnorr and EdDSA signatures is driven by privacy~\cite{cryptoepr
  scalability gains~\cite{10.1007/s10623-019-00608-x}
 but also the straightforward extension to \emph{blind Schnorr signatures}~\cite{10.1007/3-540-48071-4_7}.
 Most Schnorr-based blind signature schemes
-require multiple rounds~\cite{10.1007/3-540-48071-4_7,,}, which can make the protocol suceptible to denial-of-service attacks.
-Research has thus been focusing on making blind signatures \emph{concurrently} secure where more than one session can be interwined~\cite{}. % as well as round-optimal schemes~\cite{}.
+require multiple rounds~\cite{10.1007/3-540-48071-4_7}, which can make the protocol suceptible to denial-of-service attacks.
+Research has thus been focusing on making blind signatures \emph{concurrently} secure where more than one session can be intertwined~\cite{}. % as well as round-optimal schemes~\cite{}.
 
 Our construction hinges on the the concurrently secure blind and partially blind signing protocol
 for standard Schnorr signatures found in~\cite{blindsigs} by Fuchsbauer, et al.---the first work stating rigorous security guarantees for a practical blind signature scheme based on Schnorr signatures.
