@@ -1,35 +1,40 @@
-lc_main.synctex.gz
-lc_main.pdf
-lc_main.log
-lc_main.aux
-lc_main.fls
-lc_main.fdb_latexmk
-lc_main.bbl
-lc_main.blg
-light-clients.synctex.gz
-light-clients.pdf
-light-clients.log
-light-clients.aux
-light-clients.fls
-light-clients.fdb_latexmk
-light-clients.bbl
-light-clients.blg
-/circomlib
-/secp256k1
-/secp256k1_non_native_modP
-/wbps_circuit/circ_eddsa_cardano_js
-*.ptau
-*.log
-*.bbl
-*.json
-*.js
-*.wasm
-*.zkey
-*.wtns
-*.r1cs
-*.sym
-*.out
-*.vtc
-lc_main.synctex(busy)
-*.synctex(busy)
-*.synctex*
+# ====================================================
+# LaTeX build artifacts (restricted to ./paper)
+# ====================================================
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out
+paper/*.synctex.gz
+paper/*.synctex(busy)
+paper/*.synctex*
+
+# Local PDFs inside ./paper (we keep only timestamped builds in ../publication/)
+paper/lc_main.pdf
+paper/light-clients.pdf
+
+# Temporary build directory
+paper/tmp/
+
+# ====================================================
+# Cryptography / Circuit build artifacts (restricted to ./paper)
+# ====================================================
+paper/circomlib/
+paper/secp256k1/
+paper/secp256k1_non_native_modP/
+paper/wbps_circuit/circ_eddsa_cardano_js/
+
+# Circom / snarkjs artifacts
+paper/*.ptau
+paper/*.json
+paper/*.js
+paper/*.wasm
+paper/*.zkey
+paper/*.wtns
+paper/*.r1cs
+paper/*.sym
+paper/*.vtc
+!paper/wbps_circuit/*.json
