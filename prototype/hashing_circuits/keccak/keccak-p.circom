@@ -1,4 +1,4 @@
-pragma circom 2.0.0;
+pragma circom 2.1.2;
 
 //------------------------------------------------------------------------------
 // compute (compile time) the log2 of a number

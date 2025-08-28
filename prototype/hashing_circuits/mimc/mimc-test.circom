@@ -1,7 +1,7 @@
 
 // simple wrappers for compatibility with the crappy hackish test framework
 
-pragma circom 2.0.0;
+pragma circom 2.1.2;
 
 include "mimc-p-p.circom";
 include "mimc-feistel-2p-p.circom";

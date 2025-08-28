@@ -1,6 +1,6 @@
 
 
-pragma circom 2.0.0;
+pragma circom 2.1.2;
 
 //------------------------------------------------------------------------------
 // https://github.com/bkomuves/hash-circuits/blob/master/circuits/blake2/blake2_common.circom

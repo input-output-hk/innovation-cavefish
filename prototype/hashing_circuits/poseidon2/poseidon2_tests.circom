@@ -2,7 +2,7 @@
 // these are only wrappers to be compatible with right now very hackish
 // and limited test framework
 
-pragma circom 2.0.0;
+pragma circom 2.1.2;
 
 include "poseidon2_merkle.circom";
 

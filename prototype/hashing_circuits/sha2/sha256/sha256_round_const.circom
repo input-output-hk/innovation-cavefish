@@ -1,4 +1,4 @@
-pragma circom 2.0.0;
+pragma circom 2.1.2;
 
 //------------------------------------------------------------------------------
 // round constants for SHA2-224 and SHA2-256 (they are the same)

@@ -1,4 +1,4 @@
-pragma circom 2.0.0;
+pragma circom 2.1.2;
 
 //
 // The Griffin permutation for bn128 and t=3 

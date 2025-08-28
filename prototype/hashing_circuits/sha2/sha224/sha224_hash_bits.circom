@@ -1,4 +1,4 @@
-pragma circom 2.0.0;
+pragma circom 2.1.2;
 
 include "../sha2_common.circom";
 include "../sha256/sha256_padding.circom";
