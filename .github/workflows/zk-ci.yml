@@ -1,33 +1,47 @@
 name: ZK prototype CI
+
 on:
   pull_request:
     paths: [ 'prototype/**' ]
   push:
     branches: [ main ]
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: prototype/wbps_circuit
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Compile circuit (circom via Docker)
         uses: addnab/docker-run-action@v3
         with:
-          image: iden3/circom:latest
+          image: iden3/circom:2.1.6
           options: -v ${{ github.workspace }}/prototype/wbps_circuit:/work
           run: |
             cd /work
-            circom circ_eddsa_cardano.circom --r1cs --wasm --sym
+            circom circ_eddsa_cardano.circom --r1cs --wasm --sym \
+              -l ../circomlib \
+              -l ../hashing_circuits \
+              -l .
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Install snarkjs
         run: npm i -g snarkjs@0.7.x
-      - name: Prove & verify (permissive until vectors are final)
+
+      - name: Witness / Prove / Verify (permissive until vectors are final)
         run: |
+          # If a curated vector exists, link it where the Makefile expects it
           if [ ! -f circ_eddsa_cardano_input.json ]; then
             if [ -f vectors/circ_eddsa_cardano_input.json ]; then
               ln -s vectors/circ_eddsa_cardano_input.json circ_eddsa_cardano_input.json
@@ -35,14 +49,30 @@ jobs:
               echo '{}' > circ_eddsa_cardano_input.json
             fi
           fi
-          node circ_eddsa_cardano_js/generate_witness.js \
+
+          # Calculate witness with snarkjs (avoids Node ESM issues)
+          snarkjs wtns calculate \
             circ_eddsa_cardano_js/circ_eddsa_cardano.wasm \
             circ_eddsa_cardano_input.json \
             circ_eddsa_cardano.wtns || true
+
+          # Export public signals (ok to be empty during permissive setup)
           snarkjs wtns export json circ_eddsa_cardano.wtns circ_eddsa_cardano_public.json || true
+
+          # Groth16 (lab-only)
           snarkjs powersoftau new bn128 19 powersoftau.ptau
-          snarkjs powersoftau prepare phase2 powersoftau.ptau
+          snarkjs powersoftau prepare phase2 powersoftau.ptau pot_final.ptau
           snarkjs groth16 setup circ_eddsa_cardano.r1cs pot_final.ptau circ_eddsa_cardano.zkey
           snarkjs zkey export verificationkey circ_eddsa_cardano.zkey circ_eddsa_cardano_verifkey.json
-          snarkjs groth16 prove circ_eddsa_cardano.zkey circ_eddsa_cardano.wtns circ_eddsa_cardano_proof.json circ_eddsa_cardano_public.json || true
-          snarkjs groth16 verify circ_eddsa_cardano_verifkey.json circ_eddsa_cardano_public.json circ_eddsa_cardano_proof.json || true
+
+          # Prove & verify (permissive)
+          snarkjs groth16 prove \
+            circ_eddsa_cardano.zkey \
+            circ_eddsa_cardano.wtns \
+            circ_eddsa_cardano_proof.json \
+            circ_eddsa_cardano_public.json || true
+
+          snarkjs groth16 verify \
+            circ_eddsa_cardano_verifkey.json \
+            circ_eddsa_cardano_public.json \
+            circ_eddsa_cardano_proof.json || true
