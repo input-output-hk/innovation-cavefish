@@ -20,21 +20,23 @@ paper/light-clients.pdf
 paper/tmp/
 
 # ====================================================
-# Cryptography / Circuit build artifacts (restricted to ./paper)
+# Cryptography / Circuit build artifacts (restricted to ./prototype)
 # ====================================================
-paper/circomlib/
-paper/secp256k1/
-paper/secp256k1_non_native_modP/
-paper/wbps_circuit/circ_eddsa_cardano_js/
+prototype/circomlib/
+prototype/secp256k1/
+prototype/secp256k1_non_native_modP/
+prototype/wbps_circuit/circ_eddsa_cardano_js/
 
 # Circom / snarkjs artifacts
-paper/*.ptau
-paper/*.json
-paper/*.js
-paper/*.wasm
-paper/*.zkey
-paper/*.wtns
-paper/*.r1cs
-paper/*.sym
-paper/*.vtc
-!paper/wbps_circuit/*.json
+prototype/*.ptau
+prototype/*.json
+prototype/*.js
+prototype/*.wasm
+prototype/*.zkey
+prototype/*.wtns
+prototype/*.r1cs
+prototype/*.sym
+prototype/*.vtc
+
+# Keep curated inputs
+!prototype/wbps_circuit/*.json
