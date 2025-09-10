@@ -1,0 +1,81 @@
+cabal-version: 3.4
+name:          cavefish
+version:       0.1.0.0
+license:       Apache-2.0
+build-type:    Simple
+
+library
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  hs-source-dirs:  lib
+  exposed-modules: 
+    Lib
+    Api.Api
+    NodeClient.NodeClient
+  default-language: GHC2021
+  default-extensions:
+    DerivingStrategies
+    GeneralizedNewtypeDeriving
+    DerivingVia
+    StandaloneDeriving
+    DeriveAnyClass
+    DeriveGeneric
+
+    NamedFieldPuns
+    RecordWildCards
+    DuplicateRecordFields
+    OverloadedRecordDot 
+    ViewPatterns
+
+    ScopedTypeVariables
+    TypeOperators
+    StandaloneKindSignatures
+
+    GADTs
+    TypeFamilies
+    DataKinds
+    PolyKinds
+    RankNTypes
+    MultiParamTypeClasses
+    FunctionalDependencies
+  build-depends:
+    , base                         >=4.9   && <5
+    , aeson
+    , cardano-api
+    , mtl
+    , servant
+    , servant-server
+    , transformers
+    , transformers-either
+    , text
+    , time
+    , containers
+
+executable exec
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  main-is:        App.hs
+  hs-source-dirs: app
+  build-depends:
+    , base                     >=4.9   && <5
+    , cavefish
+    , servant
+    , servant-server
+    , warp
+
+benchmark bench
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  type:           exitcode-stdio-1.0
+  main-is:        Bench.hs
+  hs-source-dirs: bench
+  build-depends:
+    , base >=4.9     && <5
+    , cavefish
+
+test-suite test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  type:           exitcode-stdio-1.0
+  main-is:        Test.hs
+  hs-source-dirs: test
+  build-depends:
+    , base >=4.9     && <5
+    , cavefish
+ 
