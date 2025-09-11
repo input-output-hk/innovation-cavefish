@@ -40,3 +40,5 @@ prototype/*.vtc
 
 # Keep curated inputs
 !prototype/wbps_circuit/*.json
+
+cavefish-server/dist-newstyle/
