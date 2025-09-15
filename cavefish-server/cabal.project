@@ -1,3 +1,16 @@
+packages:
+  ./cavefish
+
+package cooked-validators
+  coverage: True
+  library-coverage: True
+  
+package cardano-crypto-praos
+  flags: -external-libsodium-vrf
+
+-- Custom repository for cardano haskell packages
+-- See https://github.com/IntersectMBO/cardano-haskell-packages
+-- on how to use CHaP in a Haskell project.
 repository cardano-haskell-packages
   url: https://chap.intersectmbo.org/
   secure: True
@@ -10,11 +23,47 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 index-state:
-  , hackage.haskell.org 2025-06-12T04:42:37Z
-  , cardano-haskell-packages 2025-06-11T08:32:56Z
+  , hackage.haskell.org 2025-04-16T16:04:13Z
+  , cardano-haskell-packages 2025-05-16T15:25:35Z
+    
+-- We never, ever, want this.
+write-ghc-environment-files: never
 
-packages: 
-  cavefish
+-- The only sensible test display option, since it allows us to have colourized
+-- 'tasty' output.
+test-show-details: direct
 
-tests: true
-benchmarks: true
+-- These packages appear in our dependency tree and are very slow to build.
+-- Empirically, turning off optimization shaves off ~50% build time.
+-- It also mildly improves recompilation avoidance.
+-- For dev work we don't care about performance so much, so this is okay.
+package cardano-ledger-alonzo
+  optimization: False
+package ouroboros-consensus-cardano
+  optimization: False
+package cardano-api
+  optimization: False
+package cardano-crypto-praos
+  flags: -external-libsodium-vrf
+  
+constraints:
+  cardano-api == 10.16.1.0
+  
+source-repository-package
+    type: git
+    location: https://github.com/intersectMBO/cardano-node-emulator
+    tag: 6d65996418d2b00fa791407ec47e2fe77c208790
+    subdir:
+      plutus-script-utils
+      plutus-ledger
+      cardano-node-emulator
+      freer-extras
+      --sha256: 0vyf0039wdy815r0250xhnc4dvwj8rhaa16zd9ji700x1gkkh8gv
+
+source-repository-package
+    type: git
+    location: https://github.com/tweag/cooked-validators
+    tag: v7.0.0
+    subdir:
+      .
+    --sha256: 1d506dlwmg5jqfjzynlsasdc16cvh74cj804rsanryj1ld534x9m
