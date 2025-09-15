@@ -5,12 +5,16 @@ license:       Apache-2.0
 build-type:    Simple
 
 library
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   hs-source-dirs:  lib
   exposed-modules: 
-    Lib
-    Api.Api
-    NodeClient.NodeClient
+    Core.Intent
+    Core.Proof
+    Core.TxAbs
+    Observers.Observer
+    Sp.Server
+    Sp.State
+    Sp.TxBuilder
   default-language: GHC2021
   default-extensions:
     DerivingStrategies
@@ -19,10 +23,12 @@ library
     StandaloneDeriving
     DeriveAnyClass
     DeriveGeneric
+    OverloadedStrings
 
     NamedFieldPuns
     RecordWildCards
     DuplicateRecordFields
+    LambdaCase
     OverloadedRecordDot 
     ViewPatterns
 
@@ -49,17 +55,13 @@ library
     , text
     , time
     , containers
-
-executable exec
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
-  main-is:        App.hs
-  hs-source-dirs: app
-  build-depends:
-    , base                     >=4.9   && <5
-    , cavefish
-    , servant
-    , servant-server
-    , warp
+    , cooked-validators
+    , plutus-script-utils
+    , bytestring
+    , crypton
+    , plutus-ledger
+    , memory
+    , stm
 
 benchmark bench
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
