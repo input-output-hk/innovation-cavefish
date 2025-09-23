@@ -4,6 +4,11 @@ version:       0.1.0.0
 license:       Apache-2.0
 build-type:    Simple
 
+flag ide-stub
+  description: Use IDE stub for PlutusTx compile (for HLS only)
+  default: False
+  manual: True
+
 library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   hs-source-dirs:  lib
@@ -52,16 +57,25 @@ library
     , servant-server
     , transformers
     , transformers-either
+    , cardano-crypto-class
+    , plutus-ledger-api
+    , plutus-tx
     , text
     , time
     , containers
     , cooked-validators
+    , cardano-ledger-core
+    , cardano-ledger-alonzo
     , plutus-script-utils
+    , plutus-core
+    , plutus-tx-plugin
     , bytestring
     , crypton
     , plutus-ledger
     , memory
     , stm
+  if flag(ide-stub)
+    cpp-options: -DIDE_STUB
 
 benchmark bench
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
@@ -75,9 +89,62 @@ benchmark bench
 test-suite test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   type:           exitcode-stdio-1.0
-  main-is:        Test.hs
+  main-is:        Main.hs
   hs-source-dirs: test
+  default-extensions:
+    DerivingStrategies
+    GeneralizedNewtypeDeriving
+    DerivingVia
+    StandaloneDeriving
+    DeriveAnyClass
+    DeriveGeneric
+    OverloadedStrings
+
+    NamedFieldPuns
+    RecordWildCards
+    DuplicateRecordFields
+    LambdaCase
+    OverloadedRecordDot 
+    ViewPatterns
+
+    ScopedTypeVariables
+    TypeOperators
+    StandaloneKindSignatures
+
+    GADTs
+    TypeFamilies
+    DataKinds
+    PolyKinds
+    RankNTypes
+    MultiParamTypeClasses
+    FunctionalDependencies
+  other-modules:
+    Spec
   build-depends:
     , base >=4.9     && <5
     , cavefish
- 
+    , aeson
+    , bytestring
+    , cardano-api
+    , cardano-ledger-core
+    , cardano-ledger-alonzo
+    , containers
+    , servant
+    , servant-server
+    , warp
+    , hspec
+    , servant-client
+    , http-client
+    , wai
+    , text
+    , stm
+    , crypton
+    , memory
+    , plutus-ledger-api
+    , plutus-ledger
+    , plutus-script-utils
+    , cooked-validators
+    , data-default
+    , transformers
+    , mtl
+    , cardano-crypto-class

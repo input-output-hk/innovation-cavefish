@@ -42,3 +42,8 @@ prototype/*.vtc
 !prototype/wbps_circuit/*.json
 
 cavefish-server/dist-newstyle/
+cavefish-server/.local/
+cavefish-server/.cabal/
+cavefish-server/.cache/
+cavefish-server/.cabal-local/
+cavefish-server/.config/

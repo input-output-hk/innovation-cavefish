@@ -1,12 +1,12 @@
 packages:
   ./cavefish
 
+package cavefish
+  flags: +ide-stub
+
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
--- Custom repository for cardano haskell packages
--- See https://github.com/IntersectMBO/cardano-haskell-packages
--- on how to use CHaP in a Haskell project.
 repository cardano-haskell-packages
   url: https://chap.intersectmbo.org/
   secure: True
@@ -21,30 +21,24 @@ repository cardano-haskell-packages
 index-state:
   , hackage.haskell.org 2025-04-16T16:04:13Z
   , cardano-haskell-packages 2025-05-16T15:25:35Z
-    
--- We never, ever, want this.
+
 write-ghc-environment-files: never
 
--- The only sensible test display option, since it allows us to have colourized
--- 'tasty' output.
 test-show-details: direct
 
--- These packages appear in our dependency tree and are very slow to build.
--- Empirically, turning off optimization shaves off ~50% build time.
--- It also mildly improves recompilation avoidance.
--- For dev work we don't care about performance so much, so this is okay.
 package cardano-ledger-alonzo
   optimization: False
 package ouroboros-consensus-cardano
   optimization: False
 package cardano-api
   optimization: False
+
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
-  
+
 constraints:
   cardano-api == 10.16.1.0
-  
+
 source-repository-package
     type: git
     location: https://github.com/intersectMBO/cardano-node-emulator
@@ -54,7 +48,6 @@ source-repository-package
       plutus-ledger
       cardano-node-emulator
       freer-extras
-      --sha256: 0vyf0039wdy815r0250xhnc4dvwj8rhaa16zd9ji700x1gkkh8gv
 
 source-repository-package
     type: git
@@ -62,4 +55,3 @@ source-repository-package
     tag: v7.0.0
     subdir:
       .
-    --sha256: 1d506dlwmg5jqfjzynlsasdc16cvh74cj804rsanryj1ld534x9m

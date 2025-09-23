@@ -3,9 +3,11 @@
 module Core.Proof where
 
 import Cardano.Api qualified as Api
+import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Aeson
 import Data.Aeson.Types (Parser)
+import Data.ByteArray qualified as BA
 import Data.ByteArray.Encoding qualified as BAE
 import Data.ByteString (ByteString)
 import Data.Text (Text)
@@ -34,11 +36,19 @@ instance FromJSON Proof where
     Proof <$> parseHex dataHex
 
 mkProof :: Ed.SecretKey -> Api.TxId -> ByteString -> Proof
-mkProof sk txid txAbsHash = undefined -- TODO
+mkProof sk txid txAbsHash =
+  let message = domainTag <> serializeTxId txid <> txAbsHash
+      signature = Ed.sign sk (Ed.toPublic sk) message
+   in Proof (BA.convert signature)
 
 -- What the LC would call to verify
 verifyProof :: Ed.PublicKey -> Api.TxId -> ByteString -> Proof -> Bool
-verifyProof pk txid txAbsHash (Proof dataBs) = undefined -- TODO
+verifyProof pk txid txAbsHash (Proof dataBs) =
+  case Ed.signature dataBs of
+    CryptoFailed _ -> False
+    CryptoPassed sig ->
+      let message = domainTag <> serializeTxId txid <> txAbsHash
+       in Ed.verify pk message sig
 
 renderHex :: ByteString -> Text
 renderHex = TE.decodeUtf8 . BAE.convertToBase BAE.Base16
