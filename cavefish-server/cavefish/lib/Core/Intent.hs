@@ -1,23 +1,31 @@
 module Core.Intent where
 
-import Cardano.Api hiding (Env)
+import Cardano.Api
 import Cardano.Api qualified as Api
 import Cooked (MockChainState)
-import Cooked.Wallet (Wallet)
 import Core.TxAbs (TxAbs (..))
-import Crypto.PubKey.Ed25519 (SecretKey)
-import Data.ByteString (ByteString)
-import Data.Foldable (find, foldl)
+import Data.Foldable (foldl)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map as Map
 import Data.Set qualified as Set
 import Data.Text (Text)
-import Data.Time.Clock (NominalDiffTime)
 import GHC.Generics
-import Ledger (Extended (..), Interval (..), LowerBound (..), PubKey, Slot, UpperBound (..))
-import Sp.State (PendingStore)
+import Ledger (
+  Extended (..),
+  Interval (..),
+  LowerBound (..),
+  PubKey,
+  Slot,
+  UpperBound (..),
+  cardanoPubKeyHash,
+  pubKeyHash,
+ )
 
 type ChangeDelta = Api.Value
+
+newtype Spend = Spend {source :: Api.AddressInEra Api.ConwayEra}
+  deriving (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
 
 data BuildTxResult = BuildTxResult
   { tx :: Api.Tx Api.ConwayEra
@@ -26,27 +34,6 @@ data BuildTxResult = BuildTxResult
   , mockState :: MockChainState
   }
   deriving (Show, Generic)
-
--- Shouldn't really be in this file
-data Env = Env
-  { spSk :: SecretKey
-  , pending :: PendingStore
-  , ttl :: NominalDiffTime
-  , spWallet :: Wallet
-  , resolveWallet :: Api.AddressInEra Api.ConwayEra -> Maybe Wallet
-  , spFee :: Integer
-  , build ::
-      Intent ->
-      ByteString ->
-      IO BuildTxResult
-  , submit ::
-      Api.Tx Api.ConwayEra ->
-      MockChainState ->
-      IO (Either Text ())
-  , scriptReg :: [ScriptSpec]
-  -- TODO WG: Add a registry of public keys for LCs (and, come to think of it, an endpoint for registration).
-  --          That way, we can verify the signature in `finaliseH`
-  }
 
 newtype AddressW = AddressW Text
   deriving (Eq, Ord, Show, Generic)
@@ -62,17 +49,6 @@ data IntentW
   | AndExpsW (NonEmpty IntentW)
   deriving (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
-
-data ScriptInputs = ScriptInputs (Set.Set PubKey) (Interval Slot) deriving (Eq, Show, Generic)
-
-data ScriptSpec = ScriptSpec
-  { ssId :: Api.AddressInEra ConwayEra
-  , ssEval :: ScriptInputs -> Bool
-  }
-
-lookupScriptByAddr :: [ScriptSpec] -> Api.AddressInEra ConwayEra -> Maybe ScriptSpec
-lookupScriptByAddr scriptRegistry id' =
-  find (\ScriptSpec{..} -> ssId == id') scriptRegistry
 
 {- Design:
     The SP depends upon a mapping from Intent -> Transaction,
@@ -94,7 +70,7 @@ lookupScriptByAddr scriptRegistry id' =
  -}
 data IntentExpr
   = MustMint Value
-  | SpendFrom (Api.AddressInEra ConwayEra)
+  | SpendFrom Spend
   | MaxInterval Slot
   | PayTo Value (Api.AddressInEra ConwayEra)
   | ChangeTo (Api.AddressInEra ConwayEra)
@@ -103,7 +79,7 @@ data IntentExpr
   deriving (Eq, Show, Generic)
 
 data Intent = Intent
-  { irSpendFrom :: [Api.AddressInEra Api.ConwayEra]
+  { irSpendFrom :: [Spend]
   , irPayTo :: [(Api.Value, Api.AddressInEra Api.ConwayEra)]
   , irMustMint :: [Api.Value]
   , irChangeTo :: Maybe (Api.AddressInEra Api.ConwayEra)
@@ -127,7 +103,7 @@ normalizeIntent = go emptyIntent
  where
   go acc = \case
     MustMint v -> acc{irMustMint = v : irMustMint acc}
-    SpendFrom a -> acc{irSpendFrom = a : irSpendFrom acc}
+    SpendFrom s -> acc{irSpendFrom = s : irSpendFrom acc}
     MaxInterval i -> acc{irMaxInterval = Just (maybe i (min i) (irMaxInterval acc))}
     PayTo v a -> acc{irPayTo = (v, a) : irPayTo acc}
     ChangeTo a -> acc{irChangeTo = Just a}
@@ -137,7 +113,7 @@ normalizeIntent = go emptyIntent
 toIntentExpr :: IntentW -> Either Text IntentExpr
 toIntentExpr = \case
   MustMintW v -> Right (MustMint v)
-  SpendFromW addr -> SpendFrom <$> parseAddr addr
+  SpendFromW walletAddr -> fmap SpendFrom $ Spend <$> parseAddr walletAddr
   MaxIntervalW w -> Right (MaxInterval (fromInteger w))
   PayToW v a -> PayTo v <$> parseAddr a
   ChangeToW a -> ChangeTo <$> parseAddr a
@@ -153,7 +129,7 @@ toIntentExpr = \case
   toInt :: IntentW -> Either Text IntentExpr
   toInt = \case
     MustMintW v -> Right (MustMint v)
-    SpendFromW addr -> SpendFrom <$> parseAddr addr
+    SpendFromW walletAddr -> fmap SpendFrom $ Spend <$> parseAddr walletAddr
     MaxIntervalW w -> Right (MaxInterval (fromInteger w))
     PayToW v a -> PayTo v <$> parseAddr a
     ChangeToW a -> ChangeTo <$> parseAddr a
@@ -163,22 +139,16 @@ toIntentExpr = \case
 toInternalIntent :: IntentW -> Either Text Intent
 toInternalIntent = fmap normalizeIntent . toIntentExpr
 
-satisfies :: Env -> ChangeDelta -> Intent -> TxAbs Api.ConwayEra -> Bool
-satisfies env cd Intent{..} tx =
+satisfies :: ChangeDelta -> Intent -> TxAbs Api.ConwayEra -> Bool
+satisfies cd Intent{..} tx =
   and
     [ -- MustMint: v ≤ tx.mint
       let need = Map.fromList . valueToList $ mconcat irMustMint
           have = Map.fromList (valueToList tx.absMint)
        in Map.isSubmapOfBy (<=) need have
     , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
-      all
-        ( \h ->
-            -- TODO WG: Realism - Proper script lookup - Can we do that with `cooked`?
-            case lookupScriptByAddr env.scriptReg h of
-              Nothing -> False
-              Just ScriptSpec{..} -> ssEval (ScriptInputs tx.sigKeys tx.validityInterval)
-        )
-        irSpendFrom
+      -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
+      all (hasSigner tx.sigKeys . source) irSpendFrom
     , -- MaxInterval (if any): (tx.validityInterval.snd - tx.validityInterval.fst) ≤ i
       case irMaxInterval of
         Nothing -> True
@@ -194,6 +164,12 @@ satisfies env cd Intent{..} tx =
     , -- MaxFee (if any): tx.fee ≤ f
       maybe True (\f -> tx.absFee <= f) irMaxFee
     ]
+ where
+  hasSigner :: Set.Set PubKey -> Api.AddressInEra Api.ConwayEra -> Bool
+  hasSigner sigs addr =
+    case cardanoPubKeyHash addr of
+      Nothing -> False
+      Just pkh -> any ((== pkh) . pubKeyHash) (Set.toList sigs)
 
 valueLeq :: Api.Value -> Api.Value -> Bool
 valueLeq need have =

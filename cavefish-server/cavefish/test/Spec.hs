@@ -8,41 +8,46 @@
 module Spec (spec) where
 
 import qualified Cardano.Api as Api
-import Cardano.Api.Shelley (PlutusScript (..))
-import Control.Concurrent.STM (TVar, atomically, newTVarIO, readTVarIO, writeTVar)
-import Control.Monad.Identity (Identity (..))
+import qualified Client.Mock as Mock
+import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Monad.Trans.Except (runExceptT)
-import Control.Monad.Trans.State.Strict (runStateT)
-import Control.Monad.Trans.Writer (WriterT (..))
-import Cooked (MockChain, MockChainError (..), MockChainT (..), Wallet, wallet)
-import Cooked.MockChain (MonadBlockChainWithoutValidation (..), registerStakingCred)
-import Cooked.MockChain.MockChainState (MockChainState (..), mockChainState0)
-import Cooked.Skeleton (TxSkelOut, txSkelOutValue)
-import Core.Intent (AddressW (..), BuildTxResult (..), ChangeDelta, Env (..), Intent (..), IntentW (..), ScriptSpec (..), satisfies, toInternalIntent)
-import Core.Proof (mkProof)
-import Core.TxAbs (TxAbs (..), cardanoTxToTxAbs)
+import Cooked (Wallet, wallet)
+import Cooked.MockChain.MockChainState (MockChainState)
+import Core.Intent (AddressW (..), BuildTxResult (..), IntentW (..), satisfies, toInternalIntent)
+import Core.Proof (mkProof, renderHex)
+import Core.TxAbs (cardanoTxToTxAbs)
 import Crypto.Error (CryptoFailable (..))
 import qualified Crypto.PubKey.Ed25519 as Ed
+import Data.Bits (xor)
+import qualified Data.ByteArray as BA
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Data.ByteString.Short (fromShort)
-import Data.Default (def)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Ledger.Scripts (StakeValidator (getStakeValidator))
 import Ledger.Tx (
   pattern CardanoEmulatorEraTx,
  )
-import Ledger.Tx.CardanoAPI (toCardanoAddressInEra, toCardanoValue)
-import Observers.Observer (intentStakeValidatorBytes, stakeValidatorFromBytes)
+import Ledger.Tx.CardanoAPI (toCardanoAddressInEra)
 import qualified Plutus.Script.Utils.Address as ScriptAddr
-import Plutus.Script.Utils.Scripts (Language (PlutusV2), Versioned (..))
 import Servant
-import Sp.Server (FinaliseReq (..), FinaliseResp (..), FinaliseResult (..), PrepareReq (..), PrepareResp (..), finaliseH, hashTxAbs, prepareH)
-import Sp.State (Pending (..), PendingStore)
-import Sp.TxBuilder (buildTx)
+import Sp.App (Env (..), runApp)
+import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
+import Sp.Server (
+  ClientInfo (..),
+  ClientsResp (..),
+  FinaliseReq (..),
+  FinaliseResp (..),
+  FinaliseResult (..),
+  PendingItem (..),
+  PendingResp (..),
+  PrepareReq (..),
+  PrepareResp (..),
+  finaliseH,
+  hashTxAbs,
+ )
+import Sp.State (ClientId (..), ClientRegistrationStore, Pending (..), PendingStore)
 import Test.Hspec
 
 runHandlerOrFail :: Handler a -> IO a
@@ -50,116 +55,24 @@ runHandlerOrFail handler = do
   result <- runExceptT (runHandler' handler)
   either (fail . show) pure result
 
-runMockChainPure :: MockChainState -> MockChain a -> (Either MockChainError a, MockChainState)
-runMockChainPure st action =
-  let ((result, newState), _) =
-        runIdentity $
-          runWriterT $
-            runStateT (runExceptT (unMockChain action)) st
-   in (result, newState)
-
-initialMockState :: MockChainState
-initialMockState =
-  case runMockChainPure def mockChainState0 of
-    (Left err, _) -> error ("failed to initialise mock chain state: " <> show err)
-    (Right st, _) -> st
-
-mkEnvWithBuild ::
-  PendingStore ->
-  TVar MockChainState ->
-  (Env -> Intent -> ByteString -> IO BuildTxResult) ->
-  (Env -> Api.Tx Api.ConwayEra -> MockChainState -> IO (Either Text ())) ->
-  Env
-mkEnvWithBuild pendingStore _mockState buildFn submitFn = env
- where
-  env =
-    Env
-      { spSk = testSecretKey
-      , pending = pendingStore
-      , ttl = 3600
-      , spWallet = testSpWallet
-      , resolveWallet = \case
-          ((==) testPayToAddress -> True) -> Just testPayToWallet
-          ((==) testSpendFromAddress -> True) -> Just testSpendFromWallet
-          _ -> Nothing
-      , spFee = 0
-      , build = buildFn env
-      , submit = submitFn env
-      , scriptReg = mockRegistry
-      }
-
-buildTxBuild ::
-  TVar MockChainState ->
-  Env ->
-  Intent ->
-  ByteString ->
-  IO BuildTxResult
-buildTxBuild mockState env intent observerBytes = do
-  st0 <- readTVarIO mockState
-  let (result, st1) =
-        runMockChainPure st0 $ do
-          let stakeValidator = stakeValidatorFromBytes observerBytes
-              cred =
-                ScriptAddr.toCredential
-                  (Versioned (getStakeValidator stakeValidator) PlutusV2)
-          registerStakingCred cred 0 0
-          buildTx intent observerBytes env
-  case result of
-    Left err -> fail ("buildTx failed: " <> show err)
-    Right cardanoTx@(CardanoEmulatorEraTx tx) -> do
-      let txAbs = cardanoTxToTxAbs cardanoTx
-          consumed = consumedTotal st0 st1
-          produced = producedTotal (outputs txAbs)
-          delta = consumed <> Api.negateValue produced
-      pure
-        BuildTxResult
-          { tx = tx
-          , changeDelta = delta
-          , txAbs = txAbs
-          , mockState = st1
-          }
-
-consumedTotal ::
-  MockChainState -> MockChainState -> ChangeDelta
-consumedTotal stateBefore stateAfter =
-  mconcat
-    [ toConwayValue out
-    | (oref, (out, True)) <- Map.toList (mcstOutputs stateBefore)
-    , let mAfter = Map.lookup oref (mcstOutputs stateAfter)
-    , consumedInAfter mAfter
-    ]
- where
-  toConwayValue txOut =
-    case toCardanoValue (txSkelOutValue txOut) of
-      Left err -> error ("failed to convert consumed output value: " <> show err)
-      Right valueInEra -> valueInEra
-
-consumedInAfter :: Maybe (TxSkelOut, Bool) -> Bool
-consumedInAfter Nothing = True
-consumedInAfter (Just (_, present)) = not present
-
-producedTotal ::
-  [Api.TxOut Api.CtxTx Api.ConwayEra] ->
-  ChangeDelta
-producedTotal outs =
-  mconcat
-    [ Api.txOutValueToValue val
-    | Api.TxOut _ val _ _ <- outs
-    ]
-
-submitWithCooked :: TVar MockChainState -> Env -> Api.Tx Api.ConwayEra -> MockChainState -> IO (Either Text ())
-submitWithCooked mockState _ _ newState = do
-  atomically $ writeTVar mockState newState
-  pure (Right ())
+mkEnv :: PendingStore -> ClientRegistrationStore -> TVar MockChainState -> Env
+mkEnv pendingStore clientRegVar mockStateVar =
+  mkCookedEnv mockStateVar pendingStore clientRegVar testSecretKey testSpWallet 3600 0
 
 spec :: Spec
 spec = do
   describe "buildTx integration" $ do
     it "prepare -> finalise roundtrip uses buildTx" $ do
       pendingStore <- newTVarIO Map.empty
+      clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
+      let env = mkEnv pendingStore clientRegVar mockStateVar
+      let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey (Ed.toPublic testSecretKey)
+      mockClient <- runHandlerOrFail (Mock.register mockClient0)
+      registeredClientId <- mockClientIdOrFail mockClient
+      prepareReq <- mkPrepareReqOrFail registeredClientId testIntentW
       internalIntent <-
-        case toInternalIntent (intent buildTxPrepareReq) of
+        case toInternalIntent (intent prepareReq) of
           Left err -> expectationFailure (show err) >> fail "invalid buildTx intent"
           Right intent -> pure intent
 
@@ -168,29 +81,23 @@ spec = do
       --   case intentStakeValidatorBytes internalIntent of
       --     Left err -> expectationFailure (show err) >> fail "invalid observer"
       --     Right bytes -> pure bytes
-      -- expectedObserverBytes `shouldBe` buildTxPrepareReq.observer
-      let env =
-            mkEnvWithBuild
-              pendingStore
-              mockStateVar
-              (buildTxBuild mockStateVar)
-              (submitWithCooked mockStateVar)
+      -- expectedObserverBytes `shouldBe` prepareReq.observer
       BuildTxResult
         { tx = expectedTx
         , txAbs = expectedTxAbs
         , changeDelta = expectedDelta
         } <-
-        buildTxBuild mockStateVar env internalIntent buildTxPrepareReq.observer
+        buildWithCooked mockStateVar env internalIntent prepareReq.observer
       let expectedTxIdValue = Api.getTxId (Api.getTxBody expectedTx)
           expectedTxId = Api.serialiseToRawBytesHexText expectedTxIdValue
           expectedTxAbsHash = hashTxAbs expectedTxAbs
           expectedProof = mkProof (spSk env) expectedTxIdValue expectedTxAbsHash
-      PrepareResp{txId = gotTxId, txAbs = gotTxAbs, proof = gotProof} <-
-        runHandlerOrFail (prepareH env buildTxPrepareReq)
+      prepareResp@PrepareResp{txId = gotTxId, txAbs = gotTxAbs, proof = gotProof} <-
+        runHandlerOrFail (Mock.prepareAndVerifyWithClient mockClient testIntentW)
       gotTxId `shouldBe` expectedTxId
       gotTxAbs `shouldBe` expectedTxAbs
       gotProof `shouldBe` expectedProof
-      satisfies env expectedDelta internalIntent gotTxAbs `shouldBe` True
+      satisfies expectedDelta internalIntent gotTxAbs `shouldBe` True
       pendingMap <- readTVarIO pendingStore
       case Map.lookup expectedTxIdValue pendingMap of
         Nothing -> expectationFailure "pending entry not stored"
@@ -198,54 +105,130 @@ spec = do
           tx `shouldBe` expectedTx
           txAbsHash `shouldBe` expectedTxAbsHash
           let storedTxAbs = cardanoTxToTxAbs (CardanoEmulatorEraTx tx)
-          satisfies env expectedDelta internalIntent storedTxAbs `shouldBe` True
+          satisfies expectedDelta internalIntent storedTxAbs `shouldBe` True
           let storedProof = mkProof (spSk env) expectedTxIdValue txAbsHash
           gotProof `shouldBe` storedProof
-      let finaliseReq = finaliseReqDummySig gotTxId
       FinaliseResp{txId = finalTxId, result = finalResult} <-
-        runHandlerOrFail (finaliseH env finaliseReq)
+        runHandlerOrFail (Mock.finaliseWithClient mockClient prepareResp)
       pendingAfter <- readTVarIO pendingStore
       Map.notMember expectedTxIdValue pendingAfter `shouldBe` True
       finalTxId `shouldBe` gotTxId
       finalResult `shouldBe` Finalised
 
--- Dummy registry for WIP
-mockRegistry :: [ScriptSpec]
-mockRegistry = [payV1]
+    it "rejects finalise with invalid signature" $ do
+      pendingStore <- newTVarIO Map.empty
+      clientRegVar <- newTVarIO Map.empty
+      mockStateVar <- newTVarIO initialMockState
+      let env = mkEnv pendingStore clientRegVar mockStateVar
+      let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey (Ed.toPublic testSecretKey)
+      mockClient <- runHandlerOrFail (Mock.register mockClient0)
+      registeredClientId <- mockClientIdOrFail mockClient
+      prepareReq <- mkPrepareReqOrFail registeredClientId testIntentW
+      internalIntent <-
+        case toInternalIntent (intent prepareReq) of
+          Left err -> expectationFailure (show err) >> fail "invalid buildTx intent"
+          Right intent -> pure intent
 
-payV1 :: ScriptSpec
-payV1 =
-  ScriptSpec
-    { ssId = testSpendFromAddress
-    , ssEval = const True -- TODO WG: Enhance realism
-    }
+      BuildTxResult
+        { tx = expectedTx
+        , txAbs = expectedTxAbs
+        , changeDelta = _
+        } <-
+        buildWithCooked mockStateVar env internalIntent prepareReq.observer
+      let expectedTxIdValue = Api.getTxId (Api.getTxBody expectedTx)
+          expectedTxId = Api.serialiseToRawBytesHexText expectedTxIdValue
+          expectedTxAbsHash = hashTxAbs expectedTxAbs
+      _ <- runHandlerOrFail (Mock.prepareAndVerifyWithClient mockClient testIntentW)
+      pendingMap <- readTVarIO pendingStore
+      Map.member expectedTxIdValue pendingMap `shouldBe` True
+      let validFinaliseReq = Mock.mkFinaliseReq mockClient.mcLcSk expectedTxId expectedTxAbsHash
+          invalidFinaliseReq = validFinaliseReq{lcSig = corruptSignature validFinaliseReq.lcSig}
+      FinaliseResp{txId = finalTxId, result = finalResult} <-
+        runHandlerOrFail (runApp env $ finaliseH invalidFinaliseReq)
+      finalTxId `shouldBe` expectedTxId
+      finalResult `shouldBe` Rejected "invalid client signature"
+      pendingAfter <- readTVarIO pendingStore
+      Map.member expectedTxIdValue pendingAfter `shouldBe` True
 
-buildTxPrepareReq :: PrepareReq
-buildTxPrepareReq =
-  prepareReqFromIntentW
-    ( AndExpsW
-        ( PayToW testPayToValue (AddressW testPayToAddressText)
-            :| [SpendFromW (AddressW testSpendFromAddressText)]
-        )
+  describe "API surfaces" $ do
+    it "clients endpoint returns registered clients" $ do
+      pendingStore <- newTVarIO Map.empty
+      clientRegVar <- newTVarIO Map.empty
+      mockStateVar <- newTVarIO initialMockState
+      let env = mkEnv pendingStore clientRegVar mockStateVar
+          expectedPublicKey = renderHex (BA.convert (Ed.toPublic testClientSecretKey))
+      let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey (Ed.toPublic testSecretKey)
+      mockClient <- runHandlerOrFail (Mock.register mockClient0)
+      ClientId clientUuid <- mockClientIdOrFail mockClient
+      ClientsResp{clients = clientInfos} <-
+        runHandlerOrFail (Mock.getClientsWithClient mockClient)
+      clientInfos
+        `shouldBe` [ClientInfo{clientId = clientUuid, publicKey = expectedPublicKey}]
+
+    it "pending endpoint returns stored pending transactions" $ do
+      pendingStore <- newTVarIO Map.empty
+      clientRegVar <- newTVarIO Map.empty
+      mockStateVar <- newTVarIO initialMockState
+      let env = mkEnv pendingStore clientRegVar mockStateVar
+      let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey (Ed.toPublic testSecretKey)
+      mockClient <- runHandlerOrFail (Mock.register mockClient0)
+      ClientId clientUuid <- mockClientIdOrFail mockClient
+      let registeredClientId = ClientId clientUuid
+      prepareReq <- mkPrepareReqOrFail registeredClientId testIntentW
+      internalIntent <-
+        case toInternalIntent (intent prepareReq) of
+          Left err -> expectationFailure (show err) >> fail "invalid buildTx intent"
+          Right intent -> pure intent
+      BuildTxResult
+        { tx = expectedTx
+        , txAbs = expectedTxAbs
+        , changeDelta = _
+        } <-
+        buildWithCooked mockStateVar env internalIntent prepareReq.observer
+      let expectedTxIdValue = Api.getTxId (Api.getTxBody expectedTx)
+          expectedTxId = Api.serialiseToRawBytesHexText expectedTxIdValue
+          expectedTxAbsHash = hashTxAbs expectedTxAbs
+      _ <- runHandlerOrFail (Mock.prepareAndVerifyWithClient mockClient testIntentW)
+      pendingMap <- readTVarIO pendingStore
+      case Map.lookup expectedTxIdValue pendingMap of
+        Nothing -> expectationFailure "pending entry not stored"
+        Just Pending{expiry = expectedExpiry, creator} -> do
+          creator `shouldBe` registeredClientId
+          let expectedItem =
+                PendingItem
+                  { txId = expectedTxId
+                  , txAbsHash = renderHex expectedTxAbsHash
+                  , expiresAt = expectedExpiry
+                  , clientId = clientUuid
+                  }
+          PendingResp{pending = items} <-
+            runHandlerOrFail (Mock.getPendingWithClient mockClient)
+          items `shouldBe` [expectedItem]
+
+testIntentW :: IntentW
+testIntentW =
+  AndExpsW
+    ( PayToW testPayToValue (AddressW testPayToAddressText)
+        :| [SpendFromW (AddressW testSpendFromAddressText)]
     )
 
-prepareReqFromIntentW :: IntentW -> PrepareReq
-prepareReqFromIntentW iw =
-  let intent = internalIntentOrError iw
-      observerBytes =
-        case intentStakeValidatorBytes intent of
-          Left err -> error ("prepareReqFromIntentW: " <> Text.unpack err)
-          Right bs -> bs
-   in PrepareReq{intent = iw, observer = observerBytes}
+mkPrepareReqOrFail :: ClientId -> IntentW -> IO PrepareReq
+mkPrepareReqOrFail cid iw =
+  case Mock.mkPrepareReq cid iw of
+    Left err -> expectationFailure (Text.unpack err) >> fail "invalid prepare request"
+    Right req -> pure req
 
-internalIntentOrError :: IntentW -> Intent
-internalIntentOrError iw =
-  case toInternalIntent iw of
-    Left err -> error ("internalIntentOrError: " <> Text.unpack err)
-    Right intent -> intent
+mockClientIdOrFail :: Mock.MockClient -> IO ClientId
+mockClientIdOrFail mockClient =
+  case mockClient.mcClientId of
+    Nothing -> expectationFailure "mock client not registered" >> fail "mock client not registered"
+    Just cid -> pure cid
 
-finaliseReqDummySig :: Text -> FinaliseReq
-finaliseReqDummySig txId = FinaliseReq{txId = txId, lcSig = BS.replicate 64 0}
+corruptSignature :: ByteString -> ByteString
+corruptSignature bs =
+  case BS.uncons bs of
+    Nothing -> bs
+    Just (b, rest) -> BS.cons (b `xor` 0x01) rest
 
 testNetworkId :: Api.NetworkId
 testNetworkId = Api.Testnet (Api.NetworkMagic 1)
@@ -280,11 +263,11 @@ testSpendFromAddressText = Api.serialiseAddress testSpendFromAddress
 testSpWallet :: Wallet
 testSpWallet = wallet 1
 
-testObserverBytes :: ByteString
-testObserverBytes =
-  let PlutusScriptSerialised scriptBytes =
-        Api.examplePlutusScriptAlwaysSucceeds Api.WitCtxStake
-   in fromShort scriptBytes
+testClientSecretKey :: Ed.SecretKey
+testClientSecretKey =
+  case Ed.secretKey (BS.pack [101 .. 132]) of
+    CryptoPassed sk -> sk
+    CryptoFailed err -> error ("invalid client secret key: " <> show err)
 
 testSecretKey :: Ed.SecretKey
 testSecretKey =
