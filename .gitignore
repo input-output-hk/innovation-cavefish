@@ -11,6 +11,9 @@ paper/*.out
 paper/*.synctex.gz
 paper/*.synctex(busy)
 paper/*.synctex*
+paper/*.toc
+paper/*.lot
+paper/*.lof
 
 # Local PDFs inside ./paper (we keep only timestamped builds in ../publication/)
 paper/lc_main.pdf
@@ -41,9 +44,35 @@ prototype/*.vtc
 # Keep curated inputs
 !prototype/wbps_circuit/*.json
 
+# ====================================================
+# Haskell / Cabal / GHC build artifacts
+# ====================================================
 cavefish-server/dist-newstyle/
+cavefish-server/dist/
+cavefish-server/dist-*/
+cavefish-server/*.hi
+cavefish-server/*.o
+cavefish-server/*.hie
+cavefish-server/.ghc.environment.*
+cavefish-server/.deps-src/
+cavefish-server/tags
 cavefish-server/.local/
 cavefish-server/.cabal/
 cavefish-server/.cache/
 cavefish-server/.cabal-local/
 cavefish-server/.config/
+
+# ====================================================
+# Nix build results
+# ====================================================
+cavefish-server/result
+cavefish-server/result-*
+
+
+# ====================================================
+# Local dev / editor junk
+# ====================================================
+cavefish-server/.repos/
+cavefish-server/TAGS
+cavefish-server/cabal.project.local
+cavefish-server/cavefish/.hie/
