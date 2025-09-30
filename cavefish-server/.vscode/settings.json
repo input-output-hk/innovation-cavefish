@@ -1,0 +1,7 @@
+{
+  "ctags.tagFileName": "tags",
+  "ctags.executeAtStartup": true,
+  "ctags.onSave": true,
+  "ctags.command": "./gen-tags.sh",
+  "editor.gotoLocation.multipleDefinitions": "goto"
+}

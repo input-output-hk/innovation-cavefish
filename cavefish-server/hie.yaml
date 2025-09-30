@@ -1,8 +1,10 @@
 cradle:
   cabal:
-    - path: cavefish
-      component: lib:cavefish
-      cabalProject: cabal.project.hls
-    - path: cavefish/test
-      component: test:test
-      cabalProject: cabal.project.hls
+    - path: "./cavefish/lib"
+      component: "lib:cavefish"
+
+    - path: "./cavefish/bench/Bench.hs"
+      component: "cavefish:bench:bench"
+
+    - path: "./cavefish/test"
+      component: "cavefish:test:test"

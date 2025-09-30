@@ -95,6 +95,12 @@ let
     pkgs.bash
     pkgs.git
     pkgs.which
+
+    pkgs.nix-prefetch-git
+
+    # Additions for gen-tags.sh
+    pkgs.haskellPackages.fast-tags
+    pkgs.jq
   ];
 
   shell = project.shellFor {
@@ -107,10 +113,11 @@ let
     ];
 
     withHoogle = true;
-
     shellHook = ''
       ${preCommitCheck.shellHook}
+      export TMPDIR=/tmp
       export PS1="\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] "
+      alias ll="ls -l --color=auto"
     '';
   };
 
