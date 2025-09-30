@@ -9,7 +9,7 @@ module Observers.Observer where
 import Cardano.Api (ScriptHash)
 import Cardano.Api qualified as Api
 import Cardano.Api.Shelley (PlutusScript (..))
-import Core.Intent (Intent (..))
+import Core.Intent (Intent (..), source)
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (fromShort, toShort)
 import Data.Coerce (coerce)
@@ -267,7 +267,7 @@ foldrList f z xs = case xs of
 toObserverIntent :: Intent -> Either Text ObserverIntent
 toObserverIntent Intent{..} = do
   let mustMint = foldMap LedgerValue.fromCardanoValue irMustMint
-      spendFrom = LedgerAddr.cardanoAddressCredential <$> irSpendFrom
+      spendFrom = LedgerAddr.cardanoAddressCredential . source <$> irSpendFrom
       payTo = fmap (\(val, addr) -> (LedgerValue.fromCardanoValue val, LedgerAddr.toPlutusAddress addr)) irPayTo
       changeTo = LedgerAddr.toPlutusAddress <$> irChangeTo
       maxInterval = fmap ((slotLengthMillis *) . getSlot) irMaxInterval
