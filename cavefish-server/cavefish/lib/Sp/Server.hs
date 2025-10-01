@@ -12,7 +12,7 @@ import Control.Concurrent.STM
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (..))
-import Core.Intent (BuildTxResult (..), IntentW, satisfies, toInternalIntent)
+import Core.Intent (BuildTxResult (..), ChangeDelta, IntentW, satisfies, toInternalIntent)
 import Core.Proof (
   Proof,
   mkProof,
@@ -140,6 +140,8 @@ data PrepareResp = PrepareResp
   { txId :: Text
   , txAbs :: TxAbs Api.ConwayEra
   , proof :: Proof
+  , -- We need to include a `consumed - produced` here, otherwise the client can't run `satisfies` for `ChangeTo`
+    changeDelta :: ChangeDelta
   }
   deriving (Eq, Show, Generic)
 instance FromJSON PrepareResp
@@ -218,7 +220,7 @@ prepareH PrepareReq{..} = do
   liftIO . atomically $
     modifyTVar' pending (Map.insert txId (Pending tx txAbsHash expiry builtState clientId))
 
-  pure PrepareResp{txId = txIdTxt, txAbs, proof}
+  pure PrepareResp{txId = txIdTxt, txAbs, proof, changeDelta = cd}
 
 -- TODO WG: Realism - I may need to serialise this canonically myself?
 hashTxAbs :: (ToJSON a) => a -> ByteString

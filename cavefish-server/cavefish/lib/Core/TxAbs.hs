@@ -20,7 +20,6 @@ data TxAbs era = TxAbs
   , absMint :: Value
   , absFee :: Integer
   , sigKeys :: Set.Set PubKey
-  -- TODO WG: Realism - Do we need consumed inputs on here, too?
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
