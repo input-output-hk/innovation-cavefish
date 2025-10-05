@@ -1,139 +1,171 @@
-# Cavefish – WBPS Circuit (EdDSA Cardano)
+# WBPS — Cardano Encryption & Schnorr Binding Circuit
 
-This folder contains **Circom circuits** and **Python helpers** used in the Cavefish prototype for validating the WBPS (Weakly Blind Predicate Signatures) transaction-building flow. The primary circuit is an **EdDSA (Cardano variant)**; Schnorr experiments are archived under `legacy/`.
+This folder contains the **Circom circuits** and **Node.js tooling** used in the **Cavefish WBPS (Weakly Blind Predicate Signatures)** prototype.  
+The main circuit, `wbps_cardano.circom`, implements **Cardano-style ElGamal encryption** and **SHA-512 Schnorr challenge binding** under the **BabyJubJub** curve.
 
-> ⚠️ Research prototype only. Not audited. Do not reuse keys/artifacts for production.
+> ⚠️ **Research prototype only.** Not audited.  
+> Do not reuse proving or verification keys in production.
 
+---
 
-## Layout
+## 📁 Layout
 
 ```
+wbps/
+├─ circuits/
+│  └─ wbps_cardano.circom          # Main WBPS encryption + Schnorr challenge circuit
+│
+├─ examples/
+│  └─ wbps_cardano_input.json      # Curated example input (public + private bits)
+│
+├─ tooling/
+│  └─ inputgen/
+│     ├─ gen_wbps_input.js         # Optional input generator (PoseidonEx-based)
+│     └─ package.json
+│
+├─ vendor/
+│  ├─ circomlib/                   # Poseidon, BabyJub, bitify (auto-cloned)
+│  └─ hashing_circuits/            # SHA-512 bitwise (for EdDSA-style hashes)
+│
+├─ Makefile                        # Build automation: compile → witness → setup → prove → verify
+└─ build/                          # Generated artifacts (r1cs, wasm, wtns, zkey, etc.)
+```
 
-wbps\_circuit/
-├─ circ\_eddsa\_cardano.circom             # main EdDSA circuit (Cardano variant)
-├─ circ\_eddsa\_cardano\_predicate.circom   # optional predicate-split variant
-├─ circ\_BN256\_blake.circom               # helper gadget
-├─ circ\_eddsa\_cardano.py                 # Python helpers / input generator
-├─ vectors/
-│  └─ circ\_eddsa\_cardano\_input.json      # curated input (bits for A, R, S, msg)
-└─ legacy/
-├─ circ\_schnorr\_bitcoin\*.circom
-└─ circ\_schnorr\_bitcoin\*.py
+---
 
-````
+## ⚙️ Prerequisites
 
-## Prerequisites
-
-- [circom](https://docs.circom.io/getting-started/installation/) **2.2.x**  
-- [snarkjs](https://github.com/iden3/snarkjs) **0.7.x** (`npm i -g snarkjs@0.7.x`)  
+- **circom** ≥ 2.1.0  
+  Install globally:
+  ```bash
+  npm install -g circom
+  ```
+- **snarkjs** ≥ 0.7.0  
+  ```bash
+  npm install -g snarkjs
+  ```
 - **Node.js** ≥ 18  
-- **Python 3.10+** (for helpers)
+- **Optional:** Python 3.10+ (for analytics or debugging)
 
-This repository already tracks **circomlib** as a submodule at `prototype/circomlib`.
+---
 
-Clone with submodules (recommended):
+## 🚀 Quick Start
 
-```bash
-git clone --recurse-submodules <repo-url>
-````
-
-If you already cloned without `--recurse-submodules`, run:
+You can build and verify the full proof in one command:
 
 ```bash
-git submodule update --init --recursive
+cd wbps
+make
 ```
 
-## Quick Start (recommended)
+This performs:
+```
+1. Clone circomlib into vendor/
+2. Compile wbps_cardano.circom → R1CS + WASM
+3. Use example input (examples/wbps_cardano_input.json)
+4. Compute witness
+5. Setup proving keys (Powers of Tau)
+6. Generate and verify Groth16 proof
+```
 
-Use the Makefile to run the whole flow:
+At the end you should see:
+
+```
+✅ [Verify] Checking proof
+snarkJS: OK!
+```
+
+---
+
+## 🧉 Input Handling
+
+The project supports **two input modes**:
+
+| Mode | Command | Description |
+|------|----------|-------------|
+| **Example Input (default)** | `make` | Uses curated `examples/wbps_cardano_input.json` |
+| **Generated Input** | `make with-generated-input` | Rebuilds input via Poseidon-based JS generator |
+
+To inspect generator output:
+```bash
+make gen-input-debug
+```
+
+This logs step-by-step Poseidon and encryption parameters used to produce ciphertext limbs.
+
+---
+
+## 🏰 Manual Flow (Debug Mode)
+
+If you prefer explicit commands:
 
 ```bash
-cd prototype/wbps_circuit
+# 1. Compile circuit
+circom circuits/wbps_cardano.circom --r1cs --wasm --sym \
+  -l vendor/circomlib -l vendor/hashing_circuits -l .
 
-# ensure input vector is linked once
-[ -f circ_eddsa_cardano_input.json ] || ln -s vectors/circ_eddsa_cardano_input.json circ_eddsa_cardano_input.json
+# 2. Compute witness
+snarkjs wtns calculate build/wbps_cardano/wbps_cardano_js/wbps_cardano.wasm \
+  examples/wbps_cardano_input.json \
+  build/wbps_cardano/wbps_cardano.wtns
 
-make    # compile → witness → setup → prove → verify
+# 3. Export public inputs
+snarkjs wtns export json build/wbps_cardano/wbps_cardano.wtns \
+  build/wbps_cardano/wbps_cardano_public.json
+
+# 4. Trusted setup (phases 1 & 2)
+snarkjs powersoftau new bn128 19 build/keys/powersoftau.ptau
+snarkjs powersoftau prepare phase2 build/keys/powersoftau.ptau build/keys/pot_final.ptau
+
+# 5. Proving & verification keys
+snarkjs groth16 setup build/wbps_cardano/wbps_cardano.r1cs build/keys/pot_final.ptau build/wbps_cardano/wbps_cardano.zkey
+snarkjs zkey export verificationkey build/wbps_cardano/wbps_cardano.zkey build/wbps_cardano/wbps_cardano_verifkey.json
+
+# 6. Proof generation & verification
+snarkjs groth16 prove build/wbps_cardano/wbps_cardano.zkey \
+  build/wbps_cardano/wbps_cardano.wtns \
+  build/wbps_cardano/wbps_cardano_proof.json \
+  build/wbps_cardano/wbps_cardano_public.json
+
+snarkjs groth16 verify \
+  build/wbps_cardano/wbps_cardano_verifkey.json \
+  build/wbps_cardano/wbps_cardano_public.json \
+  build/wbps_cardano/wbps_cardano_proof.json
 ```
 
-At the end, you should see:
+---
 
-```
-[INFO]  snarkJS: OK!
-```
+## 🔍 Circuit Logs (numeric tags)
 
-## Manual Flow (for debugging)
+The circuit uses **numeric log tags** for human-traceable debugging.  
+Here’s what they mean:
 
+| Tag Range | Description |
+|------------|--------------|
+| `900010–900011` | `g^ρ` (fixed-base scalar multiplication result) |
+| `900200+ t` | Per-limb encryption log (msg, rand, Cmsg, delta) |
+| `900300+ i` | SHA-512 digest bytes (Cardano Schnorr challenge) |
+
+These appear in witness-generation logs (`make witness`) for easier correlation with the generator output.
+
+---
+
+## 🧮 Generator Overview
+
+The JS generator (`tooling/inputgen/gen_wbps_input.js`) produces reproducible Poseidon-based ciphertexts:
+- Uses `PoseidonEx(2,1)` for initial seed.
+- Expands into a stream with chained `PoseidonEx(1,2)` squeezes.
+- Computes `Cmsg[i] = msg[i] + rand[i] mod q`.
+
+Run standalone:
 ```bash
-circom circ_eddsa_cardano.circom --r1cs --wasm --sym \
-  -l ../circomlib \
-  -l ../hashing_circuits \
-  -l .
-
-snarkjs wtns calculate circ_eddsa_cardano_js/circ_eddsa_cardano.wasm \
-  circ_eddsa_cardano_input.json \
-  circ_eddsa_cardano.wtns
-
-snarkjs wtns export json circ_eddsa_cardano.wtns circ_eddsa_cardano_public.json
-snarkjs powersoftau new bn128 19 powersoftau.ptau
-snarkjs powersoftau prepare phase2 powersoftau.ptau pot_final.ptau
-snarkjs groth16 setup circ_eddsa_cardano.r1cs pot_final.ptau circ_eddsa_cardano.zkey
-snarkjs zkey export verificationkey circ_eddsa_cardano.zkey circ_eddsa_cardano_verifkey.json
-snarkjs groth16 prove circ_eddsa_cardano.zkey circ_eddsa_cardano.wtns circ_eddsa_cardano_proof.json circ_eddsa_cardano_public.json
-snarkjs groth16 verify circ_eddsa_cardano_verifkey.json circ_eddsa_cardano_public.json circ_eddsa_cardano_proof.json
+node tooling/inputgen/gen_wbps_input.js --out build/wbps_cardano/wbps_cardano_input.json --debug
 ```
 
-## Signals
+---
 
-* `A[]` – public key bits
-* `R[]` – signature nonce point bits
-* `S[]` – signature scalar bits
-* `msg[]` – message bits
+## 🧠 Legacy Note
 
-Curated vectors are in `vectors/`.
-Use the Python helper to materialize inputs correctly.
-
-## Generating your own vectors
-
-You can create valid input JSONs from a Cardano-style EdDSA key, signature, and message using the included Python helper.
-
-Example: `circ_eddsa_cardano.py`:
-
-```python
-#!/usr/bin/env python3
-import json
-
-def bits_from_bytes(b: bytes) -> list[int]:
-    return [(byte >> i) & 1 for byte in b for i in range(8)]
-
-def make_vector(pk_hex: str, R_hex: str, S_hex: str, msg_hex: str):
-    A = bits_from_bytes(bytes.fromhex(pk_hex))
-    R = bits_from_bytes(bytes.fromhex(R_hex))
-    S = bits_from_bytes(bytes.fromhex(S_hex))
-    msg = bits_from_bytes(bytes.fromhex(msg_hex))
-    return {"A": A, "R": R, "S": S, "msg": msg}
-
-if __name__ == "__main__":
-    pk  = "…"   # 32-byte hex public key
-    R   = "…"   # 32-byte hex R component of signature
-    S   = "…"   # 32-byte hex S component of signature
-    msg = "…"   # message in hex
-
-    vector = make_vector(pk, R, S, msg)
-    with open("circ_eddsa_cardano_input.json", "w") as f:
-        json.dump(vector, f)
-    print("Wrote circ_eddsa_cardano_input.json")
-```
-
-Run it:
-
-```bash
-python3 circ_eddsa_cardano.py
-```
-
-This produces `circ_eddsa_cardano_input.json`, ready for `make witness`.
-
-## Legacy
-
-The `legacy/` folder contains Schnorr circuits and scripts from earlier experiments. They are kept for reference but are not part of the validated flow.
+Older experiments based on `circ_eddsa_cardano.circom` (EdDSA path) have been superseded by this new **WBPS encryption + Schnorr** formulation.  
+The current setup focuses on **security modeling**, **log consistency**, and **PoseidonEx correctness** for Cavefish research.
 
