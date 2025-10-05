@@ -23,26 +23,37 @@ paper/light-clients.pdf
 paper/tmp/
 
 # ====================================================
-# Cryptography / Circuit build artifacts (restricted to ./prototype)
+# Cryptography / Circuit build artifacts (restricted to ./wbps)
 # ====================================================
-prototype/circomlib/
-prototype/secp256k1/
-prototype/secp256k1_non_native_modP/
-prototype/wbps_circuit/circ_eddsa_cardano_js/
+
+# Vendor dependencies (circomlib, hashing_circuits, etc.)
+wbps/vendor/
 
 # Circom / snarkjs artifacts
-prototype/*.ptau
-prototype/*.json
-prototype/*.js
-prototype/*.wasm
-prototype/*.zkey
-prototype/*.wtns
-prototype/*.r1cs
-prototype/*.sym
-prototype/*.vtc
+wbps/*.ptau
+wbps/*.json
+wbps/*.js
+wbps/*.wasm
+wbps/*.zkey
+wbps/*.wtns
+wbps/*.r1cs
+wbps/*.sym
+wbps/*.vtc
 
-# Keep curated inputs
-!prototype/wbps_circuit/*.json
+# Build outputs (intermediate & generated)
+wbps/build/
+wbps/*.log
+
+# Node modules (for tooling/inputgen)
+wbps/tooling/inputgen/node_modules/
+wbps/tooling/inputgen/package-lock.json
+
+# Generated inputs (except curated examples)
+wbps/tooling/inputgen/generated/
+!wbps/examples/*.json
+
+# Keep curated example inputs
+!wbps/examples/*.json
 
 # ====================================================
 # Haskell / Cabal / GHC build artifacts
@@ -68,7 +79,6 @@ cavefish-server/.config/
 cavefish-server/result
 cavefish-server/result-*
 
-
 # ====================================================
 # Local dev / editor junk
 # ====================================================
@@ -77,23 +87,10 @@ cavefish-server/TAGS
 cavefish-server/cabal.project.local
 cavefish-server/cavefish/.hie/
 
-
 # ====================================================
 # ZK / Circom local development artifacts
 # ====================================================
-# Node modules (for input generator and scripts)
-prototype/wbps_circuit/tooling/inputgen/node_modules/
-prototype/wbps_circuit/tooling/inputgen/package-lock.json
-
-# Build outputs
-prototype/wbps_circuit/build/
-prototype/wbps_circuit/*.log
-
-# Generated inputs (except curated examples)
-prototype/wbps_circuit/tooling/inputgen/generated/
-!prototype/wbps_circuit/examples/*.json
-
-# IDE / OS / misc junk
-prototype/wbps_circuit/.DS_Store
-prototype/wbps_circuit/.vscode/
-prototype/wbps_circuit/.idea/
+# Local editor and system files
+wbps/.DS_Store
+wbps/.vscode/
+wbps/.idea/
