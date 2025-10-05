@@ -76,3 +76,24 @@ cavefish-server/.repos/
 cavefish-server/TAGS
 cavefish-server/cabal.project.local
 cavefish-server/cavefish/.hie/
+
+
+# ====================================================
+# ZK / Circom local development artifacts
+# ====================================================
+# Node modules (for input generator and scripts)
+prototype/wbps_circuit/tooling/inputgen/node_modules/
+prototype/wbps_circuit/tooling/inputgen/package-lock.json
+
+# Build outputs
+prototype/wbps_circuit/build/
+prototype/wbps_circuit/*.log
+
+# Generated inputs (except curated examples)
+prototype/wbps_circuit/tooling/inputgen/generated/
+!prototype/wbps_circuit/examples/*.json
+
+# IDE / OS / misc junk
+prototype/wbps_circuit/.DS_Store
+prototype/wbps_circuit/.vscode/
+prototype/wbps_circuit/.idea/
