@@ -1,73 +1,99 @@
 # ======================================================================
-# Cavefish prototype – ZK workflow for circ_eddsa_cardano (Circom + snarkjs)
-# ======================================================================
-# See README in repo root for usage.
+# Cavefish prototype – ZK workflow (Circom + snarkjs)
+# Structure:
+#   circuits/          -> *.circom sources
+#   tooling/inputgen/  -> gen_wbps_input.js (optional on-demand generator)
+#   build/<name>/      -> per-circuit artifacts (incl. *_input.json)
+#   build/keys/        -> trusted setup files (ptau)
+#
+# Default behavior:
+#   - Uses example input (examples/<circuit>_input.json)
+#   - Generator runs only when you call: make with-generated-input
 # ======================================================================
 
 SHELL := bash
 .ONESHELL:
+.DELETE_ON_ERROR:
 
 # --- Configuration ------------------------------------------------------
 
-CIRCUIT   ?= circ_eddsa_cardano
+CIRCUIT   ?= wbps_cardano
 PTAU_BITS ?= 19
 CURVE     ?= bn128
+
+# Paths
+CIRCUIT_DIR := circuits
+BUILD_DIR   := build
+ARTIFACT    := $(BUILD_DIR)/$(CIRCUIT)
+KEYDIR      := $(BUILD_DIR)/keys
+
 INCLUDES  := -l ../circomlib -l ../hashing_circuits -l .
 CIRCOMLIB_TAG ?= v1.0.6
 
-# All build artifacts go under BUILD_DIR/<CIRCUIT>/
-BUILD_DIR ?= build
-ARTIFACT  := $(BUILD_DIR)/$(CIRCUIT)
-# Keys (trusted setup) go here
-KEYDIR    := $(BUILD_DIR)/keys
+# --- I/O files ----------------------------------------------------------
 
-# Outputs (r1cs/wasm/sym/wtns/json/proof/keys) live under $(ARTIFACT)/
+CIRCUIT_FILE := $(CIRCUIT_DIR)/$(CIRCUIT).circom
+
 R1CS   := $(ARTIFACT)/$(CIRCUIT).r1cs
 WASM   := $(ARTIFACT)/$(CIRCUIT)_js/$(CIRCUIT).wasm
 SYM    := $(ARTIFACT)/$(CIRCUIT).sym
 WIT    := $(ARTIFACT)/$(CIRCUIT).wtns
-INPUT  ?= examples/$(CIRCUIT)_input.json
+INPUT  ?= $(ARTIFACT)/$(CIRCUIT)_input.json
 PUB    := $(ARTIFACT)/$(CIRCUIT)_public.json
 PROOF  := $(ARTIFACT)/$(CIRCUIT)_proof.json
 ZKEY   := $(ARTIFACT)/$(CIRCUIT).zkey
 VK     := $(ARTIFACT)/$(CIRCUIT)_verifkey.json
 
-# Ceremony files kept inside KEYDIR/
 PTAU1  := $(KEYDIR)/powersoftau.ptau
 PTAU2  := $(KEYDIR)/pot_final.ptau
 
-# Input generator script
-PYGEN := ./$(CIRCUIT).py
+# Example input (used by default)
+EXAMPLE_INPUT := examples/$(CIRCUIT)_input.json
+
+# ==== Node-based input generator (optional) =============================
+GEN_DIR    := tooling/inputgen
+GEN_BIN    := $(GEN_DIR)/gen_wbps_input.js
+GEN_PKJ    := $(GEN_DIR)/package.json
+GEN_NODEM  := $(GEN_DIR)/node_modules
+GEN_DEBUG  ?= 0            # set to 1 or call `make gen-input-debug` to pass --debug
+GEN_ARGS   := --out $(abspath $(INPUT)) $(if $(filter 1,$(GEN_DEBUG)),--debug,)
 
 # --- Phony targets ------------------------------------------------------
 
-.PHONY: all help compile witness setup prove verify info size-hint clean distclean clobber \
-        deps deps-circomlib deps-hashing
+.PHONY: all help with-example with-generated-input \
+        compile witness setup prove verify info size-hint clean distclean clobber \
+        deps deps-circomlib deps-hashing tree \
+        use-example-input gen-input gen-input-debug public show-paths
 
-all: compile witness setup prove verify
+# Default flow now uses the example input
+all: with-example
 
 help:
-	@echo "Cavefish ZK Makefile"
+	@echo "ZK Makefile"
 	@echo
-	@echo "Usage: make [target] [CIRCUIT=name] [PTAU_BITS=N] [CURVE=bn128] [BUILD_DIR=build]"
+	@echo "Default:"
+	@echo "  make (or make with-example)  -> compile + example input + witness + setup + prove + verify"
 	@echo
-	@echo "Targets:"
-	@echo "  all         Run compile → witness → setup → prove → verify"
-	@echo "  compile     Compile $(CIRCUIT).circom to R1CS/WASM/SYM (under $(ARTIFACT))"
-	@echo "  witness     Compute witness + export public signals (under $(ARTIFACT))"
-	@echo "  setup       Run PoT (phase1/2), Groth16 setup, export VK (under $(BUILD_DIR))"
-	@echo "  prove       Produce Groth16 proof JSON (under $(ARTIFACT))"
-	@echo "  verify      Verify proof with VK and public signals"
-	@echo "  info        Print constraint count and circuit stats"
-	@echo "  size-hint   Suggest PTAU_BITS based on constraints"
-	@echo "  clean       Remove build artifacts (keeps *.ptau, *.zkey)"
-	@echo "  distclean   Remove ALL artifacts including *.ptau/*.zkey"
+	@echo "Explicit generator:"
+	@echo "  make with-generated-input     -> compile + generate input + witness + setup + prove + verify"
+	@echo "  make gen-input                -> just (re)generate input file"
+	@echo "  make gen-input-debug          -> same as gen-input with --debug"
 	@echo
-	@echo "Variables:"
-	@echo "  CIRCUIT=$(CIRCUIT)   PTAU_BITS=$(PTAU_BITS)   CURVE=$(CURVE)   CIRCOMLIB_TAG=$(CIRCOMLIB_TAG)"
-	@echo "  BUILD_DIR=$(BUILD_DIR)  INPUT=$(INPUT)"
+	@echo "Other targets: compile | witness | setup | prove | verify | info | size-hint | clean | distclean | clobber"
+	@echo "Vars: CIRCUIT=$(CIRCUIT) PTAU_BITS=$(PTAU_BITS) CURVE=$(CURVE)"
+	@echo "      INPUT=$(INPUT)"
 
-# --- First-run bootstrap ------------------------------------------------
+tree:
+	@printf "%s\n" "circuits/" "tooling/inputgen/" "build/<circuit>/" "build/keys/"
+
+# -----------------------------------------------------------------------
+# Entry-point flows
+# -----------------------------------------------------------------------
+
+with-example: compile use-example-input witness setup prove verify
+with-generated-input: compile gen-input witness setup prove verify
+
+# --- Deps ---------------------------------------------------------------
 
 deps: deps-circomlib deps-hashing
 
@@ -76,13 +102,8 @@ deps: deps-circomlib deps-hashing
 	if [ ! -d "../circomlib/.git" ]; then \
 	  git clone https://github.com/iden3/circomlib.git ../circomlib; \
 	  cd ../circomlib && git checkout $(CIRCOMLIB_TAG); \
-	else \
-	  echo "ℹ️  circomlib already present at ../circomlib"; \
-	fi
-	@test -f ../circomlib/circuits/poseidon.circom || { \
-	  echo "❌ poseidon.circom not found in circomlib"; \
-	  exit 1; \
-	}
+	else echo "ℹ️  circomlib present"; fi
+	@test -f ../circomlib/circuits/poseidon.circom || { echo "❌ poseidon.circom missing"; exit 1; }
 
 deps-circomlib: ../circomlib/circuits/poseidon.circom
 
@@ -94,7 +115,6 @@ deps-hashing: ../hashing_circuits
 
 # --- Build steps --------------------------------------------------------
 
-# Ensure artifact dirs exist
 $(ARTIFACT):
 	@mkdir -p $(ARTIFACT)
 
@@ -103,67 +123,100 @@ $(KEYDIR):
 
 compile: deps $(R1CS) $(WASM) $(SYM)
 
-$(R1CS) $(WASM) $(SYM): $(CIRCUIT).circom | $(ARTIFACT)
-	@echo "🔧 [Compile] Building constraint system + WASM for $(CIRCUIT).circom → $(ARTIFACT)/"
-	circom $(CIRCUIT).circom --r1cs --wasm --sym $(INCLUDES) -o $(ARTIFACT)
+$(R1CS) $(WASM) $(SYM): $(CIRCUIT_FILE) | $(ARTIFACT)
+	@echo "🔧 [Compile] $(CIRCUIT_FILE) → $(ARTIFACT)/"
+	circom $(CIRCUIT_FILE) --r1cs --wasm --sym $(INCLUDES) -o $(ARTIFACT)
 
-witness: compile $(WIT) $(PUB)
+# -----------------------------------------------------------------------
+# Input handling
+#   Default: copy example → $(INPUT)
+#   Optional: run generator to produce $(INPUT)
+# -----------------------------------------------------------------------
 
-$(INPUT): $(PYGEN)
+use-example-input: $(INPUT)
+
+$(INPUT): $(EXAMPLE_INPUT) | $(ARTIFACT)
+	@cp $(EXAMPLE_INPUT) $(INPUT)
+	@echo "📥 Using example input → $(INPUT)"
+
+# Generator deps only when needed
+$(GEN_NODEM): $(GEN_PKJ)
+	@echo "📦 [Deps] Installing input generator deps in $(GEN_DIR)"
+	cd $(GEN_DIR); \
+	if [ ! -f package-lock.json ]; then npm install --no-fund --no-audit; \
+	else npm ci --no-fund --no-audit; fi
+	@echo "✅  deps installed"
+
+gen-input: $(GEN_BIN) $(GEN_NODEM) | $(ARTIFACT)
 	@set -euo pipefail
-	@abs_in="$(abspath $@)"; \
-	abs_dir="$$(dirname "$$abs_in")"; \
-	echo "📝 [Init] Generating $$abs_in via $(PYGEN)"; \
-	mkdir -p "$$abs_dir"; \
-	python3 "$(abspath $(PYGEN))" "$$abs_in"; \
-	echo "✅  Wrote $$abs_in"
+	@echo "📝 [Init] Generating $(abspath $(INPUT)) via $(GEN_BIN)"
+	node "$(GEN_BIN)" $(GEN_ARGS)
+	@echo "✅  Wrote $(abspath $(INPUT))"
+
+gen-input-debug:
+	@$(MAKE) gen-input GEN_DEBUG=1
+
+# --- Witness & public export -------------------------------------------
+
+witness: $(WIT) $(PUB)
+
+# Log legend before witness generation
+define WBPS_LOG_LEGEND
+───────────────────────────────────────────────────────────────
+🧭 WBPS CIRCUIT LOG LEGEND
+───────────────────────────────────────────────────────────────
+  900010 → g^ρ.x             (x-coordinate of generator^rho)
+  900011 → g^ρ.y             (y-coordinate of generator^rho)
+
+  900200 + i → per-limb diagnostics (for i-th 254-bit chunk):
+      1st line → msg_i      (message limb)
+      2nd line → rand_i     (Poseidon-derived random mask)
+      3rd line → sum_i      (msg_i + rand_i)
+      4th line → Cmsg[i]    (cipher limb from public input)
+      5th line → delta_i    (Cmsg[i] - sum_i, must be 0 if valid)
+
+  900300 + j → SHA-512 digest bytes (c_schnorr[j])
+───────────────────────────────────────────────────────────────
+endef
+export WBPS_LOG_LEGEND
 
 $(WIT): $(WASM) $(INPUT) | $(ARTIFACT)
-	@set -euo pipefail
-	@[ -f "$(INPUT)" ] || { \
-	  echo "❌ Missing input file: $(INPUT)"; \
-	  exit 1; \
-	}
-	@echo "🧮 [Witness] Computing witness from $(INPUT) → $(WIT)"
+	@echo "$$WBPS_LOG_LEGEND"
+	@echo "🧮 [Witness] $(INPUT) → $(WIT)"
 	snarkjs wtns calculate $(WASM) $(INPUT) $(WIT)
 
 $(PUB): $(WIT) | $(ARTIFACT)
-	@set -euo pipefail
-	@echo "📤 [Witness] Exporting public signals → $(PUB)"
+	@echo "📤 [Witness] Export public → $(PUB)"
 	snarkjs wtns export json $(WIT) $(PUB)
+
+# --- Setup / Prove / Verify --------------------------------------------
 
 setup: $(VK)
 
 $(PTAU1): | $(KEYDIR)
-	@set -euo pipefail
-	@echo "🌍 [Setup/Phase1] Powers of Tau (curve=$(CURVE), size=2^$(PTAU_BITS)) → $(PTAU1)"
+	@echo "🌍 [Setup/Phase1] curve=$(CURVE), size=2^$(PTAU_BITS) → $(PTAU1)"
 	snarkjs powersoftau new $(CURVE) $(PTAU_BITS) $(PTAU1)
 
 $(PTAU2): $(PTAU1) | $(KEYDIR)
-	@set -euo pipefail
-	@echo "🔑 [Setup/Phase2] Specializing universal PoT → $(PTAU2)"
+	@echo "🔑 [Setup/Phase2] PoT phase2 → $(PTAU2)"
 	snarkjs powersoftau prepare phase2 $(PTAU1) $(PTAU2)
 
 $(ZKEY): $(R1CS) $(PTAU2) | $(ARTIFACT)
-	@set -euo pipefail
-	@echo "📦 [Setup/Groth16] Creating proving key for $(CIRCUIT) → $(ZKEY)"
+	@echo "📦 [Setup/Groth16] Proving key → $(ZKEY)"
 	snarkjs groth16 setup $(R1CS) $(PTAU2) $(ZKEY)
 
 $(VK): $(ZKEY) | $(ARTIFACT)
-	@set -euo pipefail
-	@echo "🔍 [Setup/Groth16] Exporting verification key → $(VK)"
+	@echo "🔍 [Setup/Groth16] Verification key → $(VK)"
 	snarkjs zkey export verificationkey $(ZKEY) $(VK)
 
 prove: $(PROOF)
 
 $(PROOF): $(ZKEY) $(WIT) $(PUB) | $(ARTIFACT)
-	@set -euo pipefail
-	@echo "🛡️  [Prove] Generating Groth16 proof → $(PROOF)"
+	@echo "🛡️  [Prove] Generating proof → $(PROOF)"
 	snarkjs groth16 prove $(ZKEY) $(WIT) $(PROOF) $(PUB)
 
 verify: $(VK) $(PUB) $(PROOF)
-	@set -euo pipefail
-	@echo "✅ [Verify] Checking proof with verification key"
+	@echo "✅ [Verify] Checking proof"
 	snarkjs groth16 verify $(VK) $(PUB) $(PROOF)
 
 # --- Utilities ----------------------------------------------------------
@@ -183,34 +236,38 @@ n=int(sys.argv[1])\n\
 bits = math.ceil(math.log2(max(n,1)))+1\n\
 print(bits)\n\
 PY\n\
-); \
-	echo "Constraints: $$N"; \
-	echo "Suggested PTAU_BITS: $$REQ (current: $(PTAU_BITS))"
+); echo "Constraints: $$N"; echo "Suggested PTAU_BITS: $$REQ (current: $(PTAU_BITS))"
+
+public: $(PUB)
+
+show-paths:
+	@echo "Circuit:        $(CIRCUIT_FILE)"
+	@echo "Build dir:      $(ARTIFACT)"
+	@echo "WASM:           $(WASM)"
+	@echo "R1CS:           $(R1CS)"
+	@echo "SYM:            $(SYM)"
+	@echo "Input (build):  $(INPUT)"
+	@echo "Input (example):$(EXAMPLE_INPUT)"
+	@echo "Witness:        $(WIT)"
+	@echo "Public:         $(PUB)"
+	@echo "Proof:          $(PROOF)"
+	@echo "VK:             $(VK)"
+	@echo "PTAU1:          $(PTAU1)"
+	@echo "PTAU2:          $(PTAU2)"
 
 # --- Cleanup ------------------------------------------------------------
 
-.DELETE_ON_ERROR:
-
-.PHONY: clean distclean clobber
-
 clean:
-	@echo ">> clean: removing build outputs"
-	$(RM) -r $(BUILD_DIR)
+	@echo ">> clean: removing build outputs for $(CIRCUIT)"
+	$(RM) -r $(BUILD_DIR)/$(CIRCUIT)
 
 distclean: clean
-	@echo ">> distclean: removing zk artifacts"
-	$(RM) -f $(ARTIFACT)/*.zkey $(ARTIFACT)/*.wtns $(ARTIFACT)/*.vkey \
-	        $(ARTIFACT)/*proof.json $(ARTIFACT)/*public.json \
-	        $(ARTIFACT)/*verifier.sol
-	@find $(BUILD_DIR) -type f \( -name '*.zkey' -o -name '*.wtns' -o -name '*.vkey' \
-	    -o -name 'proof.json' -o -name 'public.json' -o -name 'verifier.sol' \) -delete || true
+	@echo ">> distclean: removing zk artifacts (except *.ptau/*.tau)"
+	@find $(BUILD_DIR) -type f \( -name '*.zkey' -o -name '*.wtns' -o -name '*.vkey' -o -name 'proof.json' -o -name '*_proof.json' -o -name 'public.json' -o -name '*_public.json' -o -name 'verifier.sol' \) -print -delete || true
 
 clobber:
-	@if [ "$$ALLOW_CLOBBER" != "1" ]; then \
-	  echo "Refusing to delete *.ptau/*.tau without ALLOW_CLOBBER=1"; exit 2; \
-	fi
+	@if [ "$$ALLOW_CLOBBER" != "1" ]; then echo "Refusing to delete *.ptau/*.tau without ALLOW_CLOBBER=1"; exit 2; fi
 	@echo ">> clobber: removing trusted setup files"
-	$(RM) -f $(KEYDIR)/*.ptau $(KEYDIR)/*.tau
-	$(RM) -f ./*.ptau ./*.tau
+	@find $(KEYDIR) -type f \( -name '*.ptau' -o -name '*.tau' \) -print -delete || true
 
 .PRECIOUS: $(R1CS) $(WASM) $(WIT) $(PTAU1) $(PTAU2) $(ZKEY)
