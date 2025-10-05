@@ -5,16 +5,16 @@
 pragma circom 2.1.2;
 
 // Poseidon hash / sponge (for PRF stream)
-include "../circomlib/circuits/poseidon.circom";
+include "../vendor/circomlib/circuits/poseidon.circom";
 
 // Scalar multiplication gadgets
-include "../circomlib/circuits/escalarmulany.circom";
+include "../vendor/circomlib/circuits/escalarmulany.circom";
 
 // Bits <-> number helpers
-include "../circomlib/circuits/bitify.circom";
+include "../vendor/circomlib/circuits/bitify.circom";
 
 // SHA-512 bitwise (Cardano EdDSA)
-include "../hashing_circuits/sha2/sha512/sha512_hash_bits.circom";
+include "hashing/sha2/sha512/sha512_hash_bits.circom";
 
 template CardanoWBPS(n, sb_n, sb_o) {
     // ------------------------------------------------------------------
