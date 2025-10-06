@@ -9,18 +9,19 @@ import Cooked.Wallet (Wallet, knownWallets)
 import Core.Intent (BuildTxResult, Intent)
 import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.ByteString (ByteString)
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime)
-import Data.Map.Strict qualified as Map
-import Servant.Server (Handler)
-import Servant.Server.Internal.ServerError (ServerError)
-import Sp.State (ClientRegistrationStore, PendingStore)
 import Ledger.Address qualified as Ledger
 import Ledger.CardanoWallet qualified as CW
+import Servant.Server (Handler)
+import Servant.Server.Internal.ServerError (ServerError)
+import Sp.State (ClientRegistrationStore, CompleteStore, PendingStore)
 
 data Env = Env
   { spSk :: SecretKey
   , pending :: PendingStore
+  , complete :: CompleteStore
   , clientRegistration :: ClientRegistrationStore
   , ttl :: NominalDiffTime
   , spWallet :: Wallet

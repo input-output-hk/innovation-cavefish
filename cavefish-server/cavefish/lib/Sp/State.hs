@@ -18,10 +18,18 @@ data Pending = Pending
   , creator :: ClientId
   }
 
+type PendingStore = TVar (Map TxId Pending)
+
+data Completed = Completed
+  { tx :: Tx ConwayEra
+  , submittedAt :: UTCTime
+  , creator :: ClientId
+  }
+  deriving (Eq, Show, Generic)
+
 newtype ClientId = ClientId {unClientId :: UUID}
   deriving (Eq, Show, Ord, Generic)
   deriving newtype (FromJSON, ToJSON)
-type PendingStore = TVar (Map TxId Pending)
 
 newtype ClientRegistration = ClientRegistration
   { publicKey :: PublicKey
@@ -31,3 +39,5 @@ instance FromJSON ClientRegistration
 instance ToJSON ClientRegistration
 
 type ClientRegistrationStore = TVar (Map ClientId ClientRegistration)
+
+type CompleteStore = TVar (Map TxId Completed)

@@ -4,7 +4,7 @@ module Client.Mock where
 
 import Cardano.Api qualified as Api
 import Control.Monad.Error.Class (throwError)
-import Core.Intent (IntentW, toInternalIntent)
+import Core.Intent (IntentW, satisfies, toInternalIntent)
 import Core.Proof (verifyProof)
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.ByteArray qualified as BA
@@ -37,20 +37,25 @@ import Sp.State (ClientId (..))
 
 type RunServer = forall a. AppM a -> Handler a
 
+data UnregisteredMockClient = UnregisteredMockClient
+  { umcRun :: RunServer
+  , umcLcSk :: Ed.SecretKey
+  , umcSpPk :: Ed.PublicKey
+  }
+
 data MockClient = MockClient
   { mcRun :: RunServer
   , mcLcSk :: Ed.SecretKey
   , mcSpPk :: Ed.PublicKey
-  , mcClientId :: Maybe ClientId
+  , mcClientId :: ClientId
   }
 
-initMockClient :: RunServer -> Ed.SecretKey -> Ed.PublicKey -> MockClient
+initMockClient :: RunServer -> Ed.SecretKey -> Ed.PublicKey -> UnregisteredMockClient
 initMockClient run lcSk spPk =
-  MockClient
-    { mcRun = run
-    , mcLcSk = lcSk
-    , mcSpPk = spPk
-    , mcClientId = Nothing
+  UnregisteredMockClient
+    { umcRun = run
+    , umcLcSk = lcSk
+    , umcSpPk = spPk
     }
 
 mkPrepareReq :: ClientId -> IntentW -> Either Text PrepareReq
@@ -77,10 +82,10 @@ verifyPrepareProof publicKey PrepareResp{txId = txIdText, txAbs, proof} = do
 registerClient :: RunServer -> Ed.PublicKey -> Handler RegisterResp
 registerClient run publicKey = run $ registerH RegisterReq{publicKey}
 
-register :: MockClient -> Handler MockClient
-register mockClient = do
-  RegisterResp{id = uuid} <- registerClient (mcRun mockClient) (Ed.toPublic (mcLcSk mockClient))
-  pure mockClient{mcClientId = Just (ClientId uuid)}
+register :: UnregisteredMockClient -> Handler MockClient
+register UnregisteredMockClient{..} = do
+  RegisterResp{id = uuid} <- registerClient umcRun (Ed.toPublic umcLcSk)
+  pure MockClient{mcRun = umcRun, mcLcSk = umcLcSk, mcSpPk = umcSpPk, mcClientId = ClientId uuid}
 
 getClients :: RunServer -> Handler ClientsResp
 getClients run = run clientsH
@@ -102,8 +107,7 @@ prepare run clientId intentW =
 
 prepareWithClient :: MockClient -> IntentW -> Handler PrepareResp
 prepareWithClient mockClient intentW = do
-  clientId <- requireClientId mockClient
-  prepare (mcRun mockClient) clientId intentW
+  prepare (mcRun mockClient) mockClient.mcClientId intentW
 
 prepareAndVerifyWithClient :: MockClient -> IntentW -> Handler PrepareResp
 prepareAndVerifyWithClient mockClient intentW = do
@@ -125,9 +129,10 @@ finaliseWithClient mockClient = finalise (mcRun mockClient) (mcLcSk mockClient)
 verifyPrepareProofWithClient :: MockClient -> PrepareResp -> Either Text Bool
 verifyPrepareProofWithClient mockClient = verifyPrepareProof (mcSpPk mockClient)
 
-requireClientId :: MockClient -> Handler ClientId
-requireClientId MockClient{mcClientId = Just clientId} = pure clientId
-requireClientId _ = throwError (as422 "mock client not registered")
+verifySatisfies :: IntentW -> PrepareResp -> Either Text Bool
+verifySatisfies intentW PrepareResp{txAbs, changeDelta} = do
+  internal <- toInternalIntent intentW
+  pure (satisfies changeDelta internal txAbs)
 
 as422 :: Text -> ServerError
 as422 t = err422{errBody = BL.fromStrict (TE.encodeUtf8 t)}

@@ -13,12 +13,14 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   hs-source-dirs:  lib
   exposed-modules: 
+    Core.Cbor
     Core.Intent
     Core.Proof
     Core.TxAbs
     Observers.Observer
     Sp.App
     Sp.Emulator
+    Client.Impl
     Client.Mock
     Sp.Server
     Sp.State
@@ -55,12 +57,14 @@ library
     , base                         >=4.9   && <5
     , aeson
     , cardano-api
+    , cardano-binary
     , mtl
     , servant
     , servant-server
     , transformers
     , transformers-either
     , cardano-crypto-class
+    , cborg
     , plutus-ledger-api
     , plutus-tx
     , text
