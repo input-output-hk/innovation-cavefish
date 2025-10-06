@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
@@ -12,6 +13,7 @@ import Control.Concurrent.STM
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (..))
+import Core.Cbor (serialiseTxAbs)
 import Core.Intent (BuildTxResult (..), ChangeDelta, IntentW, satisfies, toInternalIntent)
 import Core.Proof (
   Proof,
@@ -21,7 +23,7 @@ import Core.Proof (
  )
 import Core.TxAbs (TxAbs)
 import Crypto.Error (CryptoFailable (..))
-import Crypto.Hash (SHA256 (..), hashlazy)
+import Crypto.Hash (SHA256 (..), hash)
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Aeson
 import Data.ByteArray qualified as BA
@@ -34,19 +36,74 @@ import Data.Time
 import Data.UUID
 import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
+import Ledger.Tx.CardanoAPI (CardanoTx, pattern CardanoEmulatorEraTx)
 import Servant
 import Sp.App (AppM, Env (..), runApp)
-import Sp.State (ClientId (ClientId), ClientRegistration (..), Pending (..))
+import Sp.State (ClientId (ClientId), ClientRegistration (..), Completed (..), Pending (..))
 
 type CavefishApi =
   "prepare" :> ReqBody '[JSON] PrepareReq :> Post '[JSON] PrepareResp
+    -- TODO WG: Need more in the middle
     :<|> "finalise" :> ReqBody '[JSON] FinaliseReq :> Post '[JSON] FinaliseResp
     :<|> "register" :> ReqBody '[JSON] RegisterReq :> Post '[JSON] RegisterResp
     :<|> "clients" :> Get '[JSON] ClientsResp
     :<|> "pending" :> Get '[JSON] PendingResp
+    :<|> "transaction" :> Capture "id" Text :> Get '[JSON] TransactionResp
 
--- TODO WG: Probably add an endpoint that says "Has my tx been submitted?",
--- whereupon, if it has been submitted, the response is "yes, and here it is in case you don't believe me"
+data TransactionResp
+  = TransactionMissing
+  | TransactionPending PendingSummary
+  | TransactionSubmitted SubmittedSummary
+  deriving (Eq, Show, Generic)
+
+data PendingSummary = PendingSummary
+  { pendingExpiresAt :: UTCTime
+  , pendingClientId :: UUID
+  }
+  deriving (Eq, Show, Generic)
+
+data SubmittedSummary = SubmittedSummary
+  { submittedTx :: CardanoTx
+  , submittedAt :: UTCTime
+  , submittedClientId :: UUID
+  }
+  deriving (Eq, Show, Generic)
+
+instance ToJSON TransactionResp where
+  toJSON = \case
+    TransactionMissing ->
+      object ["status" .= String "missing"]
+    TransactionPending PendingSummary{..} ->
+      object
+        [ "status" .= String "pending"
+        , "expiresAt" .= pendingExpiresAt
+        , "clientId" .= pendingClientId
+        ]
+    TransactionSubmitted SubmittedSummary{..} ->
+      object
+        [ "status" .= String "submitted"
+        , "transaction" .= submittedTx
+        , "submittedAt" .= submittedAt
+        , "clientId" .= submittedClientId
+        ]
+
+instance FromJSON TransactionResp where
+  parseJSON = withObject "TransactionResp" $ \o -> do
+    status :: Text <- o .: "status"
+    case status of
+      "missing" -> pure TransactionMissing
+      "pending" -> do
+        expiresAt <- o .: "expiresAt"
+        clientId <- o .: "clientId"
+        pure $ TransactionPending (PendingSummary expiresAt clientId)
+      "submitted" -> do
+        tx <- o .: "transaction"
+        submittedAt <- o .: "submittedAt"
+        clientId <- o .: "clientId"
+        pure $ TransactionSubmitted (SubmittedSummary tx submittedAt clientId)
+      _ -> fail "unknown transaction status"
+
+-- Zero out the non-TxAbs fields in the CBOR?
 
 newtype ClientsResp = ClientsResp
   { clients :: [ClientInfo]
@@ -183,7 +240,7 @@ instance ToJSON FinaliseResp
 instance FromJSON FinaliseResp
 
 server :: ServerT CavefishApi AppM
-server = prepareH :<|> finaliseH :<|> registerH :<|> clientsH :<|> pendingH
+server = prepareH :<|> finaliseH :<|> registerH :<|> clientsH :<|> pendingH :<|> transactionH
 
 prepareH :: PrepareReq -> AppM PrepareResp
 prepareH PrepareReq{..} = do
@@ -222,9 +279,8 @@ prepareH PrepareReq{..} = do
 
   pure PrepareResp{txId = txIdTxt, txAbs, proof, changeDelta = cd}
 
--- TODO WG: Realism - I may need to serialise this canonically myself?
-hashTxAbs :: (ToJSON a) => a -> ByteString
-hashTxAbs = BA.convert . (hashlazy @SHA256) . encode
+hashTxAbs :: TxAbs Api.ConwayEra -> ByteString
+hashTxAbs = BA.convert . (hash @_ @SHA256) . serialiseTxAbs
 
 finaliseH :: FinaliseReq -> AppM FinaliseResp
 finaliseH FinaliseReq{..} = do
@@ -262,8 +318,10 @@ finaliseH FinaliseReq{..} = do
                         Left reason ->
                           pure $ FinaliseResp txId now (Rejected reason)
                         Right _ -> do
-                          liftIO . atomically $
+                          let completed = Completed{tx, submittedAt = now, creator}
+                          liftIO . atomically $ do
                             modifyTVar' pending (Map.delete wantedTxId)
+                            modifyTVar' complete (Map.insert wantedTxId completed)
                           pure $ FinaliseResp txId now Finalised
                     else pure $ FinaliseResp txId now (Rejected "invalid client signature")
 
@@ -302,6 +360,24 @@ pendingH = do
           , expiresAt = expiry
           , clientId = creatorId
           }
+
+transactionH :: Text -> AppM TransactionResp
+transactionH txIdText = do
+  Env{complete, pending} <- ask
+  txId <-
+    case Api.deserialiseFromRawBytesHex @Api.TxId (TE.encodeUtf8 txIdText) of
+      Left _ -> throwError err400{errBody = "malformed tx id"}
+      Right parsedTxId -> pure parsedTxId
+  completes <- liftIO (readTVarIO complete)
+  case Map.lookup txId completes of
+    Just Completed{tx, submittedAt, creator = ClientId creatorId} ->
+      pure $ TransactionSubmitted (SubmittedSummary (CardanoEmulatorEraTx tx) submittedAt creatorId)
+    Nothing -> do
+      pendings <- liftIO (readTVarIO pending)
+      case Map.lookup txId pendings of
+        Just Pending{expiry, creator = ClientId creatorId} ->
+          pure $ TransactionPending (PendingSummary expiry creatorId)
+        Nothing -> pure TransactionMissing
 
 finaliseSigTag :: ByteString
 finaliseSigTag = "cavefish/finalise/v1"

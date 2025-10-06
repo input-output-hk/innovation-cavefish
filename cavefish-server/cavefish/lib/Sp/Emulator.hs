@@ -36,24 +36,26 @@ import Observers.Observer (stakeValidatorFromBytes)
 import Plutus.Script.Utils.Address qualified as ScriptAddr
 import Plutus.Script.Utils.Scripts (Language (PlutusV2), Versioned (..))
 import Sp.App (Env (..), defaultWalletResolver)
-import Sp.State (ClientRegistrationStore, PendingStore)
+import Sp.State (ClientRegistrationStore, CompleteStore, PendingStore)
 import Sp.TxBuilder (buildTx)
 
 mkCookedEnv ::
   TVar MockChainState ->
   PendingStore ->
+  CompleteStore ->
   ClientRegistrationStore ->
   SecretKey ->
   Wallet ->
   NominalDiffTime ->
   Integer ->
   Env
-mkCookedEnv mockState pendingStore clientRegStore spSk spWallet ttl spFee = env
+mkCookedEnv mockState pendingStore completeStore clientRegStore spSk spWallet ttl spFee = env
  where
   env =
     Env
       { spSk
       , pending = pendingStore
+      , complete = completeStore
       , clientRegistration = clientRegStore
       , ttl
       , spWallet

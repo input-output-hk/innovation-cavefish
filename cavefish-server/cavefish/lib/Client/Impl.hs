@@ -1,0 +1,110 @@
+module Client.Impl (
+  ClientEnv (..),
+  ClientM,
+  runClient,
+  withSession,
+  ClientSession (..),
+  startSession,
+  throw422,
+  eitherAs422,
+  prepare,
+  prepareAndValidate,
+  finalise,
+  runIntent,
+  listPending,
+  listClients,
+) where
+
+import Client.Mock (
+  MockClient,
+  RunServer,
+  as422,
+  finaliseWithClient,
+  getClients,
+  getPending,
+  initMockClient,
+  prepareWithClient,
+  register,
+  verifyPrepareProofWithClient,
+  verifySatisfies,
+ )
+import Control.Monad.Except (MonadError, liftEither, throwError)
+import Control.Monad.Reader (MonadReader, ReaderT, ask, runReaderT)
+import Control.Monad.Trans.Class (lift)
+import Crypto.PubKey.Ed25519 (PublicKey, SecretKey)
+import Data.Bifunctor (first)
+import Data.Text (Text)
+import Servant (Handler, ServerError)
+
+import Core.Intent (IntentW)
+import Sp.Server (ClientsResp, FinaliseResp, PendingResp, PrepareResp)
+
+newtype ClientM a = ClientM (ReaderT ClientEnv Handler a)
+  deriving newtype (Functor, Applicative, Monad, MonadReader ClientEnv, MonadError ServerError)
+
+data ClientEnv = ClientEnv
+  { run :: RunServer
+  , lcSk :: SecretKey
+  , spPk :: PublicKey
+  }
+
+newtype ClientSession = ClientSession
+  { client :: MockClient
+  }
+
+runClient :: ClientEnv -> ClientM a -> Handler a
+runClient env (ClientM m) = runReaderT m env
+
+withSession :: ClientEnv -> (ClientSession -> ClientM a) -> Handler a
+withSession env action = runClient env (startSession >>= action)
+
+startSession :: ClientM ClientSession
+startSession = do
+  ClientEnv{run, lcSk, spPk} <- ask
+  let unregistered = initMockClient run lcSk spPk
+  client <- liftHandler (register unregistered)
+  pure (ClientSession client)
+
+throw422 :: Text -> ClientM a
+throw422 = throwError . as422
+
+eitherAs422 :: Either Text a -> ClientM a
+eitherAs422 = liftEither . first as422
+
+prepare :: ClientSession -> IntentW -> ClientM PrepareResp
+prepare ClientSession{client} intent = liftHandler (prepareWithClient client intent)
+
+prepareAndValidate :: ClientSession -> IntentW -> ClientM PrepareResp
+prepareAndValidate session intent = do
+  resp <- prepare session intent
+  eitherAs422 $
+    ensureM "Satisfies failed" (verifySatisfies intent resp)
+      >> ensureM "Proof verification failed" (verifyPrepareProofWithClient (client session) resp)
+  pure resp
+
+finalise :: ClientSession -> PrepareResp -> ClientM FinaliseResp
+finalise ClientSession{client} resp = liftHandler (finaliseWithClient client resp)
+
+runIntent :: ClientSession -> IntentW -> ClientM FinaliseResp
+runIntent session intent = do
+  resp <- prepareAndValidate session intent
+  finalise session resp
+
+listPending :: ClientM PendingResp
+listPending = do
+  ClientEnv{run} <- ask
+  liftHandler (getPending run)
+
+listClients :: ClientM ClientsResp
+listClients = do
+  ClientEnv{run} <- ask
+  liftHandler (getClients run)
+
+ensure :: Text -> Bool -> Either Text ()
+ensure msg ok = if ok then Right () else Left msg
+
+ensureM :: Text -> Either Text Bool -> Either Text ()
+ensureM msg = (>>= ensure msg)
+
+liftHandler :: Handler a -> ClientM a
+liftHandler = ClientM . lift
