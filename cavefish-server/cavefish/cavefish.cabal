@@ -15,7 +15,9 @@ library
   exposed-modules: 
     Core.Cbor
     Core.Intent
+    Core.Pke
     Core.Proof
+    Core.PaymentProof
     Core.TxAbs
     Observers.Observer
     Sp.App
@@ -143,14 +145,18 @@ test-suite test
     FunctionalDependencies
   other-modules:
     Spec
+    Core.CborSpec
+    Test.Common
   build-depends:
     , base >=4.9     && <5
     , cavefish
     , aeson
     , bytestring
+    , base16-bytestring
     , cardano-api
     , cardano-ledger-core
     , cardano-ledger-alonzo
+    , cborg
     , containers
     , servant
     , servant-server

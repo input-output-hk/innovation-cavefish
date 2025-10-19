@@ -2,6 +2,7 @@ module Sp.State where
 
 import Cardano.Api
 import Cooked.MockChain.MockChainState (MockChainState)
+import Core.Pke (PkeCiphertext)
 import Crypto.PubKey.Ed25519 (PublicKey)
 import Data.ByteString (ByteString)
 import Data.Map (Map)
@@ -16,6 +17,9 @@ data Pending = Pending
   , expiry :: UTCTime
   , mockState :: MockChainState
   , creator :: ClientId
+  , ciphertext :: PkeCiphertext
+  , auxNonce :: ByteString
+  , rho :: ByteString
   }
 
 type PendingStore = TVar (Map TxId Pending)

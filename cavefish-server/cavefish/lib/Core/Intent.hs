@@ -160,7 +160,10 @@ satisfies cd Intent{..} tx =
     , -- ChangeTo: (s,consumed − produced) ∈ tx.outputs
       case irChangeTo of
         Nothing -> True
-        Just addr -> if valuePositive cd then any (outExactly addr cd) tx.outputs else True
+        Just addr ->
+          if valuePositive cd
+            then any (outMatchesChange addr) tx.outputs
+            else True
     , -- MaxFee (if any): tx.fee ≤ f
       maybe True (\f -> tx.absFee <= f) irMaxFee
     ]
@@ -199,6 +202,16 @@ outExactly ::
   Bool
 outExactly addrReq vReq (Api.TxOut addr vOut _ _) =
   addrReq == addr && valueEq vReq (Api.txOutValueToValue vOut)
+
+outMatchesChange ::
+  Api.AddressInEra Api.ConwayEra ->
+  Api.TxOut Api.CtxTx Api.ConwayEra ->
+  Bool
+outMatchesChange addrReq (Api.TxOut addr vOut _ _) =
+  addrReq == addr && valueIsPlaceholder (Api.txOutValueToValue vOut)
+
+valueIsPlaceholder :: Api.Value -> Bool
+valueIsPlaceholder = valueEq mempty
 
 toClosedFinite :: (Num a, Ord a) => Interval a -> Maybe (a, a)
 toClosedFinite (Interval (LowerBound loE loC) (UpperBound hiE hiC)) = do

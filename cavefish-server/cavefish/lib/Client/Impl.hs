@@ -78,8 +78,8 @@ prepareAndValidate :: ClientSession -> IntentW -> ClientM PrepareResp
 prepareAndValidate session intent = do
   resp <- prepare session intent
   eitherAs422 $
-    ensureM "Satisfies failed" (verifySatisfies intent resp)
-      >> ensureM "Proof verification failed" (verifyPrepareProofWithClient (client session) resp)
+    (verifySatisfies intent resp >>= ensure "Satisfies failed")
+      >> verifyPrepareProofWithClient (client session) resp
   pure resp
 
 finalise :: ClientSession -> PrepareResp -> ClientM FinaliseResp
@@ -102,9 +102,6 @@ listClients = do
 
 ensure :: Text -> Bool -> Either Text ()
 ensure msg ok = if ok then Right () else Left msg
-
-ensureM :: Text -> Either Text Bool -> Either Text ()
-ensureM msg = (>>= ensure msg)
 
 liftHandler :: Handler a -> ClientM a
 liftHandler = ClientM . lift

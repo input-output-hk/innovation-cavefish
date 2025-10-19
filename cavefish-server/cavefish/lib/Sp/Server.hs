@@ -11,23 +11,24 @@ module Sp.Server where
 import Cardano.Api qualified as Api
 import Control.Concurrent.STM
 import Control.Monad (unless, when)
+import Control.Monad.Except (liftEither)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (..))
-import Core.Cbor (serialiseTxAbs)
+import Core.Cbor (WitnessBundle (..), mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
 import Core.Intent (BuildTxResult (..), ChangeDelta, IntentW, satisfies, toInternalIntent)
-import Core.Proof (
-  Proof,
-  mkProof,
-  parseHex,
-  renderHex,
- )
+import Core.PaymentProof (ProofResult, hashTxAbs, mkPaymentProof)
+import Core.Pke (decrypt, encrypt, renderError)
+import Core.Proof (parseHex, renderHex)
 import Core.TxAbs (TxAbs)
 import Crypto.Error (CryptoFailable (..))
-import Crypto.Hash (SHA256 (..), hash)
 import Crypto.PubKey.Ed25519 qualified as Ed
+import Crypto.Random (getRandomBytes)
 import Data.Aeson
+import Data.Bifunctor (first)
 import Data.ByteArray qualified as BA
 import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as BL
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -102,8 +103,6 @@ instance FromJSON TransactionResp where
         clientId <- o .: "clientId"
         pure $ TransactionSubmitted (SubmittedSummary tx submittedAt clientId)
       _ -> fail "unknown transaction status"
-
--- Zero out the non-TxAbs fields in the CBOR?
 
 newtype ClientsResp = ClientsResp
   { clients :: [ClientInfo]
@@ -196,9 +195,10 @@ instance ToJSON PrepareReq where
 data PrepareResp = PrepareResp
   { txId :: Text
   , txAbs :: TxAbs Api.ConwayEra
-  , proof :: Proof
+  , proof :: ProofResult
   , -- We need to include a `consumed - produced` here, otherwise the client can't run `satisfies` for `ChangeTo`
     changeDelta :: ChangeDelta
+  , witnessBundleHex :: Text
   }
   deriving (Eq, Show, Generic)
 instance FromJSON PrepareResp
@@ -262,6 +262,16 @@ prepareH PrepareReq{..} = do
 
   BuildTxResult{tx = tx, txAbs = txAbs, mockState = builtState, changeDelta = cd} <- liftIO $ build internalIntent observer
 
+  auxNonceBytes :: ByteString <- liftIO $ getRandomBytes 32
+  rhoBytes :: ByteString <- liftIO $ getRandomBytes 32
+
+  let payload = serialiseTx tx <> auxNonceBytes
+      toServerErr msg = err500{errBody = BL.fromStrict (TE.encodeUtf8 msg)}
+      toPkeErr err = err500{errBody = BL.fromStrict (TE.encodeUtf8 ("pke encryption failed: " <> renderError err))}
+  ciphertext <- liftEither $ first toPkeErr (encrypt pkePublic payload rhoBytes)
+  witnessBundle <- liftEither $ first toServerErr $ mkWitnessBundle tx txAbs observer auxNonceBytes ciphertext
+  let witnessBundleHex = renderHex (serialiseClientWitnessBundle witnessBundle)
+
   unless (satisfies cd internalIntent txAbs) $
     throwError err422{errBody = "transaction does not satisfy intent"}
 
@@ -270,21 +280,36 @@ prepareH PrepareReq{..} = do
       txIdTxt = Api.serialiseToRawBytesHexText txId
       txAbsHash :: ByteString
       txAbsHash = hashTxAbs txAbs
-
-      proof = mkProof spSk txId txAbsHash -- Proof stuff is very placeholdery
+  proof <- liftIO (mkPaymentProof spSk internalIntent tx txAbs (encryptedTx witnessBundle) auxNonceBytes rhoBytes)
   now <- liftIO getCurrentTime
   let expiry = addUTCTime ttl now
   liftIO . atomically $
-    modifyTVar' pending (Map.insert txId (Pending tx txAbsHash expiry builtState clientId))
+    modifyTVar' pending $
+      Map.insert
+        txId
+        Pending
+          { tx
+          , txAbsHash
+          , expiry
+          , mockState = builtState
+          , creator = clientId
+          , ciphertext
+          , auxNonce = auxNonceBytes
+          , rho = rhoBytes
+          }
 
-  pure PrepareResp{txId = txIdTxt, txAbs, proof, changeDelta = cd}
-
-hashTxAbs :: TxAbs Api.ConwayEra -> ByteString
-hashTxAbs = BA.convert . (hash @_ @SHA256) . serialiseTxAbs
+  pure
+    PrepareResp
+      { txId = txIdTxt
+      , txAbs
+      , proof
+      , changeDelta = cd
+      , witnessBundleHex
+      }
 
 finaliseH :: FinaliseReq -> AppM FinaliseResp
 finaliseH FinaliseReq{..} = do
-  Env{..} <- ask
+  env@Env{..} <- ask
   now <- liftIO getCurrentTime
   case Api.deserialiseFromRawBytesHex @Api.TxId (TE.encodeUtf8 txId) of
     Left _ ->
@@ -296,7 +321,7 @@ finaliseH FinaliseReq{..} = do
       case mp of
         Nothing ->
           pure $ FinaliseResp txId now (Rejected "unknown or expired tx")
-        Just Pending{..} -> do
+        Just pendingEntry@Pending{..} -> do
           when (now > expiry) $ do
             liftIO . atomically $
               modifyTVar' pending (Map.delete wantedTxId)
@@ -304,6 +329,7 @@ finaliseH FinaliseReq{..} = do
           if now > expiry
             then pure $ FinaliseResp txId now (Rejected "pending expired")
             else do
+              _payload <- either throwError pure (decryptPendingPayload env pendingEntry)
               mClient <- liftIO . atomically $ do
                 registry <- readTVar clientRegistration
                 pure (Map.lookup creator registry)
@@ -392,3 +418,29 @@ verifyClientSignature pk txAbsHash sigBytes =
     CryptoPassed sig ->
       let message = clientSignatureMessage txAbsHash
        in Ed.verify pk message sig
+
+decryptPendingPayload :: Env -> Pending -> Either ServerError ByteString
+decryptPendingPayload Env{pkeSecret} Pending{ciphertext = pendingCiphertext, auxNonce = pendingAuxNonce, tx} =
+  case decrypt pkeSecret pendingCiphertext of
+    Left err ->
+      let msg = "pke decrypt failed: " <> renderError err
+       in Left err500{errBody = BL.fromStrict (TE.encodeUtf8 msg)}
+    Right payload ->
+      let txBytes = serialiseTx tx
+          (payloadTxBytes, payloadNonce) = BS.splitAt (BS.length txBytes) payload
+       in if payloadTxBytes /= txBytes
+            then
+              Left
+                err500
+                  { errBody =
+                      "ciphertext payload mismatch: transaction bytes differ"
+                  }
+            else
+              if payloadNonce /= pendingAuxNonce
+                then
+                  Left
+                    err500
+                      { errBody =
+                          "ciphertext payload mismatch: aux nonce differ"
+                      }
+                else Right payload

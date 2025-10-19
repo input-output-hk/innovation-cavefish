@@ -2,6 +2,7 @@ module Main where
 
 import Control.Concurrent.STM (newTVarIO)
 import Cooked (wallet)
+import Core.Pke (deriveSecretKey)
 import Crypto.Error (CryptoFailable (..))
 import qualified Crypto.PubKey.Ed25519 as Ed
 import qualified Data.ByteString as BS
@@ -27,6 +28,10 @@ main = do
         case Ed.secretKey (BS.pack [1 .. 32]) of
           CryptoPassed sk -> sk
           CryptoFailed err -> error ("failed to derive service key: " <> show err)
+      pkeSk =
+        case deriveSecretKey (BS.pack [33 .. 64]) of
+          Left err -> error ("failed to derive PKE secret key: " <> show err)
+          Right sk -> sk
       env =
         mkCookedEnv
           mockState
@@ -34,6 +39,7 @@ main = do
           completeStore
           clientStore
           spSk
+          pkeSk
           (wallet 1)
           (fromInteger ttlSeconds)
           spFee

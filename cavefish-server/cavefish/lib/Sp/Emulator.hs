@@ -14,24 +14,26 @@ import Cooked.MockChain.MockChainState (
   MockChainState (..),
   mockChainState0,
  )
-import Cooked.Skeleton (TxSkelOut, txSkelOutValue)
 import Core.Intent (
   BuildTxResult (..),
   ChangeDelta,
   Intent,
  )
+import Core.Pke (PkePublicKey, PkeSecretKey, toPublicKey)
 import Core.TxAbs (TxAbs (..), cardanoTxToTxAbs)
 import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.ByteString (ByteString)
 import Data.Default (def)
-import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime)
+import Ledger (
+  getCardanoTxOutputs,
+ )
 import Ledger.Scripts (StakeValidator (getStakeValidator))
 import Ledger.Tx (
   pattern CardanoEmulatorEraTx,
  )
-import Ledger.Tx.CardanoAPI (toCardanoValue)
+import Ledger.Tx qualified as LedgerTx
 import Observers.Observer (stakeValidatorFromBytes)
 import Plutus.Script.Utils.Address qualified as ScriptAddr
 import Plutus.Script.Utils.Scripts (Language (PlutusV2), Versioned (..))
@@ -45,12 +47,14 @@ mkCookedEnv ::
   CompleteStore ->
   ClientRegistrationStore ->
   SecretKey ->
+  PkeSecretKey ->
   Wallet ->
   NominalDiffTime ->
   Integer ->
   Env
-mkCookedEnv mockState pendingStore completeStore clientRegStore spSk spWallet ttl spFee = env
+mkCookedEnv mockState pendingStore completeStore clientRegStore spSk pkeSk spWallet ttl spFee = env
  where
+  pkePk = toPublicKey pkeSk
   env =
     Env
       { spSk
@@ -61,6 +65,8 @@ mkCookedEnv mockState pendingStore completeStore clientRegStore spSk spWallet tt
       , spWallet
       , resolveWallet = defaultWalletResolver
       , spFee
+      , pkeSecret = pkeSk
+      , pkePublic = pkePk
       , build = buildWithCooked mockState env
       , submit = submitWithCooked mockState env
       }
@@ -84,10 +90,13 @@ buildWithCooked mockState env intent observerBytes = do
   case result of
     Left err -> fail ("buildTx failed: " <> show err)
     Right cardanoTx@(CardanoEmulatorEraTx tx) -> do
-      let txAbs = cardanoTxToTxAbs cardanoTx
-          consumed = consumedTotal st0 st1
-          produced = producedTotal (outputs txAbs)
-          changeDelta = consumed <> Api.negateValue produced
+      let rawOutputs = [out | LedgerTx.TxOut out <- getCardanoTxOutputs cardanoTx]
+          txAbs = cardanoTxToTxAbs cardanoTx
+          producedMasked = producedTotal (outputs txAbs)
+          producedRaw = producedTotal rawOutputs
+          -- The masked TxAbs zeroes the change output, so we recover the hidden
+          -- amount by subtracting masked outputs from their raw counterparts.
+          changeDelta = producedRaw <> Api.negateValue producedMasked
       pure
         BuildTxResult
           { tx
@@ -116,28 +125,6 @@ runMockChainPure st action =
           runWriterT $
             runStateT (runExceptT (unMockChain action)) st
    in (result, newState)
-
-consumedTotal ::
-  MockChainState ->
-  MockChainState ->
-  ChangeDelta
-consumedTotal stateBefore stateAfter =
-  mconcat
-    [ toDelta out
-    | (oref, (out, True)) <- Map.toList (mcstOutputs stateBefore)
-    , let mAfter = Map.lookup oref (mcstOutputs stateAfter)
-    , consumedInAfter mAfter
-    ]
- where
-  toDelta :: TxSkelOut -> ChangeDelta
-  toDelta txOut =
-    case toCardanoValue (txSkelOutValue txOut) of
-      Left err -> error ("failed to convert consumed output value: " <> show err)
-      Right valueInEra -> valueInEra
-
-consumedInAfter :: Maybe (TxSkelOut, Bool) -> Bool
-consumedInAfter Nothing = True
-consumedInAfter (Just (_, present)) = not present
 
 producedTotal ::
   [Api.TxOut Api.CtxTx Api.ConwayEra] ->

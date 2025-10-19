@@ -35,19 +35,19 @@ instance FromJSON Proof where
     dataHex :: Text <- o .: "data"
     Proof <$> parseHex dataHex
 
-mkProof :: Ed.SecretKey -> Api.TxId -> ByteString -> Proof
-mkProof sk txid txAbsHash =
-  let message = domainTag <> serializeTxId txid <> txAbsHash
+mkProof :: Ed.SecretKey -> Api.TxId -> ByteString -> ByteString -> Proof
+mkProof sk txid txAbsHash commitmentBytes =
+  let message = domainTag <> serializeTxId txid <> txAbsHash <> commitmentBytes
       signature = Ed.sign sk (Ed.toPublic sk) message
    in Proof (BA.convert signature)
 
 -- What the LC would call to verify
-verifyProof :: Ed.PublicKey -> Api.TxId -> ByteString -> Proof -> Bool
-verifyProof pk txid txAbsHash (Proof dataBs) =
+verifyProof :: Ed.PublicKey -> Api.TxId -> ByteString -> ByteString -> Proof -> Bool
+verifyProof pk txid txAbsHash commitmentBytes (Proof dataBs) =
   case Ed.signature dataBs of
     CryptoFailed _ -> False
     CryptoPassed sig ->
-      let message = domainTag <> serializeTxId txid <> txAbsHash
+      let message = domainTag <> serializeTxId txid <> txAbsHash <> commitmentBytes
        in Ed.verify pk message sig
 
 renderHex :: ByteString -> Text

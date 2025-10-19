@@ -13,9 +13,12 @@ import Client.Mock (mkFinaliseReq)
 import qualified Client.Mock as Mock
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Monad.Trans.Except (runExceptT)
-import Cooked (Wallet, wallet)
 import Cooked.MockChain.MockChainState (MockChainState)
+import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
+import qualified Core.CborSpec as CborSpec
 import Core.Intent (AddressW (..), BuildTxResult (..), IntentW (..), satisfies, toInternalIntent)
+import Core.PaymentProof (ProofResult (..), hashTxAbs)
+import Core.Pke (ciphertextDigest)
 import Core.Proof (mkProof, renderHex)
 import Core.TxAbs (cardanoTxToTxAbs)
 import Crypto.Error (CryptoFailable (..))
@@ -24,24 +27,24 @@ import Data.Bits (xor)
 import qualified Data.ByteArray as BA
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Data.ByteArray.Encoding as BAE
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as TE
 import Ledger.Tx (
   pattern CardanoEmulatorEraTx,
  )
-import Ledger.Tx.CardanoAPI (toCardanoAddressInEra)
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import qualified Network.Wai.Handler.Warp as Warp
-import qualified Plutus.Script.Utils.Address as ScriptAddr
 import Servant
 import Servant.Client (BaseUrl (..), Scheme (..))
 import qualified Servant.Client as SC
 import Sp.App (Env (..), runApp)
 import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
-import Sp.Server (CavefishApi, ClientInfo (..), ClientsResp (..), FinaliseReq (..), FinaliseResp (..), FinaliseResult (..), PendingItem (..), PendingResp (..), PendingSummary (..), PrepareReq (..), PrepareResp (..), RegisterReq (..), RegisterResp (..), SubmittedSummary (..), TransactionResp (..), finaliseH, hashTxAbs, mkApp, transactionH)
+import Sp.Server (CavefishApi, ClientInfo (..), ClientsResp (..), FinaliseReq (..), FinaliseResp (..), FinaliseResult (..), PendingItem (..), PendingResp (..), PendingSummary (..), PrepareReq (..), PrepareResp (..), RegisterReq (..), RegisterResp (..), SubmittedSummary (..), TransactionResp (..), finaliseH, mkApp, transactionH)
 import Sp.State (ClientId (..), ClientRegistrationStore, CompleteStore, Pending (..), PendingStore)
+import Test.Common
 import Test.Hspec
 
 runHandlerOrFail :: Handler a -> IO a
@@ -58,7 +61,7 @@ runClientOrFail clientEnv action = do
 
 mkEnv :: PendingStore -> CompleteStore -> ClientRegistrationStore -> TVar MockChainState -> Env
 mkEnv pendingStore completeStore clientRegVar mockStateVar =
-  mkCookedEnv mockStateVar pendingStore completeStore clientRegVar testSecretKey testSpWallet 3600 0
+  mkCookedEnv mockStateVar pendingStore completeStore clientRegVar testSecretKey testPkeSecretKey testSpWallet 3600 0
 
 mkClientEnv :: Env -> Client.ClientEnv
 mkClientEnv env =
@@ -70,6 +73,7 @@ mkClientEnv env =
 
 spec :: Spec
 spec = do
+  CborSpec.spec
   describe "buildTx integration" $ do
     it "prepare -> finalise roundtrip uses buildTx" $ do
       pendingStore <- newTVarIO Map.empty
@@ -79,7 +83,7 @@ spec = do
       let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey (Ed.toPublic testSecretKey)
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
-      let registeredClientId = mockClient.mcClientId
+      let registeredClientId = Mock.mcClientId mockClient
       prepareReq <- mkPrepareReqOrFail registeredClientId testIntentW
       internalIntent <-
         case toInternalIntent (intent prepareReq) of
@@ -101,7 +105,6 @@ spec = do
       let expectedTxIdValue = Api.getTxId (Api.getTxBody expectedTx)
           expectedTxId = Api.serialiseToRawBytesHexText expectedTxIdValue
           expectedTxAbsHash = hashTxAbs expectedTxAbs
-          expectedProof = mkProof (spSk env) expectedTxIdValue expectedTxAbsHash
           fetchTransaction txIdTxt =
             runExceptT (runHandler' (runApp env (transactionH txIdTxt)))
           ClientId expectedClientUuid = registeredClientId
@@ -112,23 +115,43 @@ spec = do
         Right resp -> expectationFailure ("expected missing transaction but got " <> show resp)
         Left err -> expectationFailure ("expected missing transaction but got error: " <> show err)
 
-      prepareResp@PrepareResp{txId = gotTxId, txAbs = gotTxAbs, proof = gotProof} <-
+      prepareResp@PrepareResp{txId = gotTxId, txAbs = gotTxAbs, proof = gotProof, witnessBundleHex} <-
         runHandlerOrFail (Mock.prepareAndVerifyWithClient mockClient testIntentW)
       gotTxId `shouldBe` expectedTxId
       gotTxAbs `shouldBe` expectedTxAbs
-      gotProof `shouldBe` expectedProof
       satisfies expectedDelta internalIntent gotTxAbs `shouldBe` True
       pendingMap <- readTVarIO pendingStore
       pendingEntry <-
         case Map.lookup expectedTxIdValue pendingMap of
           Nothing -> expectationFailure "pending entry not stored" >> fail "missing pending entry"
           Just entry -> pure entry
-      let Pending{tx = storedTx, txAbsHash = storedTxAbsHash, expiry = storedExpiry, creator = storedCreator} = pendingEntry
+      let Pending
+            { tx = storedTx
+            , txAbsHash = storedTxAbsHash
+            , expiry = storedExpiry
+            , creator = storedCreator
+            , ciphertext = storedCiphertext
+            , auxNonce = storedAuxNonce
+            , rho = _storedRho
+            } = pendingEntry
+          storedCipherDigest = ciphertextDigest storedCiphertext
+          expectedProof = ProofEd25519 (mkProof (spSk env) expectedTxIdValue expectedTxAbsHash storedCipherDigest)
+      gotProof `shouldBe` expectedProof
+      witnessBundleBytes <-
+        case BAE.convertFromBase BAE.Base16 (TE.encodeUtf8 witnessBundleHex) of
+          Left err -> expectationFailure ("failed to decode witness bundle hex: " <> err) >> fail "invalid witness bundle"
+          Right bs -> pure bs
+      clientBundle <-
+        case deserialiseClientWitnessBundle witnessBundleBytes of
+          Left err -> expectationFailure ("failed to decode witness bundle: " <> Text.unpack err) >> fail "invalid witness bundle"
+          Right bundle -> pure bundle
+      cwbCiphertext clientBundle `shouldBe` storedCiphertext
+      cwbAuxNonce clientBundle `shouldBe` storedAuxNonce
       storedTx `shouldBe` expectedTx
       storedTxAbsHash `shouldBe` expectedTxAbsHash
       let storedTxAbs = cardanoTxToTxAbs (CardanoEmulatorEraTx storedTx)
       satisfies expectedDelta internalIntent storedTxAbs `shouldBe` True
-      let storedProof = mkProof (spSk env) expectedTxIdValue storedTxAbsHash
+      let storedProof = ProofEd25519 (mkProof (spSk env) expectedTxIdValue storedTxAbsHash storedCipherDigest)
       gotProof `shouldBe` storedProof
       storedCreator `shouldBe` registeredClientId
 
@@ -165,7 +188,7 @@ spec = do
       let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey (Ed.toPublic testSecretKey)
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
-      let registeredClientId = mockClient.mcClientId
+      let registeredClientId = Mock.mcClientId mockClient
       prepareReq <- mkPrepareReqOrFail registeredClientId testIntentW
       internalIntent <-
         case toInternalIntent (intent prepareReq) of
@@ -184,8 +207,11 @@ spec = do
       _ <- runHandlerOrFail (Mock.prepareAndVerifyWithClient mockClient testIntentW)
       pendingMap <- readTVarIO pendingStore
       Map.member expectedTxIdValue pendingMap `shouldBe` True
-      let validFinaliseReq = Mock.mkFinaliseReq mockClient.mcLcSk expectedTxId expectedTxAbsHash
-          invalidFinaliseReq = validFinaliseReq{lcSig = corruptSignature validFinaliseReq.lcSig}
+      let validFinaliseReq = Mock.mkFinaliseReq (Mock.mcLcSk mockClient) expectedTxId expectedTxAbsHash
+          invalidFinaliseReq =
+            validFinaliseReq
+              { lcSig = corruptSignature (lcSig validFinaliseReq)
+              }
       FinaliseResp{txId = finalTxId, result = finalResult} <-
         runHandlerOrFail (runApp env $ finaliseH invalidFinaliseReq)
       finalTxId `shouldBe` expectedTxId
@@ -203,7 +229,7 @@ spec = do
           expectedPublicKey = renderHex (BA.convert (Ed.toPublic testClientSecretKey))
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey (Ed.toPublic testSecretKey)
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
-      let ClientId clientUuid = mockClient.mcClientId
+      let ClientId clientUuid = Mock.mcClientId mockClient
       ClientsResp{clients = clientInfos} <-
         runHandlerOrFail (Mock.getClientsWithClient mockClient)
       clientInfos
@@ -217,7 +243,7 @@ spec = do
       let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey (Ed.toPublic testSecretKey)
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
-      let ClientId clientUuid = mockClient.mcClientId
+      let ClientId clientUuid = Mock.mcClientId mockClient
       let registeredClientId = ClientId clientUuid
       prepareReq <- mkPrepareReqOrFail registeredClientId testIntentW
       internalIntent <-
@@ -295,8 +321,9 @@ spec = do
 
         -- Test that the client was registered
         ClientsResp{clients = clientInfos} <- runClientOrFail servantEnv clientsClient
+        let registeredId = registerResp.id
         clientInfos
-          `shouldBe` [ClientInfo{clientId = registerResp.id, publicKey = expectedPublicKey}]
+          `shouldBe` [ClientInfo{clientId = registeredId, publicKey = expectedPublicKey}]
 
         -- Ask the SP about pending transactions...there should be none
         PendingResp ps <-
@@ -304,7 +331,7 @@ spec = do
         ps `shouldBe` mempty
 
         -- Ask the SP to construct a transaction based on an intent
-        prepareReq <- mkPrepareReqOrFail (ClientId registerResp.id) testIntentW
+        prepareReq <- mkPrepareReqOrFail (ClientId registeredId) testIntentW
         PrepareResp{txId, txAbs, proof, changeDelta} <-
           runClientOrFail servantEnv (prepareClient prepareReq)
         let unknownTxId =
@@ -331,8 +358,8 @@ spec = do
           ([PendingItem{txId = pendingTxId, expiresAt = pendingExpiresAtExpected, clientId = pendingClientIdExpected}], TransactionPending PendingSummary{pendingExpiresAt, pendingClientId}) -> do
             pendingTxId `shouldBe` txId
             pendingExpiresAt `shouldBe` pendingExpiresAtExpected
-            pendingClientId `shouldBe` registerResp.id
-            pendingClientIdExpected `shouldBe` registerResp.id
+            pendingClientId `shouldBe` registeredId
+            pendingClientIdExpected `shouldBe` registeredId
           (_, TransactionPending _) ->
             expectationFailure "expected exactly one pending item to compare with transaction response"
           (_, TransactionSubmitted _) ->
@@ -362,18 +389,11 @@ spec = do
                       Api.serialiseToRawBytesHexText (Api.getTxId (Api.getTxBody cardanoTx))
                 submittedTxId `shouldBe` txId
             submittedAt' `shouldBe` submittedAt
-            submittedClientId `shouldBe` registerResp.id
+            submittedClientId `shouldBe` registeredId
           TransactionPending{} ->
             expectationFailure "expected submitted transaction, but it is still pending"
           TransactionMissing ->
             expectationFailure "expected submitted transaction, but it is missing"
-
-testIntentW :: IntentW
-testIntentW =
-  AndExpsW
-    ( PayToW testPayToValue (AddressW testPayToAddressText)
-        :| [SpendFromW (AddressW testSpendFromAddressText)]
-    )
 
 mkPrepareReqOrFail :: ClientId -> IntentW -> IO PrepareReq
 mkPrepareReqOrFail cid iw =
@@ -386,48 +406,3 @@ corruptSignature bs =
   case BS.uncons bs of
     Nothing -> bs
     Just (b, rest) -> BS.cons (b `xor` 0x01) rest
-
-testNetworkId :: Api.NetworkId
-testNetworkId = Api.Testnet (Api.NetworkMagic 1)
-
-testPayToWallet :: Wallet
-testPayToWallet = wallet 3
-
-testPayToAddress :: Api.AddressInEra Api.ConwayEra
-testPayToAddress =
-  case toCardanoAddressInEra testNetworkId (ScriptAddr.toAddress testPayToWallet) of
-    Left err -> error ("failed to derive pay-to address: " <> show err)
-    Right addr -> addr
-
-testPayToAddressText :: Text
-testPayToAddressText = Api.serialiseAddress testPayToAddress
-
-testPayToValue :: Api.Value
-testPayToValue = Api.lovelaceToValue 2
-
-testSpendFromWallet :: Wallet
-testSpendFromWallet = wallet 2
-
-testSpendFromAddress :: Api.AddressInEra Api.ConwayEra
-testSpendFromAddress =
-  case toCardanoAddressInEra testNetworkId (ScriptAddr.toAddress testSpendFromWallet) of
-    Left err -> error ("failed to derive pay-to address: " <> show err)
-    Right addr -> addr
-
-testSpendFromAddressText :: Text
-testSpendFromAddressText = Api.serialiseAddress testSpendFromAddress
-
-testSpWallet :: Wallet
-testSpWallet = wallet 1
-
-testClientSecretKey :: Ed.SecretKey
-testClientSecretKey =
-  case Ed.secretKey (BS.pack [101 .. 132]) of
-    CryptoPassed sk -> sk
-    CryptoFailed err -> error ("invalid client secret key: " <> show err)
-
-testSecretKey :: Ed.SecretKey
-testSecretKey =
-  case Ed.secretKey (BS.pack [1 .. 32]) of
-    CryptoPassed sk -> sk
-    CryptoFailed err -> error ("invalid static secret key: " <> show err)

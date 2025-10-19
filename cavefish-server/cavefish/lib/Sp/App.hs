@@ -7,6 +7,7 @@ import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Cooked (MockChainState)
 import Cooked.Wallet (Wallet, knownWallets)
 import Core.Intent (BuildTxResult, Intent)
+import Core.Pke (PkePublicKey, PkeSecretKey)
 import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.ByteString (ByteString)
 import Data.Map.Strict qualified as Map
@@ -27,6 +28,8 @@ data Env = Env
   , spWallet :: Wallet
   , resolveWallet :: Api.AddressInEra Api.ConwayEra -> Maybe Wallet
   , spFee :: Integer
+  , pkeSecret :: PkeSecretKey
+  , pkePublic :: PkePublicKey
   , build ::
       Intent ->
       ByteString ->

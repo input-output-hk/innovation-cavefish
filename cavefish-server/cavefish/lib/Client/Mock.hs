@@ -4,10 +4,13 @@ module Client.Mock where
 
 import Cardano.Api qualified as Api
 import Control.Monad.Error.Class (throwError)
+import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
 import Core.Intent (IntentW, satisfies, toInternalIntent)
-import Core.Proof (verifyProof)
+import Core.PaymentProof (hashTxAbs, verifyPaymentProof)
 import Crypto.PubKey.Ed25519 qualified as Ed
+import Data.Bifunctor (first)
 import Data.ByteArray qualified as BA
+import Data.ByteArray.Encoding qualified as BAE
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy qualified as BL
 import Data.Text (Text)
@@ -28,7 +31,6 @@ import Sp.Server (
   clientSignatureMessage,
   clientsH,
   finaliseH,
-  hashTxAbs,
   pendingH,
   prepareH,
   registerH,
@@ -70,14 +72,20 @@ mkFinaliseReq secretKey txId txAbsHash =
       signature = Ed.sign secretKey (Ed.toPublic secretKey) message
    in FinaliseReq{txId = txId, lcSig = BA.convert signature}
 
-verifyPrepareProof :: Ed.PublicKey -> PrepareResp -> Either Text Bool
-verifyPrepareProof publicKey PrepareResp{txId = txIdText, txAbs, proof} = do
+verifyPrepareProof :: Ed.PublicKey -> PrepareResp -> Either Text ()
+verifyPrepareProof publicKey PrepareResp{txId = txIdText, txAbs, proof, witnessBundleHex} = do
+  witnessBytes <- decodeHex "witness bundle" witnessBundleHex
+  ClientWitnessBundle{cwbCiphertext = ciphertext, cwbAuxNonce = auxNonceBytes, cwbTxId = bundleTxId} <-
+    first (const "failed to decode witness bundle") (deserialiseClientWitnessBundle witnessBytes)
   txId <-
     case Api.deserialiseFromRawBytesHex @Api.TxId (TE.encodeUtf8 txIdText) of
       Left err -> Left (Text.pack ("failed to deserialise tx id: " <> show err))
       Right v -> Right v
-  let txAbsHash = hashTxAbs txAbs
-  pure (verifyProof publicKey txId txAbsHash proof)
+  let expectedTxIdBytes = Api.serialiseToRawBytes txId
+  if bundleTxId /= expectedTxIdBytes
+    then Left "witness bundle tx id mismatch"
+    else pure ()
+  verifyPaymentProof publicKey proof txAbs txId ciphertext auxNonceBytes
 
 registerClient :: RunServer -> Ed.PublicKey -> Handler RegisterResp
 registerClient run publicKey = run $ registerH RegisterReq{publicKey}
@@ -114,8 +122,7 @@ prepareAndVerifyWithClient mockClient intentW = do
   resp <- prepareWithClient mockClient intentW
   case verifyPrepareProofWithClient mockClient resp of
     Left err -> throwError (as422 err)
-    Right False -> throwError (as422 "prepare proof verification failed")
-    Right True -> pure resp
+    Right () -> pure resp
 
 finalise :: RunServer -> Ed.SecretKey -> PrepareResp -> Handler FinaliseResp
 finalise run secretKey PrepareResp{txId, txAbs} =
@@ -126,7 +133,7 @@ finalise run secretKey PrepareResp{txId, txAbs} =
 finaliseWithClient :: MockClient -> PrepareResp -> Handler FinaliseResp
 finaliseWithClient mockClient = finalise (mcRun mockClient) (mcLcSk mockClient)
 
-verifyPrepareProofWithClient :: MockClient -> PrepareResp -> Either Text Bool
+verifyPrepareProofWithClient :: MockClient -> PrepareResp -> Either Text ()
 verifyPrepareProofWithClient mockClient = verifyPrepareProof (mcSpPk mockClient)
 
 verifySatisfies :: IntentW -> PrepareResp -> Either Text Bool
@@ -136,3 +143,9 @@ verifySatisfies intentW PrepareResp{txAbs, changeDelta} = do
 
 as422 :: Text -> ServerError
 as422 t = err422{errBody = BL.fromStrict (TE.encodeUtf8 t)}
+
+decodeHex :: Text -> Text -> Either Text ByteString
+decodeHex label hexText =
+  case BAE.convertFromBase BAE.Base16 (TE.encodeUtf8 hexText) of
+    Left err -> Left (Text.concat ["failed to decode ", label, ": ", Text.pack err])
+    Right bs -> Right bs
