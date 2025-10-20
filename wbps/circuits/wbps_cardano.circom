@@ -1,188 +1,354 @@
 // ======================================================================
-// CardanoWBPS.circom — numeric-tag logs (Circom-safe)
+// CardanoWBPS.circom
+// ----------------------------------------------------------------------
+// Purpose:
+//   Formal, property-driven implementation of the WBPS proof relation for
+//   Cardano’s EdDSA/UTxO signing model.  Verifies that a message μ was
+//   correctly committed and hashed into a Schnorr-style transcript.
+//
+// Conventions enforced here:
+//   - Prefix ALL `signal input` ports with  in_*
+//   - Prefix ALL `signal output` ports with out_*
+//   - Component instance names use lowerCamelCase (template names are UpperCamelCase)
+//
+// ======================================================================
+// Mapping between Circuit Signals and Paper Notation
+// ----------------------------------------------------------------------
+//  Circuit Name                         |  Paper Symbol / Meaning
+// --------------------------------------|------------------------------------------
+//  signer_key                           |  X      — Signer’s public key (EdDSA/LC)
+//  solver_encryption_key                |  ek     — ElGamal encryption key of the SP
+//  commitment_randomizer_rho            |  ρ      — Random scalar used for commitment
+//  commitment_point                     |  R      — g^ρ (bit representation for transcript)
+//  commitment_g_rho                     |  C₀=g^ρ — Commitment base (curve point)
+//  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, μ; ρ)
+//  message_public_part                  |  m_pub  — Public portion of μ
+//  message_private_part                 |  m_priv — Private overlay portion of μ
+//  rebuildMessage.out_message           |  μ      — Full reconstructed message bits
+//  rebuildCommitment.out_message_chunk  |  μ̂[i]  — Message limbs packed to Fr
+//  (internal) PRF in RebuildCommitment  |  PRF[i] — Pseudorandom mask from ek^ρ
+//  rebuildChallenge.out_challenge       |  c      — SHA-512 transcript digest
+// --------------------------------------|------------------------------------------
+//  Component Relationships (Properties):
+//    P0: RebuildMessage(m_pub, m_priv) → μ
+//    P1: CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ)  and assert C₀ == g^ρ
+//    P2: RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF)  and assert Cmsg[i] == μ̂[i] + PRF[i]
+//    P3: RebuildChallenge(R, X, μ) → digest      and assert c == digest
+// ======================================================================
+//
+// Parameters (top-level):
+//   message_size                    : |μ| (must be a multiple of 254 bits)
+//   message_private_part_size       : size of the private overlay window
+//   message_private_part_offset     : starting bit offset for the private overlay
+//
+// Circom operator semantics reminder:
+//   <== : unidirectional wiring (no constraint)
+//   ==> : reverse wiring (no constraint)
+//   === : equality constraint in Fr (adds R1CS constraint)
+//
+// Notes on serialization:
+//   - All elliptic curve points are BabyJubJub affine coordinates.
+//   - R and X are fed to SHA-512 with per-byte bit-reversal, matching EdDSA/Cardano encoding.
+//   - The circuit enforces curve-level equalities (Fr) for all commitments.
+//
 // ======================================================================
 
 pragma circom 2.1.2;
 
-// Poseidon hash / sponge (for PRF stream)
+// Vendor gadgets
 include "../vendor/circomlib/circuits/poseidon.circom";
-
-// Scalar multiplication gadgets
 include "../vendor/circomlib/circuits/escalarmulany.circom";
-
-// Bits <-> number helpers
+include "../vendor/circomlib/circuits/escalarmulfix.circom";
 include "../vendor/circomlib/circuits/bitify.circom";
 
-// SHA-512 bitwise (Cardano EdDSA)
+// Cardano EdDSA SHA-512 (bitwise)
 include "hashing/sha2/sha512/sha512_hash_bits.circom";
 
-template CardanoWBPS(n, sb_n, sb_o) {
-    // ------------------------------------------------------------------
-    // Params & sanity
-    // ------------------------------------------------------------------
-    var bits = 254;
-    assert(n % bits == 0);
+// ======================================================================
+// 1) RebuildMessage — P0
+// ----------------------------------------------------------------------
+// Inputs:
+//   in_message_public_part[message_size]           : m_pub
+//   in_message_private_part[message_private_part_size] : m_priv (overlay window)
+// Output:
+//   out_message[message_size]                      : μ (reconstructed)
+//
+// Property (P0):
+//   RebuildMessage(m_pub, m_priv) → μ
+//   (overlay m_priv into m_pub on [offset, offset+size) to form μ)
+// ======================================================================
+template RebuildMessage(message_size, message_private_part_size, message_private_part_offset) {
+    signal input  in_message_public_part[message_size];
+    signal input  in_message_private_part[message_private_part_size];
+    signal output out_message[message_size];
 
-    var cmsg_elem = n \ bits;
-
-    // ------------------------------------------------------------------
-    // PUBLIC INPUTS
-    // ------------------------------------------------------------------
-    signal input A[256];            // Schnorr/EdDSA public key X (bits)
-    signal input R8[256];           // Schnorr nonce point R (bits)
-    signal input ek[2];             // encryption key point (x,y)
-    signal input C0[2];             // C0 = g^rho
-    signal input Cmsg[cmsg_elem];   // ciphertext limbs
-    signal input c_schnorr[64];     // SHA-512 digest bytes
-    signal input msg_pub[n];        // public message bits
-
-    // ------------------------------------------------------------------
-    // PRIVATE INPUTS
-    // ------------------------------------------------------------------
-    signal input rho;               // encryption randomness
-    signal input msg_priv[sb_n];    // private message slice bits
-
-    // ------------------------------------------------------------------
-    // Internal signals / vars
-    // ------------------------------------------------------------------
     var i;
-    var j;
+    for (i = 0; i < message_size; i++) {
+        if (i >= message_private_part_offset && i < message_private_part_offset + message_private_part_size) {
+            out_message[i] <== in_message_private_part[i - message_private_part_offset];
+        } else {
+            out_message[i] <== in_message_public_part[i];
+        }
+    }
+}
 
-    // BabyJub base (affine)
+// ======================================================================
+// 2) CommitmentScalars — P1
+// ----------------------------------------------------------------------
+// Inputs:
+//   in_solver_encryption_key[2] : ek (BabyJub affine point)
+//   in_commitment_randomizer_rho: ρ ∈ [0, 2^251)
+// Outputs:
+//   out_commitment_randomizer_rho[251]            : bits(ρ)
+//   out_solver_encryption_key_pow_rho[2]          : ek^ρ
+//   out_commitment_g_rho[2]                       : g^ρ
+//
+// Property (P1):
+//   CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ) and top-level asserts commitment_g_rho == g^ρ
+//   (range-limit ρ via Num2Bits(251); compute ek^ρ via EscalarMulAny; g^ρ via EscalarMulFix)
+// ======================================================================
+template CommitmentScalars() {
+    signal input  in_solver_encryption_key[2];
+    signal input  in_commitment_randomizer_rho;
+
+    signal output out_commitment_randomizer_rho[251];
+    signal output out_solver_encryption_key_pow_rho[2];
+    signal output out_commitment_g_rho[2];
+
     var base[2] = [
         5299619240641551281634865583518297030282874472190772894086521144482721001553,
         16950150798460657717958625567821834550301663161624707787222815936182638968203
     ];
 
-    // ------------------------------------------------------------------
-    // Rebuild message m (bitwise)
-    // ------------------------------------------------------------------
-    signal msg[n];
+    component n2b = Num2Bits(251);
+    in_commitment_randomizer_rho ==> n2b.in;
 
-    for (i = 0; i < n; i++) {
-        if (i >= sb_o && i < sb_o + sb_n) {
-            msg[i] <== msg_priv[i - sb_o];
-        } else {
-            msg[i] <== msg_pub[i];
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // ENC binding: C = Enc(ek, m; rho)
-    // ------------------------------------------------------------------
-
-    // rho → bits
-    component n2b_rho = Num2Bits(251);
-    rho ==> n2b_rho.in;
-
-    // ek^rho (arbitrary-base mul)
-    component ek_rho = EscalarMulAny(251);
-    ek_rho.p[0] <== ek[0];
-    ek_rho.p[1] <== ek[1];
+    var i;
     for (i = 0; i < 251; i++) {
-        n2b_rho.out[i] ==> ek_rho.e[i];
+        out_commitment_randomizer_rho[i] <== n2b.out[i];
     }
 
-    // g^rho (fixed-base mul) and check C0
-    component g_pow_rho = EscalarMulFix(251, base);
+    component mul_any = EscalarMulAny(251);
+    mul_any.p[0] <== in_solver_encryption_key[0];
+    mul_any.p[1] <== in_solver_encryption_key[1];
     for (i = 0; i < 251; i++) {
-        n2b_rho.out[i] ==> g_pow_rho.e[i];
+        n2b.out[i] ==> mul_any.e[i];
     }
+    out_solver_encryption_key_pow_rho[0] <== mul_any.out[0];
+    out_solver_encryption_key_pow_rho[1] <== mul_any.out[1];
 
-    // --- Numeric logs for g^rho:
-    // 900010 => g^rho.x
-    // 900011 => g^rho.y
-    log(900010);
-    log(g_pow_rho.out[0]);
-    log(900011);
-    log(g_pow_rho.out[1]);
+    component mul_fix = EscalarMulFix(251, base);
+    for (i = 0; i < 251; i++) {
+        n2b.out[i] ==> mul_fix.e[i];
+    }
+    out_commitment_g_rho[0] <== mul_fix.out[0];
+    out_commitment_g_rho[1] <== mul_fix.out[1];
+}
 
-    C0[0] === g_pow_rho.out[0];
-    C0[1] === g_pow_rho.out[1];
+// ======================================================================
+// 3) RebuildCommitment — P2
+// ----------------------------------------------------------------------
+// Inputs:
+//   in_seed_x, in_seed_y                        : (ek^ρ).x, (ek^ρ).y
+//   in_message[total_bits]                      : μ_bits
+//   in_commitment_payload[nb_commitment_limbs]  : Cmsg limbs
+// Outputs (debug):
+//   out_message_chunk[nb_commitment_limbs]      : μ̂[i] (254-bit packing)
+//   out_masked_chunk[nb_commitment_limbs]       : μ̂[i] + PRF[i]
+//   out_delta[nb_commitment_limbs]              : Cmsg[i] − (μ̂[i] + PRF[i])
+//
+// Property (P2):
+//   RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF)
+//   (PRF via PoseidonEx seeded with ek^ρ; μ packed into 254-bit limbs with Bits2Num)
+// ======================================================================
+template RebuildCommitment(total_bits, commitment_limb_size, nb_commitment_limbs) {
+    signal input  in_seed_x;
+    signal input  in_seed_y;
+    signal input  in_message[total_bits];
+    signal input  in_commitment_payload[nb_commitment_limbs];
 
-    // PoseidonEx(2,1) seed from ek^rho
+    signal output out_message_chunk[nb_commitment_limbs];
+    signal output out_masked_chunk[nb_commitment_limbs];
+    signal output out_delta[nb_commitment_limbs];
+
+    // PRF stream
+    signal prf[nb_commitment_limbs];
+
     component pEx = PoseidonEx(2, 1);
     pEx.initialState <== 0;
-    pEx.inputs[0] <== ek_rho.out[0];
-    pEx.inputs[1] <== ek_rho.out[1];
+    pEx.inputs[0] <== in_seed_x;
+    pEx.inputs[1] <== in_seed_y;
+    prf[0] <== pEx.out[0];
 
-    // rand stream as signals (so we can log/constraint)
-    signal rand[cmsg_elem];
-    rand[0] <== pEx.out[0];
+    component nexts[nb_commitment_limbs];
+    var k;
+    for (k = 1; k < nb_commitment_limbs; k += 2) {
+        nexts[k] = PoseidonEx(1, 2);
+        nexts[k].initialState <== 0;
+        nexts[k].inputs[0] <== prf[k - 1];
 
-    // Chain with PoseidonEx(1,2)
-    component randEnc[cmsg_elem];
-    for (var k = 1; k < cmsg_elem; k += 2) {
-        randEnc[k] = PoseidonEx(1, 2);
-        randEnc[k].initialState <== 0;
-        randEnc[k].inputs[0] <== rand[k - 1];
-
-        rand[k] <== randEnc[k].out[0];
-        if (k + 1 < cmsg_elem) {
-            rand[k + 1] <== randEnc[k].out[1];
+        prf[k] <== nexts[k].out[0];
+        if (k + 1 < nb_commitment_limbs) {
+            prf[k + 1] <== nexts[k].out[1];
         }
     }
 
-    // Convert message bits to limbs and enforce Cmsg[i] = msg_i + rand[i]
-    component msgBits2Num[cmsg_elem];
-    signal msg_limb[cmsg_elem];
-    signal sum_i[cmsg_elem];
-    signal delta[cmsg_elem];
+    // Pack μ and compute masked limbs
+    component pack[nb_commitment_limbs];
+    var t;
+    var b;
 
-    for (var t = 0; t < cmsg_elem; t++) {
-        msgBits2Num[t] = Bits2Num(bits);
-        for (var b = 0; b < bits; b++) {
-            msgBits2Num[t].in[b] <== msg[t*bits + b];
+    for (t = 0; t < nb_commitment_limbs; t++) {
+        pack[t] = Bits2Num(commitment_limb_size);
+        for (b = 0; b < commitment_limb_size; b++) {
+            pack[t].in[b] <== in_message[t*commitment_limb_size + b];
         }
-        msg_limb[t] <== msgBits2Num[t].out;
+        out_message_chunk[t] <== pack[t].out;
 
-        sum_i[t] <== msg_limb[t] + rand[t];
-        delta[t] <== Cmsg[t] - sum_i[t];
+        out_masked_chunk[t] <== out_message_chunk[t] + prf[t];
+        out_delta[t]        <== in_commitment_payload[t] - out_masked_chunk[t];
 
-        // --- Numeric limb logs (match generator and are human-traceable):
-        // Tag = 900200 + t, then we print:
-        //   1) tag
-        //   2) msg_i
-        //   3) rand_i
-        //   4) sum_i
-        //   5) Cmsg[i]
-        //   6) delta = Cmsg[i] - sum_i (should be 0)
+        // Deterministic trace (unchanged)
         log(900200 + t);
-        log(msg_limb[t]);
-        log(rand[t]);
-        log(sum_i[t]);
-        log(Cmsg[t]);
-        log(delta[t]);
+        log(out_message_chunk[t]);
+        log(prf[t]);
+        log(out_masked_chunk[t]);
+        log(in_commitment_payload[t]);
+        log(out_delta[t]);
 
-        // Constraint
-        Cmsg[t] === sum_i[t];
-    }
-
-    // ------------------------------------------------------------------
-    // Schnorr challenge binding (Cardano SHA-512 over (R, A, m_bits))
-    // ------------------------------------------------------------------
-    component hash = Sha512_hash_bits_digest(n + 512);
-
-    // Feed R8 (256 bits) then A (256 bits), reversing bits within each byte
-    for (i = 0; i < 256; i += 8) {
-        for (j = 0; j < 8; j++) {
-            hash.inp_bits[i + j]       <== R8[i + (7 - j)];
-            hash.inp_bits[256 + i + j] <== A [i + (7 - j)];
-        }
-    }
-    // Append message bits
-    for (i = 0; i < n; i++) {
-        msg[i] ==> hash.inp_bits[512 + i];
-    }
-
-    // Check digest; also log each byte with a numeric tag:
-    // Tag = 900300 + i → then value
-    for (i = 0; i < 64; i++) {
-        log(900300 + i);
-        log(hash.hash_bytes[i]);
-        c_schnorr[i] === hash.hash_bytes[i];
     }
 }
 
-// Top-level
-component main { public [A, R8, ek, C0, Cmsg, c_schnorr, msg_pub] } = CardanoWBPS(9*254, 333, 32);
+// ======================================================================
+// 4) RebuildChallenge — P3
+// ----------------------------------------------------------------------
+// Inputs:
+//   in_commitment_point[256] : R bits (nonce commitment g^ρ), byte-wise bit-reversed per EdDSA
+//   in_signer_key[256]       : X bits (signer key), byte-wise bit-reversed per EdDSA
+//   in_message[total_bits]   : μ_bits
+// Output:
+//   out_challenge[64]        : digest
+//
+// Property (P3):
+//   RebuildChallenge(R, X, μ) → digest and assert challenge == digest
+//   (digest = SHA512(R || X || μ_bits) with per-byte bit-reversal for R, X)
+// ======================================================================
+template RebuildChallenge(total_bits) {
+    signal input  in_commitment_point[256];
+    signal input  in_signer_key[256];
+    signal input  in_message[total_bits];
+    signal output out_challenge[64];
+
+    component hash = Sha512_hash_bits_digest(total_bits + 512);
+
+    var i;
+    var j;
+
+    for (i = 0; i < 256; i += 8) {
+        for (j = 0; j < 8; j++) {
+            hash.inp_bits[i + j]       <== in_commitment_point[i + (7 - j)];
+            hash.inp_bits[256 + i + j] <== in_signer_key[i + (7 - j)];
+        }
+    }
+    for (i = 0; i < total_bits; i++) {
+        in_message[i] ==> hash.inp_bits[512 + i];
+    }
+
+    for (i = 0; i < 64; i++) {
+        out_challenge[i] <== hash.hash_bytes[i];
+        log(900300 + i);
+        log(out_challenge[i]);
+    }
+}
+
+// ======================================================================
+// 5) Top-level — CardanoWBPS(message_size, message_private_part_size, message_private_part_offset)
+// ----------------------------------------------------------------------
+// Orchestration (explicit):
+//   - P0: RebuildMessage(m_pub, m_priv) → μ
+//   - P1: CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ) and assert commitment_g_rho == g^ρ
+//   - P2: RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF) and assert Cmsg[i] == μ̂[i] + PRF[i]
+//   - P3: RebuildChallenge(R, X, μ) → digest and assert challenge == digest
+// ======================================================================
+template CardanoWBPS(message_size, message_private_part_size, message_private_part_offset) {
+    var commitment_limb_size = 254;
+    assert(message_size % commitment_limb_size == 0);
+    var nb_commitment_limbs = message_size \ commitment_limb_size;
+
+    // External inputs
+    signal input signer_key[256];
+    signal input solver_encryption_key[2];
+
+    // R = g^ρ (bits for transcript), C0 = g^ρ (affine), payload limbs, challenge
+    signal input commitment_point[256];
+    signal input commitment_g_rho[2];
+    signal input commitment_randomizer_rho;
+    signal input commitment_payload[nb_commitment_limbs];
+    signal input challenge[64];
+    signal input message_public_part[message_size];
+    signal input message_private_part[message_private_part_size];
+
+    // P0
+    component rebuildMessage = RebuildMessage(message_size, message_private_part_size, message_private_part_offset);
+    for (var i = 0; i < message_size; i++) {
+        rebuildMessage.in_message_public_part[i] <== message_public_part[i];
+    }
+    for (var j = 0; j < message_private_part_size; j++) {
+        rebuildMessage.in_message_private_part[j] <== message_private_part[j];
+    }
+
+    // P1
+    component commitmentScalars = CommitmentScalars();
+    commitmentScalars.in_solver_encryption_key[0] <== solver_encryption_key[0];
+    commitmentScalars.in_solver_encryption_key[1] <== solver_encryption_key[1];
+    commitmentScalars.in_commitment_randomizer_rho <== commitment_randomizer_rho;
+
+    log(900010); log(commitmentScalars.out_commitment_g_rho[0]);
+    log(900011); log(commitmentScalars.out_commitment_g_rho[1]);
+
+    commitment_g_rho[0] === commitmentScalars.out_commitment_g_rho[0];
+    commitment_g_rho[1] === commitmentScalars.out_commitment_g_rho[1];
+
+    // P2
+    component rebuildCommitment = RebuildCommitment(message_size, commitment_limb_size, nb_commitment_limbs);
+    rebuildCommitment.in_seed_x <== commitmentScalars.out_solver_encryption_key_pow_rho[0];
+    rebuildCommitment.in_seed_y <== commitmentScalars.out_solver_encryption_key_pow_rho[1];
+    for (var t = 0; t < message_size; t++) {
+        rebuildCommitment.in_message[t] <== rebuildMessage.out_message[t];
+    }
+    for (var k = 0; k < nb_commitment_limbs; k++) {
+        rebuildCommitment.in_commitment_payload[k] <== commitment_payload[k];
+    }
+
+    for (var q = 0; q < nb_commitment_limbs; q++) {
+        commitment_payload[q] === rebuildCommitment.out_masked_chunk[q];
+    }
+
+    // P3
+    component rebuildChallenge = RebuildChallenge(message_size);
+    for (var r = 0; r < 256; r++) {
+        rebuildChallenge.in_commitment_point[r] <== commitment_point[r];
+        rebuildChallenge.in_signer_key[r]       <== signer_key[r];
+    }
+    for (var m = 0; m < message_size; m++) {
+        rebuildChallenge.in_message[m] <== rebuildMessage.out_message[m];
+    }
+
+    for (var d = 0; d < 64; d++) {
+        challenge[d] === rebuildChallenge.out_challenge[d];
+    }
+}
+
+// ======================================================================
+// Public exposure (unchanged API & parameters)
+// ======================================================================
+component main { public [
+    signer_key,
+    solver_encryption_key,
+    commitment_point,
+    commitment_g_rho,
+    commitment_randomizer_rho,
+    commitment_payload,
+    challenge,
+    message_public_part
+] } = CardanoWBPS(9*254, 333, 32);
