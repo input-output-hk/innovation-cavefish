@@ -150,7 +150,7 @@ template CommitmentScalars() {
 // ----------------------------------------------------------------------
 // Inputs:
 //   in_seed_x, in_seed_y                        : (ek^ρ).x, (ek^ρ).y
-//   in_message[total_bits]                      : μ_bits
+//   in_message[message_size]                      : μ_bits
 //   in_commitment_payload[nb_commitment_limbs]  : Cmsg limbs
 // Outputs (debug):
 //   out_message_chunk[nb_commitment_limbs]      : μ̂[i] (254-bit packing)
@@ -161,10 +161,10 @@ template CommitmentScalars() {
 //   RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF)
 //   (PRF via PoseidonEx seeded with ek^ρ; μ packed into 254-bit limbs with Bits2Num)
 // ======================================================================
-template RebuildCommitment(total_bits, commitment_limb_size, nb_commitment_limbs) {
+template RebuildCommitment(message_size, commitment_limb_size, nb_commitment_limbs) {
     signal input  in_seed_x;
     signal input  in_seed_y;
-    signal input  in_message[total_bits];
+    signal input  in_message[message_size];
     signal input  in_commitment_payload[nb_commitment_limbs];
 
     signal output out_message_chunk[nb_commitment_limbs];
@@ -225,7 +225,7 @@ template RebuildCommitment(total_bits, commitment_limb_size, nb_commitment_limbs
 // Inputs:
 //   in_commitment_point[256] : R bits (nonce commitment g^ρ), byte-wise bit-reversed per EdDSA
 //   in_signer_key[256]       : X bits (signer key), byte-wise bit-reversed per EdDSA
-//   in_message[total_bits]   : μ_bits
+//   in_message[message_size]   : μ_bits
 // Output:
 //   out_challenge[64]        : digest
 //
@@ -233,13 +233,13 @@ template RebuildCommitment(total_bits, commitment_limb_size, nb_commitment_limbs
 //   RebuildChallenge(R, X, μ) → digest and assert challenge == digest
 //   (digest = SHA512(R || X || μ_bits) with per-byte bit-reversal for R, X)
 // ======================================================================
-template RebuildChallenge(total_bits) {
+template RebuildChallenge(message_size) {
     signal input  in_commitment_point[256];
     signal input  in_signer_key[256];
-    signal input  in_message[total_bits];
+    signal input  in_message[message_size];
     signal output out_challenge[64];
 
-    component hash = Sha512_hash_bits_digest(total_bits + 512);
+    component hash = Sha512_hash_bits_digest(message_size + 512);
 
     var i;
     var j;
@@ -250,7 +250,7 @@ template RebuildChallenge(total_bits) {
             hash.inp_bits[256 + i + j] <== in_signer_key[i + (7 - j)];
         }
     }
-    for (i = 0; i < total_bits; i++) {
+    for (i = 0; i < message_size; i++) {
         in_message[i] ==> hash.inp_bits[512 + i];
     }
 
