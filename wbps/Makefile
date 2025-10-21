@@ -2,7 +2,7 @@
 # WBPS — Circom + SnarkJS workflow (example-or-generate input)
 # - Vendorizes circomlib (shallow clone) under ./vendor
 # - Default uses examples/<circuit>_input.json if present, else generates
-# - Prints a LOG PREFACE right before witness to explain circuit logs
+# - Prints a LOG PREFACE + PROPERTY OVERVIEW before witness
 # ======================================================================
 
 SHELL := bash
@@ -154,32 +154,95 @@ gen-input-debug:
 witness: $(WIT) $(PUB)
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# LOG PREFACE (prints once per run, just before witness calculation)
+# LOG PREFACE (context shown once per run, before witness generation)
 define WBPS_LOG_PREFACE
-──────────────────────── WBPS CIRCUIT LOGS ────────────────────────
-These numeric tags/lines are printed by the circuit during witness:
-  900010 → g^rho.x
-  900011 → g^rho.y
 
-For each ciphertext limb i (i=0..8), a block tagged 900200+i:
-  line 1: (tag)            900200+i
-  line 2: msg_limb[i]      (unpacked 254-bit message limb)
-  line 3: rand[i]          (Poseidon-derived OTP for this limb)
-  line 4: sum_i            = msg_limb[i] + rand[i]   (mod p)
-  line 5: Cmsg[i]          (provided ciphertext limb)
-  line 6: delta            = Cmsg[i] − sum_i   (should be 0)
+[1;36m──────────────────────── WBPS CIRCUIT LOGS ────────────────────────[0m
+These numeric tags are emitted by the circuit during witness generation.
+They are [1;33mCAPTURED silently[0m to file and then parsed into a structured
+report ([1m[32mwitness_report.txt[0m / [1m[32mwitness_report.json[0m). Nothing is printed
+to the terminal while the circuit runs.
 
-Then 64 lines for SHA-512 digest bytes:
-  900300..900363 → each line prints the corresponding digest byte.
-────────────────────────────────────────────────────────────────────
+[1;36mNonce / commitment base (P1):[0m
+  [1;33m900010[0m → [1m(g^ρ).x[0m     — x-coordinate of the BabyJub point g^ρ
+  [1;33m900011[0m → [1m(g^ρ).y[0m     — y-coordinate of the BabyJub point g^ρ
+  (ρ is range-checked via [1mNum2Bits(251)[0m; g^ρ is computed via [1mEscalarMulFix[0m.)
+
+[1;36mCiphertext limbs (P2):[0m for each limb [1mi[0m = 0..(nb_commitment_limbs−1)
+  [1;33m900200+i[0m  (tag header for limb i)
+    [32mline 2:[0m μ̂[i]            — 254-bit packed limb of μ
+    [32mline 3:[0m PRF[i]           — Poseidon-derived mask from (ek^ρ)
+    [32mline 4:[0m μ̂[i] + PRF[i]   — masked limb
+    [32mline 5:[0m Cmsg[i]          — provided ciphertext limb
+    [32mline 6:[0m Δ[i] = Cmsg[i] − (μ̂[i] + PRF[i])  — should be [1;32m0[0m
+  (The equality [1mCmsg[i] == μ̂[i] + PRF[i][0m is verified at the [1;35mTOP LEVEL[0m.)
+
+[1;36mTranscript / challenge digest (P3):[0m
+  [1;33m900300..900363[0m → c[j] for j=0..63, where
+    [1mc = SHA-512(R || X || μ_bits)[0m,
+    with R and X fed byte-wise bit-reversed as in Cardano’s EdDSA.
+
+[1;36mLegend:[0m
+  ρ       — commitment randomizer scalar
+  ek      — solver encryption (ElGamal) public key
+  μ       — message bits after overlay (public ⊕ private)
+  μ̂[i]   — i-th 254-bit field limb of μ
+  PRF[i]  — Poseidon-derived mask stream seeded by (ek^ρ)
+
+[1;36mThe parsed report will summarize:[0m
+  • [1;35mP1[0m: Commitment base [1m(g^ρ)[0m (x, y)
+  • [1;35mP2[0m: Ciphertext binding per limb ([1mCmsg[i] ≟ μ̂[i] + PRF[i][0m)
+  • [1;35mP3[0m: SHA-512 transcript digest c[0..63]
+
+[1;36mExample outputs:[0m
+  [1;32m✓[0m  Δ[i] = 0   → constraint satisfied
+  [1;31m✗[0m  Δ[i] ≠ 0   → mismatch (likely constraint failure)
+
+[1;36m────────────────────────────────────────────────────────────────────[0m
 endef
 export WBPS_LOG_PREFACE
+
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# PROPERTY OVERVIEW (adds human-readable spec language for P0..P3)
+define WBPS_PROPERTY_OVERVIEW
+[1;34m──────────────────────── WBPS Proof Properties ────────────────────────[0m
+[1mP0 – Message Reconstruction[0m
+  Build the message [1mμ[0m by overlaying the private window onto the public
+  bits: [1mμ = Overlay(m_pub, m_priv)[0m.
+
+[1mP1 – Commitment Scalar Correctness[0m
+  Range-check [1mρ ∈ [0,2^251)[0m, compute [1mek^ρ[0m and [1mg^ρ[0m, then assert:
+    [1mC₀ == g^ρ[0m
+  This binds the commitment to the nonce scalar [1mρ[0m.
+
+[1mP2 – Ciphertext Binding Consistency[0m
+  Pack [1mμ[0m into 254-bit limbs [1mμ̂[i][0m and generate a PRF stream from [1mek^ρ[0m.
+  For every limb [1mi[0m:
+    [1mCmsg[i] == μ̂[i] + PRF[i][0m   (mod p)
+  Ensures the ciphertext encodes [1mμ[0m under the solver key and nonce.
+
+[1mP3 – Transcript Integrity[0m
+  Rebuild the Schnorr transcript:
+    [1mc = SHA-512(R || X || μ_bits)[0m
+  and assert the provided challenge equals [1mc[0m.
+[1;34m───────────────────────────────────────────────────────────────────────[0m
+endef
+export WBPS_PROPERTY_OVERVIEW
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+WITLOG  := $(ARTIFACT)/witness_raw.log
+LOGTXT  := $(ARTIFACT)/witness_report.txt
+LOGJSON := $(ARTIFACT)/witness_report.json
 
 $(WIT): $(WASM) $(INPUT) | $(ARTIFACT)
 	@echo "$$WBPS_LOG_PREFACE"
+	@echo "$$WBPS_PROPERTY_OVERVIEW"
 	@echo "🧮 [Witness] $(INPUT) → $(WIT)"
-	snarkjs wtns calculate $(WASM) $(INPUT) $(WIT)
+	# Capture circuit logs silently; redirect both stdout & stderr
+	(snarkjs wtns calculate $(WASM) $(INPUT) $(WIT) >$(WITLOG) 2>&1) || true
+	# Parse logs and emit colored summary
+	@python3 tooling/parse_wbps_logs.py $(WITLOG) --txt $(LOGTXT) --json $(LOGJSON) --color || true
+	@echo "🧾 [Logs] Parsed → $(LOGTXT)"
 
 $(PUB): $(WIT) | $(ARTIFACT)
 	@echo "📤 [Witness] Export public → $(PUB)"
