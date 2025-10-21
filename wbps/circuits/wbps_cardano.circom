@@ -29,13 +29,38 @@
 //  (internal) PRF in RebuildCommitment  |  PRF[i] — Pseudorandom mask from ek^ρ
 //  rebuildChallenge.out_challenge       |  c      — SHA-512 transcript digest
 // --------------------------------------|------------------------------------------
-//  Component Relationships (Properties):
-//    P0: RebuildMessage(m_pub, m_priv) → μ
-//    P1: CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ)  and assert C₀ == g^ρ
-//    P2: RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF)  and assert Cmsg[i] == μ̂[i] + PRF[i]
-//    P3: RebuildChallenge(R, X, μ) → digest      and assert c == digest
 // ======================================================================
+// Proof Properties 
+// ----------------------------------------------------------------------
+// The CardanoWBPS circuit enforces four sequential properties (P0–P3).
+// Each property expresses a verifiable relation between public and private inputs.
 //
+//   P0 – Message Reconstruction
+//        Ensures that the full message μ is correctly rebuilt from its
+//        public and private segments: μ = Overlay(m_pub, m_priv).
+//
+//   P1 – Commitment Scalar Correctness
+//        Confirms that the commitment scalar ρ is valid and used consistently:
+//        (a) ρ is range-checked to [0, 2^251)
+//        (b) g^ρ is computed from the fixed BabyJub base g
+//        (c) ek^ρ is computed from the encryption key ek
+//        (d) The public commitment C₀ must equal g^ρ
+//
+//   P2 – Ciphertext Binding Consistency
+//        Rebuilds the commitment ciphertext Cmsg and verifies its correctness.
+//        For each message limb i:
+//            μ̂[i] = Bits2Num_i(μ)
+//            PRF[i] = PoseidonStream_i(ek^ρ)
+//            Enforce:  Cmsg[i] = μ̂[i] + PRF[i]   (mod p)
+//        This guarantees that Cmsg encrypts μ under ek using ρ.
+//
+//   P3 – Transcript Integrity
+//        Recomputes the Schnorr transcript challenge used in EdDSA verification:
+//            c = SHA-512(R || X || μ_bits)
+//        and enforces equality with the provided challenge input.
+//        This binds together the nonce R = g^ρ, the signer key X, and the
+//        message μ, ensuring the proof is non-malleable and self-consistent.
+// ======================================================================
 // Parameters (top-level):
 //   message_size                    : |μ| (must be a multiple of 254 bits)
 //   message_private_part_size       : size of the private overlay window
@@ -90,6 +115,7 @@ template RebuildMessage(message_size, message_private_part_size, message_private
             out_message[i] <== in_message_public_part[i];
         }
     }
+    
 }
 
 // ======================================================================
