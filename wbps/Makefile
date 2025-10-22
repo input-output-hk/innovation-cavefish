@@ -4,6 +4,16 @@
 # - Default uses examples/<circuit>_input.json if present, else generates
 # - Prints a LOG PREFACE + PROPERTY OVERVIEW before witness
 # - Records per-step timings and prints a benchmark report at the end
+# - OUTPUT LAYOUT (new):
+#     build/<circuit>/
+#       relation/{relation.r1cs,relation_symbols.sym}
+#       witness_generator/{witness_gen.wasm,generate_witness.js,witness_calculator.js}
+#       setup/{powersoftau.ptau,pot_final.ptau,proving_key.zkey,verification_key.json}
+#       runs/<UTC-ISO>/
+#         input/generation_input.json
+#         witness/{witness.wtns,public_signals.json}
+#         logs/{generation_raw.log,generation_report.txt,generation_report.json}
+#         proof/{proof.json,message_public_part.json}
 # ======================================================================
 
 SHELL := bash
@@ -18,13 +28,27 @@ PTAU_BITS ?= 19
 CURVE     ?= bn128
 
 # ----------------------------------------------------------------------
-# Paths
+# Paths (top-level)
 # ----------------------------------------------------------------------
 CIRCUIT_DIR := circuits
 BUILD_DIR   := build
 ARTIFACT    := $(BUILD_DIR)/$(CIRCUIT)
-KEYDIR      := $(BUILD_DIR)/keys
 VENDOR_DIR  := vendor
+
+# Static artifact folders
+REL_DIR   := $(ARTIFACT)/relation
+SETUP_DIR := $(ARTIFACT)/setup
+WITGEN_DIR := $(ARTIFACT)/witness_generator
+
+# Per-run folders
+RUNS_DIR := $(ARTIFACT)/runs
+RUN ?= $(shell date -u +%Y-%m-%dT%H-%M-%SZ)
+RUN_DIR := $(RUNS_DIR)/$(RUN)
+
+INPUT_DIR := $(RUN_DIR)/input
+WIT_DIR   := $(RUN_DIR)/witness
+LOG_DIR   := $(RUN_DIR)/logs
+PROOF_DIR := $(RUN_DIR)/proof
 
 INCLUDES  := -l $(VENDOR_DIR)/circomlib -l $(VENDOR_DIR)/hashing_circuits -l .
 
@@ -33,21 +57,35 @@ INCLUDES  := -l $(VENDOR_DIR)/circomlib -l $(VENDOR_DIR)/hashing_circuits -l .
 # ----------------------------------------------------------------------
 CIRCUIT_FILE := $(CIRCUIT_DIR)/$(CIRCUIT).circom
 
-R1CS   := $(ARTIFACT)/$(CIRCUIT).r1cs
-WASM   := $(ARTIFACT)/$(CIRCUIT)_js/$(CIRCUIT).wasm
-SYM    := $(ARTIFACT)/$(CIRCUIT).sym
-WIT    := $(ARTIFACT)/$(CIRCUIT).wtns
-INPUT  ?= $(ARTIFACT)/$(CIRCUIT)_input.json
-PUB    := $(ARTIFACT)/$(CIRCUIT)_public.json
-PROOF  := $(ARTIFACT)/$(CIRCUIT)_proof.json
-ZKEY   := $(ARTIFACT)/$(CIRCUIT).zkey
-VK     := $(ARTIFACT)/$(CIRCUIT)_verifkey.json
+# relation/ (renamed artifacts)
+R1CS   := $(REL_DIR)/relation.r1cs
+SYM    := $(REL_DIR)/relation_symbols.sym
 
-PTAU1  := $(KEYDIR)/powersoftau.ptau
-PTAU2  := $(KEYDIR)/pot_final.ptau
+# witness_generator/ (runtime moved here)
+WASM        := $(WITGEN_DIR)/witness_gen.wasm
+GENWIT_JS   := $(WITGEN_DIR)/generate_witness.js
+WITCALC_JS  := $(WITGEN_DIR)/witness_calculator.js
+
+# setup/
+ZKEY   := $(SETUP_DIR)/proving_key.zkey
+VK     := $(SETUP_DIR)/verification_key.json
+PTAU1  := $(SETUP_DIR)/powersoftau.ptau
+PTAU2  := $(SETUP_DIR)/pot_final.ptau
+
+# per-run main IO
+INPUT  ?= $(INPUT_DIR)/generation_input.json
+WIT    := $(WIT_DIR)/witness.wtns
+PUB    := $(PROOF_DIR)/public_signals.json
+PROOF  := $(PROOF_DIR)/proof.json
+MSG_PUB := $(PROOF_DIR)/message_public_part.json
 
 # Example input (preferred if present)
 EXAMPLE_INPUT := examples/$(CIRCUIT)_input.json
+
+# Logs
+WITLOG  := $(LOG_DIR)/generation_raw.log
+LOGTXT  := $(LOG_DIR)/generation_report.txt
+LOGJSON := $(LOG_DIR)/generation_report.json
 
 # ----------------------------------------------------------------------
 # Node input generator (optional, used as fallback)
@@ -62,7 +100,8 @@ GEN_ARGS   := --out $(abspath $(INPUT)) $(if $(filter 1,$(GEN_DEBUG)),--debug,)
 # ----------------------------------------------------------------------
 # Timings (append-only TSV) and helpers
 # ----------------------------------------------------------------------
-TIMINGS := $(ARTIFACT)/timings.tsv
+
+TIMINGS := $(LOG_DIR)/timings.tsv
 
 define __now_ms
 python3 -c 'import time,sys; sys.stdout.write(str(int(time.time()*1000)))'
@@ -80,7 +119,8 @@ endef
         compile witness setup prove verify info size-hint \
         clean distclean clobber \
         use-example-or-generate gen-input gen-input-debug \
-        with-example with-generated-input tree show-paths bench-report
+        with-example with-generated-input tree show-paths bench-report \
+        ensure-run-dirs
 
 # ----------------------------------------------------------------------
 # Entrypoints
@@ -95,7 +135,18 @@ help:
 	@echo "  make info | size-hint | clean | distclean | clobber"
 
 tree:
-	@printf "%s\n" "circuits/" "tooling/inputgen/" "build/<circuit>/" "build/keys/" "vendor/"
+	@printf "%s\n" \
+	"circuits/" \
+	"tooling/inputgen/" \
+	"build/<circuit>/relation/" \
+	"build/<circuit>/setup/" \
+	"build/<circuit>/witness_generator/" \
+	"build/<circuit>/runs/<utc-iso>/{input,witness,logs,proof}/" \
+	"vendor/"
+
+# Ensure all directories exist for this run
+ensure-run-dirs:
+	@mkdir -p $(REL_DIR) $(SETUP_DIR) $(WITGEN_DIR) $(RUN_DIR) $(INPUT_DIR) $(WIT_DIR) $(LOG_DIR) $(PROOF_DIR)
 
 # ----------------------------------------------------------------------
 # Deps
@@ -121,26 +172,34 @@ $(VENDOR_DIR)/hashing_circuits: | $(VENDOR_DIR)
 deps-hashing: $(VENDOR_DIR)/hashing_circuits
 
 # ----------------------------------------------------------------------
-# Build / Compile
+# Build / Compile → relation/
 # ----------------------------------------------------------------------
-$(ARTIFACT):
-	mkdir -p $(ARTIFACT)
+compile: deps ensure-run-dirs $(R1CS) $(WASM) $(SYM) $(GENWIT_JS) $(WITCALC_JS)
 
-compile: deps $(ARTIFACT) $(R1CS) $(WASM) $(SYM)
-
-$(R1CS) $(WASM) $(SYM): $(CIRCUIT_FILE) | $(ARTIFACT)
+# Emit to relation/ then rename to our canonical filenames
+$(R1CS) $(WASM) $(SYM) $(GENWIT_JS) $(WITCALC_JS): $(CIRCUIT_FILE) | $(REL_DIR)
 	$(call TS,compile,START)
-	@echo "🔧 [Compile] $(CIRCUIT_FILE) → $(ARTIFACT)/"
-	circom $(CIRCUIT_FILE) --r1cs --wasm --sym $(INCLUDES) -o $(ARTIFACT)
+	@echo "🔧 [Compile] $(CIRCUIT_FILE) → $(REL_DIR)/"
+	# Compile in-place under relation/
+	circom $(CIRCUIT_FILE) --r1cs --wasm --sym $(INCLUDES) -o $(REL_DIR)
+	# Rename to canonical names
+	@mv -f "$(REL_DIR)/$(CIRCUIT).r1cs" "$(R1CS)"
+	@mv -f "$(REL_DIR)/$(CIRCUIT).sym"  "$(SYM)"
+	# Move runtime into witness_generator/
+	@mkdir -p "$(WITGEN_DIR)"
+	@mv -f "$(REL_DIR)/$(CIRCUIT)_js/$(CIRCUIT).wasm" "$(WASM)"
+	@mv -f "$(REL_DIR)/$(CIRCUIT)_js/generate_witness.js" "$(GENWIT_JS)"
+	@mv -f "$(REL_DIR)/$(CIRCUIT)_js/witness_calculator.js" "$(WITCALC_JS)"
+	@rm -rf "$(REL_DIR)/$(CIRCUIT)_js"
 	$(call TS,compile,END)
 
 # ----------------------------------------------------------------------
-# Input: copy example if exists, otherwise generate
+# Input: copy example if exists, otherwise generate → runs/<run>/input/
 # ----------------------------------------------------------------------
 with-example: compile use-example-or-generate witness setup prove verify bench-report
 with-generated-input: compile gen-input witness setup prove verify bench-report
 
-use-example-or-generate: | $(ARTIFACT)
+use-example-or-generate: ensure-run-dirs
 	$(call TS,input,START)
 	@echo "📥 Preparing input → $(INPUT)"
 	@if [ -f "$(EXAMPLE_INPUT)" ]; then \
@@ -159,7 +218,7 @@ $(GEN_NODEM): $(GEN_PKJ)
 	else npm ci --no-fund --no-audit; fi
 	@echo "✅ generator deps installed"
 
-gen-input: $(GEN_BIN) $(GEN_NODEM) | $(ARTIFACT)
+gen-input: $(GEN_BIN) $(GEN_NODEM) ensure-run-dirs
 	@echo "📝 [Init] Generating $(abspath $(INPUT)) via $(GEN_BIN)"
 	node "$(GEN_BIN)" $(GEN_ARGS)
 	@echo "✅ Wrote $(abspath $(INPUT))"
@@ -168,18 +227,14 @@ gen-input-debug:
 	@$(MAKE) gen-input GEN_DEBUG=1
 
 # ----------------------------------------------------------------------
-# Witness / Setup / Prove / Verify
+# LOG PREFACE + PROPERTY OVERVIEW (printed before witness)
 # ----------------------------------------------------------------------
-witness: $(WIT) $(PUB)
-
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# LOG PREFACE (context shown once per run, before witness generation)
 define WBPS_LOG_PREFACE
 
 [1;36m──────────────────────── WBPS CIRCUIT LOGS ────────────────────────[0m
 These numeric tags are emitted by the circuit during witness generation.
 They are [1;33mCAPTURED silently[0m to file and then parsed into a structured
-report ([1m[32mwitness_report.txt[0m / [1m[32mwitness_report.json[0m). Nothing is printed
+report ([1m[32m$(LOGTXT)[0m / [1m[32m$(LOGJSON)[0m). Nothing is printed
 to the terminal while the circuit runs.
 
 [1;36mNonce / commitment base (P1):[0m
@@ -221,8 +276,6 @@ to the terminal while the circuit runs.
 endef
 export WBPS_LOG_PREFACE
 
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# PROPERTY OVERVIEW (adds human-readable spec language for P0..P3)
 define WBPS_PROPERTY_OVERVIEW
 [1;34m──────────────────────── WBPS Proof Properties ────────────────────────[0m
 [1mP0 – Message Reconstruction[0m
@@ -247,13 +300,13 @@ define WBPS_PROPERTY_OVERVIEW
 [1;34m───────────────────────────────────────────────────────────────────────[0m
 endef
 export WBPS_PROPERTY_OVERVIEW
-# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-WITLOG  := $(ARTIFACT)/witness_raw.log
-LOGTXT  := $(ARTIFACT)/witness_report.txt
-LOGJSON := $(ARTIFACT)/witness_report.json
+# ----------------------------------------------------------------------
+# Witness / Setup / Prove / Verify
+# ----------------------------------------------------------------------
+witness: $(WIT) $(PUB)
 
-$(WIT): $(WASM) $(INPUT) | $(ARTIFACT)
+$(WIT): $(WASM) $(INPUT) | ensure-run-dirs
 	@echo "$$WBPS_LOG_PREFACE"
 	@echo "$$WBPS_PROPERTY_OVERVIEW"
 	@echo "🧮 [Witness] $(INPUT) → $(WIT)"
@@ -267,42 +320,47 @@ $(WIT): $(WASM) $(INPUT) | $(ARTIFACT)
 	$(call TS,log-parse,END)
 	@echo "🧾 [Logs] Parsed → $(LOGTXT)"
 
-$(PUB): $(WIT) | $(ARTIFACT)
+$(PUB): $(WIT)
 	$(call TS,export-public,START)
 	@echo "📤 [Witness] Export public → $(PUB)"
 	snarkjs wtns export json $(WIT) $(PUB)
 	$(call TS,export-public,END)
 
+# --- Setup (static under setup/) ---
 setup: $(VK)
 
-$(KEYDIR):
-	mkdir -p $(KEYDIR)
-
-$(PTAU1): | $(KEYDIR)
+$(PTAU1):
 	$(call TS,setup-phase1,START)
+	@mkdir -p $(SETUP_DIR)
 	@echo "🌍 [Setup/Phase1] curve=$(CURVE), size=2^$(PTAU_BITS)"
 	snarkjs powersoftau new $(CURVE) $(PTAU_BITS) $(PTAU1)
 	$(call TS,setup-phase1,END)
 
-$(PTAU2): $(PTAU1) | $(KEYDIR)
+$(PTAU2): $(PTAU1)
 	$(call TS,setup-phase2,START)
 	@echo "🔑 [Setup/Phase2]"
 	snarkjs powersoftau prepare phase2 $(PTAU1) $(PTAU2)
 	$(call TS,setup-phase2,END)
 
-$(ZKEY): $(R1CS) $(PTAU2) | $(ARTIFACT)
+$(ZKEY): $(R1CS) $(PTAU2)
 	$(call TS,keygen,START)
 	@echo "📦 [Setup/Groth16] Proving key"
 	snarkjs groth16 setup $(R1CS) $(PTAU2) $(ZKEY)
 	$(call TS,keygen,END)
 
-$(VK): $(ZKEY) | $(ARTIFACT)
+$(VK): $(ZKEY)
 	@echo "🔍 [Setup/Groth16] Verification key"
 	snarkjs zkey export verificationkey $(ZKEY) $(VK)
 
+# --- Proof (per-run under runs/<run>/proof/) ---
 prove: $(PROOF)
 
-$(PROOF): $(ZKEY) $(WIT) $(PUB) | $(ARTIFACT)
+# Extract only the portion needed by proof/verification
+$(MSG_PUB): $(INPUT) | $(PROOF_DIR)
+	@jq '.message_public_part // {}' "$(INPUT)" > "$(MSG_PUB)" 2>/dev/null || echo "{}" > "$(MSG_PUB)"
+	@echo "🧾 [Proof] message_public_part extracted → $(MSG_PUB)"
+
+$(PROOF): $(ZKEY) $(WIT) $(PUB) $(MSG_PUB) | $(PROOF_DIR)
 	$(call TS,prove,START)
 	@echo "🛡️  [Prove] Generating proof"
 	snarkjs groth16 prove $(ZKEY) $(WIT) $(PROOF) $(PUB)
@@ -377,19 +435,32 @@ PY\n\
 ); echo "Constraints: $$N"; echo "Suggested PTAU_BITS: $$REQ (current: $(PTAU_BITS))"
 
 show-paths:
-	@echo "Circuit:        $(CIRCUIT_FILE)"
-	@echo "Build dir:      $(ARTIFACT)"
-	@echo "WASM:           $(WASM)"
-	@echo "R1CS:           $(R1CS)"
-	@echo "SYM:            $(SYM)"
-	@echo "Input (build):  $(INPUT)"
-	@echo "Input (example):$(EXAMPLE_INPUT)"
-	@echo "Witness:        $(WIT)"
-	@echo "Public:         $(PUB)"
-	@echo "Proof:          $(PROOF)"
-	@echo "VK:             $(VK)"
-	@echo "PTAU1:          $(PTAU1)"
-	@echo "PTAU2:          $(PTAU2)"
+	@echo "Circuit:              $(CIRCUIT_FILE)"
+	@echo "Build dir:            $(ARTIFACT)"
+	@echo "Relation dir:         $(REL_DIR)"
+	@echo "Setup dir:            $(SETUP_DIR)"
+	@echo "Witness gen dir:      $(WITGEN_DIR)"
+	@echo "Runs dir:             $(RUNS_DIR)"
+	@echo "This run:             $(RUN_DIR)"
+	@echo "R1CS:                 $(R1CS)"
+	@echo "SYM:                  $(SYM)"
+	@echo "WASM:                 $(WASM)"
+	@echo "generate_witness.js:  $(GENWIT_JS)"
+	@echo "witness_calculator.js:$(WITCALC_JS)"
+	@echo "Input (example):      $(EXAMPLE_INPUT)"
+	@echo "Input (this run):     $(INPUT)"
+	@echo "Witness:              $(WIT)"
+	@echo "Public signals:       $(PUB)"
+	@echo "Raw logs:             $(WITLOG)"
+	@echo "Parsed (txt):         $(LOGTXT)"
+	@echo "Parsed (json):        $(LOGJSON)"
+	@echo "Proof:                $(PROOF)"
+	@echo "message_public_part:  $(MSG_PUB)"
+	@echo "PTAU1:                $(PTAU1)"
+	@echo "PTAU2:                $(PTAU2)"
+	@echo "ZKey:                 $(ZKEY)"
+	@echo "VK:                   $(VK)"
+	@echo "Timings TSV:          $(TIMINGS)"
 
 # ----------------------------------------------------------------------
 # Cleanup
@@ -400,8 +471,8 @@ clean:
 
 distclean: clean
 	@echo ">> distclean: removing zk artifacts (except *.ptau/*.tau)"
-	find $(BUILD_DIR) -type f \( -name '*.zkey' -o -name '*.wtns' -o -name '*proof.json' -o -name '*public.json' \) -print -delete || true
+	find $(ARTIFACT) -type f \( -name '*.zkey' -o -name '*.wtns' -o -name '*proof.json' -o -name '*public.json' \) -print -delete || true
 
 clobber:
 	@if [ "$$ALLOW_CLOBBER" != "1" ]; then echo "Refusing to delete PTAU without ALLOW_CLOBBER=1"; exit 2; fi
-	rm -f $(BUILD_DIR)/keys/*.ptau $(BUILD_DIR)/keys/*.tau
+	rm -f $(SETUP_DIR)/*.ptau $(SETUP_DIR)/*.tau
