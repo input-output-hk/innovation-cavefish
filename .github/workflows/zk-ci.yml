@@ -59,58 +59,9 @@ jobs:
             git clone --depth=1 https://github.com/iden3/circomlib.git vendor/circomlib
           fi
 
-      # If you prefer the Makefile to orchestrate everything (recommended),
-      # just call `make`. Otherwise uncomment the “Manual compile/witness” step below.
       - name: Build with Makefile
         run: |
           make
-
-      # --- Manual compile / witness path (kept for reference) ---
-      # - name: Compile circuit (manual)
-      #   run: |
-      #     circom circuits/wbps_cardano.circom --r1cs --wasm --sym \
-      #       -l ./vendor/circomlib/circuits \
-      #       -l ./circuits \
-      #       -o build/wbps_cardano
-      #
-      # - name: Prepare example input (manual)
-      #   run: |
-      #     mkdir -p build/wbps_cardano
-      #     cp -f examples/wbps_cardano_input.json build/wbps_cardano/wbps_cardano_input.json
-      #
-      # - name: Witness (manual)
-      #   run: |
-      #     snarkjs wtns calculate \
-      #       build/wbps_cardano/wbps_cardano_js/wbps_cardano.wasm \
-      #       build/wbps_cardano/wbps_cardano_input.json \
-      #       build/wbps_cardano/wbps_cardano.wtns
-
-      # Optional: quick Groth16 loop for lab/testing. Leave permissive so CI
-      # still passes while vectors/constraints evolve.
-      - name: Prove & Verify (optional / permissive)
-        run: |
-          set -e
-          # Export public signals (ignore if witness failed earlier)
-          snarkjs wtns export json build/wbps_cardano/wbps_cardano.wtns build/wbps_cardano/wbps_cardano_public.json || true
-
-          # Tiny trusted setup (DO NOT use in production)
-          snarkjs powersoftau new bn128 19 build/ptau/powersoftau.ptau
-          snarkjs powersoftau prepare phase2 build/ptau/powersoftau.ptau build/ptau/pot_final.ptau
-          snarkjs groth16 setup build/wbps_cardano/wbps_cardano.r1cs build/ptau/pot_final.ptau build/wbps_cardano/wbps_cardano.zkey
-          snarkjs zkey export verificationkey build/wbps_cardano/wbps_cardano.zkey build/wbps_cardano/wbps_cardano_verifkey.json
-
-          # Prove / verify but don't fail CI if vectors aren’t consistent yet
-          snarkjs groth16 prove \
-            build/wbps_cardano/wbps_cardano.zkey \
-            build/wbps_cardano/wbps_cardano.wtns \
-            build/wbps_cardano/wbps_cardano_proof.json \
-            build/wbps_cardano/wbps_cardano_public.json || true
-
-          snarkjs groth16 verify \
-            build/wbps_cardano/wbps_cardano_verifkey.json \
-            build/wbps_cardano/wbps_cardano_public.json \
-            build/wbps_cardano/wbps_cardano_proof.json || true
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
