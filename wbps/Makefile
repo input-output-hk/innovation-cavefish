@@ -3,6 +3,7 @@
 # - Vendorizes circomlib (shallow clone) under ./vendor
 # - Default uses examples/<circuit>_input.json if present, else generates
 # - Prints a LOG PREFACE + PROPERTY OVERVIEW before witness
+# - Records per-step timings and prints a benchmark report at the end
 # ======================================================================
 
 SHELL := bash
@@ -59,13 +60,27 @@ GEN_DEBUG  ?= 0
 GEN_ARGS   := --out $(abspath $(INPUT)) $(if $(filter 1,$(GEN_DEBUG)),--debug,)
 
 # ----------------------------------------------------------------------
+# Timings (append-only TSV) and helpers
+# ----------------------------------------------------------------------
+TIMINGS := $(ARTIFACT)/timings.tsv
+
+define __now_ms
+python3 -c 'import time,sys; sys.stdout.write(str(int(time.time()*1000)))'
+endef
+
+define TS
+@{ mkdir -p $(ARTIFACT); \
+   printf "%s\t%s\t%s\n" "$(1)" "$(2)" "$$($(__now_ms))"; } >> $(TIMINGS)
+endef
+
+# ----------------------------------------------------------------------
 # Phonies
 # ----------------------------------------------------------------------
 .PHONY: all help deps deps-circomlib deps-hashing \
         compile witness setup prove verify info size-hint \
         clean distclean clobber \
         use-example-or-generate gen-input gen-input-debug \
-        with-example with-generated-input tree show-paths
+        with-example with-generated-input tree show-paths bench-report
 
 # ----------------------------------------------------------------------
 # Entrypoints
@@ -74,8 +89,8 @@ all: with-example
 
 help:
 	@echo "WBPS Circom/SnarkJS workflow"
-	@echo "  make (with-example)      → compile + example-or-generate + witness + setup + prove + verify"
-	@echo "  make with-generated-input → compile + generator + witness + setup + prove + verify"
+	@echo "  make (with-example)      → compile + example-or-generate + witness + setup + prove + verify + bench-report"
+	@echo "  make with-generated-input → compile + generator + witness + setup + prove + verify + bench-report"
 	@echo "  make gen-input[-debug]    → only regenerate input"
 	@echo "  make info | size-hint | clean | distclean | clobber"
 
@@ -114,16 +129,19 @@ $(ARTIFACT):
 compile: deps $(ARTIFACT) $(R1CS) $(WASM) $(SYM)
 
 $(R1CS) $(WASM) $(SYM): $(CIRCUIT_FILE) | $(ARTIFACT)
+	$(call TS,compile,START)
 	@echo "🔧 [Compile] $(CIRCUIT_FILE) → $(ARTIFACT)/"
 	circom $(CIRCUIT_FILE) --r1cs --wasm --sym $(INCLUDES) -o $(ARTIFACT)
+	$(call TS,compile,END)
 
 # ----------------------------------------------------------------------
 # Input: copy example if exists, otherwise generate
 # ----------------------------------------------------------------------
-with-example: compile use-example-or-generate witness setup prove verify
-with-generated-input: compile gen-input witness setup prove verify
+with-example: compile use-example-or-generate witness setup prove verify bench-report
+with-generated-input: compile gen-input witness setup prove verify bench-report
 
 use-example-or-generate: | $(ARTIFACT)
+	$(call TS,input,START)
 	@echo "📥 Preparing input → $(INPUT)"
 	@if [ -f "$(EXAMPLE_INPUT)" ]; then \
 	  cp "$(EXAMPLE_INPUT)" "$(INPUT)"; \
@@ -132,6 +150,7 @@ use-example-or-generate: | $(ARTIFACT)
 	  echo "ℹ️ No example input at $(EXAMPLE_INPUT). Generating one..."; \
 	  $(MAKE) gen-input GEN_DEBUG=$(GEN_DEBUG); \
 	fi
+	$(call TS,input,END)
 
 # Generator deps only when needed
 $(GEN_NODEM): $(GEN_PKJ)
@@ -207,8 +226,8 @@ export WBPS_LOG_PREFACE
 define WBPS_PROPERTY_OVERVIEW
 [1;34m──────────────────────── WBPS Proof Properties ────────────────────────[0m
 [1mP0 – Message Reconstruction[0m
-  Build the message [1mμ[0m by overlaying the private window onto the public
-  bits: [1mμ = Overlay(m_pub, m_priv)[0m.
+  Builds: the message [1mμ[0m by overlaying the private window onto the public bits
+  Formula: [1mμ = Overlay(m_pub, m_priv)[0m
 
 [1mP1 – Commitment Scalar Correctness[0m
   Range-check [1mρ ∈ [0,2^251)[0m, compute [1mek^ρ[0m and [1mg^ρ[0m, then assert:
@@ -238,15 +257,21 @@ $(WIT): $(WASM) $(INPUT) | $(ARTIFACT)
 	@echo "$$WBPS_LOG_PREFACE"
 	@echo "$$WBPS_PROPERTY_OVERVIEW"
 	@echo "🧮 [Witness] $(INPUT) → $(WIT)"
+	$(call TS,witness,START)
 	# Capture circuit logs silently; redirect both stdout & stderr
 	(snarkjs wtns calculate $(WASM) $(INPUT) $(WIT) >$(WITLOG) 2>&1) || true
+	$(call TS,witness,END)
+	$(call TS,log-parse,START)
 	# Parse logs and emit colored summary
 	@python3 tooling/parse_wbps_logs.py $(WITLOG) --txt $(LOGTXT) --json $(LOGJSON) --color || true
+	$(call TS,log-parse,END)
 	@echo "🧾 [Logs] Parsed → $(LOGTXT)"
 
 $(PUB): $(WIT) | $(ARTIFACT)
+	$(call TS,export-public,START)
 	@echo "📤 [Witness] Export public → $(PUB)"
 	snarkjs wtns export json $(WIT) $(PUB)
+	$(call TS,export-public,END)
 
 setup: $(VK)
 
@@ -254,16 +279,22 @@ $(KEYDIR):
 	mkdir -p $(KEYDIR)
 
 $(PTAU1): | $(KEYDIR)
+	$(call TS,setup-phase1,START)
 	@echo "🌍 [Setup/Phase1] curve=$(CURVE), size=2^$(PTAU_BITS)"
 	snarkjs powersoftau new $(CURVE) $(PTAU_BITS) $(PTAU1)
+	$(call TS,setup-phase1,END)
 
 $(PTAU2): $(PTAU1) | $(KEYDIR)
+	$(call TS,setup-phase2,START)
 	@echo "🔑 [Setup/Phase2]"
 	snarkjs powersoftau prepare phase2 $(PTAU1) $(PTAU2)
+	$(call TS,setup-phase2,END)
 
 $(ZKEY): $(R1CS) $(PTAU2) | $(ARTIFACT)
+	$(call TS,keygen,START)
 	@echo "📦 [Setup/Groth16] Proving key"
 	snarkjs groth16 setup $(R1CS) $(PTAU2) $(ZKEY)
+	$(call TS,keygen,END)
 
 $(VK): $(ZKEY) | $(ARTIFACT)
 	@echo "🔍 [Setup/Groth16] Verification key"
@@ -272,12 +303,58 @@ $(VK): $(ZKEY) | $(ARTIFACT)
 prove: $(PROOF)
 
 $(PROOF): $(ZKEY) $(WIT) $(PUB) | $(ARTIFACT)
+	$(call TS,prove,START)
 	@echo "🛡️  [Prove] Generating proof"
 	snarkjs groth16 prove $(ZKEY) $(WIT) $(PROOF) $(PUB)
+	$(call TS,prove,END)
 
 verify: $(VK) $(PUB) $(PROOF)
+	$(call TS,verify,START)
 	@echo "✅ [Verify] Checking proof"
 	snarkjs groth16 verify $(VK) $(PUB) $(PROOF)
+	$(call TS,verify,END)
+
+# ----------------------------------------------------------------------
+# Benchmark report (printed automatically at end of entrypoint targets)
+# ----------------------------------------------------------------------
+bench-report:
+	@set -euo pipefail; \
+	NO_COLOR=$${NO_COLOR:-}; \
+	COL_RESET="\033[0m"; COL_SEC="\033[1;36m"; \
+	if [ -n "$$NO_COLOR" ]; then COL_RESET=""; COL_SEC=""; fi; \
+	if [ ! -f "$(TIMINGS)" ]; then echo "No timings found."; exit 0; fi; \
+	awk -F '\t' ' \
+	  function msfmt(ms,  s,m,h,rem) { \
+	    s=int(ms/1000); rem=ms%1000; m=int(s/60); s=s%60; h=int(m/60); m=m%60; \
+	    if (h>0) return sprintf("%dh %02dm %02ds.%03d",h,m,s,rem); \
+	    if (m>0) return sprintf("%dm %02ds.%03d",m,s,rem); \
+	    return sprintf("%2ds.%03d",s,rem); \
+	  } \
+	  { m[$$1,$$2]=$$3 } \
+	  END { \
+	    order[1]="compile";        names["compile"]="Compile (circom)"; \
+	    order[2]="input";          names["input"]="Prepare input"; \
+	    order[3]="witness";        names["witness"]="Witness (WASM)"; \
+	    order[4]="log-parse";      names["log-parse"]="Parse circuit logs"; \
+	    order[5]="export-public";  names["export-public"]="Export public signals"; \
+	    order[6]="setup-phase1";   names["setup-phase1"]="Setup Phase 1 (powersoftau new)"; \
+	    order[7]="setup-phase2";   names["setup-phase2"]="Setup Phase 2 (prepare phase2)"; \
+	    order[8]="keygen";         names["keygen"]="Groth16 Keygen (setup)"; \
+	    order[9]="prove";          names["prove"]="Groth16 Prove"; \
+	    order[10]="verify";        names["verify"]="Groth16 Verify"; \
+	    printf("%s──────────────── WBPS Benchmark Report ────────────────%s\n", ENVIRON["COL_SEC"], ENVIRON["COL_RESET"]); \
+	    total=0; printed=0; \
+	    for (i=1;i<=10;i++) { \
+	      s=order[i]; \
+	      if ((s,"START") in m && (s,"END") in m) { \
+	        d=m[s,"END"]-m[s,"START"]; total+=d; printed++; \
+	        printf("  %-30s %s\n", names[s], msfmt(d)); \
+	      } \
+	    } \
+	    if (printed==0) { print "No timings found."; exit 0; } \
+	    if (total>0) printf("\n  TOTAL                         %s\n", msfmt(total)); \
+	    printf("%s─────────────────────────────────────────────────────%s\n", ENVIRON["COL_SEC"], ENVIRON["COL_RESET"]); \
+	  }' "$(TIMINGS)"
 
 # ----------------------------------------------------------------------
 # Utilities
