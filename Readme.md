@@ -13,6 +13,7 @@ This repository includes both the **academic specification** and the **prototype
 
 ```
 cavefish/
+├─ cavefish-server/    # Haskell prototype of SP, Service Provider
 ├─ paper/              # LaTeX sources for the academic paper
 ├─ publication/        # Timestamped PDF builds of the paper
 ├─ wbps/               # Circom circuits, tooling, and Makefile for the WBPS prototype
