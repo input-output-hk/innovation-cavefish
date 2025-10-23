@@ -118,6 +118,7 @@ let
       export TMPDIR=/tmp
       export PS1="\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] "
       alias ll="ls -l --color=auto"
+      alias haskell-language-server-wrapper="haskell-language-server"
     '';
   };
 
