@@ -1,0 +1,31 @@
+# ====================================================
+# Cryptography / Circuit build artifacts (restricted to ./wbps)
+# ====================================================
+
+# Vendor dependencies (circomlib, hashing_circuits, etc.)
+vendor/
+
+# Circom / snarkjs artifacts
+*.ptau
+*.json
+*.js
+*.wasm
+*.zkey
+*.wtns
+*.r1cs
+*.sym
+*.vtc
+
+# Build outputs (intermediate & generated)
+build/
+*.log
+
+# Node modules (for tooling/inputgen)
+tooling/inputgen/node_modules/
+tooling/inputgen/package-lock.json
+
+# Generated inputs (except curated examples)
+tooling/inputgen/generated/
+
+# Keep curated example inputs
+!examples/*.json

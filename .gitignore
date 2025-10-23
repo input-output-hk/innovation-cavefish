@@ -1,96 +1,23 @@
 # ====================================================
-# LaTeX build artifacts (restricted to ./paper)
+# Root-level `.gitignore` for common exclusions
+# This file containsx patterns that are universally ignored across all projects within this monorepo.
+#
+# Project-specific `.gitignore` files are for localized exclusions.
+# They should contain patterns specific to that project's:
+#  - build artifacts
+#  - temporary files
+# or other ignored items that are not relevant to other projects
 # ====================================================
-paper/*.aux
-paper/*.bbl
-paper/*.blg
-paper/*.fdb_latexmk
-paper/*.fls
-paper/*.log
-paper/*.out
-paper/*.synctex.gz
-paper/*.synctex(busy)
-paper/*.synctex*
-paper/*.toc
-paper/*.lot
-paper/*.lof
-
-# Local PDFs inside ./paper (we keep only timestamped builds in ../publication/)
-paper/lc_main.pdf
-paper/light-clients.pdf
-
-# Temporary build directory
-paper/tmp/
-
+#
+**/.DS_Store
+**/.vscode/
+**/.idea/
+**/node_modules/
+**/dist/
+**/*.log
+**/tmp/
+#
 # ====================================================
-# Cryptography / Circuit build artifacts (restricted to ./wbps)
+# nix / git-conig-hook link
 # ====================================================
-
-# Vendor dependencies (circomlib, hashing_circuits, etc.)
-wbps/vendor/
-
-# Circom / snarkjs artifacts
-wbps/*.ptau
-wbps/*.json
-wbps/*.js
-wbps/*.wasm
-wbps/*.zkey
-wbps/*.wtns
-wbps/*.r1cs
-wbps/*.sym
-wbps/*.vtc
-
-# Build outputs (intermediate & generated)
-wbps/build/
-wbps/*.log
-
-# Node modules (for tooling/inputgen)
-wbps/tooling/inputgen/node_modules/
-wbps/tooling/inputgen/package-lock.json
-
-# Generated inputs (except curated examples)
-wbps/tooling/inputgen/generated/
-!wbps/examples/*.json
-
-# Keep curated example inputs
-!wbps/examples/*.json
-
-# ====================================================
-# Haskell / Cabal / GHC build artifacts
-# ====================================================
-cavefish-server/dist-newstyle/
-cavefish-server/dist/
-cavefish-server/dist-*/
-cavefish-server/*.hi
-cavefish-server/*.o
-cavefish-server/*.hie
-cavefish-server/.ghc.environment.*
-cavefish-server/.deps-src/
-cavefish-server/tags
-cavefish-server/.local/
-cavefish-server/.cabal/
-cavefish-server/.cache/
-cavefish-server/.cabal-local/
-cavefish-server/.config/
-
-# ====================================================
-# Nix build results
-# ====================================================
-cavefish-server/result
-cavefish-server/result-*
-
-# ====================================================
-# Local dev / editor junk
-# ====================================================
-cavefish-server/.repos/
-cavefish-server/TAGS
-cavefish-server/cabal.project.local
-cavefish-server/cavefish/.hie/
-
-# ====================================================
-# ZK / Circom local development artifacts
-# ====================================================
-# Local editor and system files
-wbps/.DS_Store
-wbps/.vscode/
-wbps/.idea/
+.pre-commit-config.yaml
