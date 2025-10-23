@@ -80,6 +80,7 @@ let
     tools.stylish-haskell
     tools.fourmolu
     tools.cabal
+    tools.cabal-fmt
     tools.hlint
     tools.cabal-fmt
 
