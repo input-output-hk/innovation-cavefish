@@ -11,7 +11,7 @@
 #       setup/{powersoftau.ptau,pot_final.ptau,proving_key.zkey,verification_key.json}
 #       runs/<UTC-ISO>/
 #         input/generation_input.json
-#         witness/{witness.wtns,public_signals.json}
+#         witness/{witness.wtns,statement_theta.json}
 #         logs/{generation_raw.log,generation_report.txt,generation_report.json}
 #         proof/{proof.json,message_public_part.json}
 # ======================================================================
@@ -74,10 +74,10 @@ PTAU2  := $(SETUP_DIR)/pot_final.ptau
 
 # per-run main IO
 INPUT  ?= $(INPUT_DIR)/generation_input.json
-WIT    := $(WIT_DIR)/witness.wtns
-PUB    := $(PROOF_DIR)/public_signals.json
+WITNESS    := $(WIT_DIR)/witness.wtns
+STATEMENT_THETA    := $(PROOF_DIR)/statement_theta.json
 PROOF  := $(PROOF_DIR)/proof.json
-MSG_PUB := $(PROOF_DIR)/message_public_part.json
+MSG_PUBLIC_PART := $(PROOF_DIR)/message_public_part.json
 
 # Example input (preferred if present)
 EXAMPLE_INPUT := examples/$(CIRCUIT)_input.json
@@ -304,15 +304,15 @@ export WBPS_PROPERTY_OVERVIEW
 # ----------------------------------------------------------------------
 # Witness / Setup / Prove / Verify
 # ----------------------------------------------------------------------
-witness: $(WIT) $(PUB)
+witness: $(WITNESS) $(STATEMENT_THETA)
 
-$(WIT): $(WASM) $(INPUT) | ensure-run-dirs
+$(WITNESS): $(WASM) $(INPUT) | ensure-run-dirs
 	@echo "$$WBPS_LOG_PREFACE"
 	@echo "$$WBPS_PROPERTY_OVERVIEW"
-	@echo "🧮 [Witness] $(INPUT) → $(WIT)"
+	@echo "🧮 [Witness] $(INPUT) → $(WITNESS)"
 	$(call TS,witness,START)
 	# Capture circuit logs silently; redirect both stdout & stderr
-	(snarkjs wtns calculate $(WASM) $(INPUT) $(WIT) >$(WITLOG) 2>&1) || true
+	(snarkjs wtns calculate $(WASM) $(INPUT) $(WITNESS) >$(WITLOG) 2>&1) || true
 	$(call TS,witness,END)
 	$(call TS,log-parse,START)
 	# Parse logs and emit colored summary
@@ -320,10 +320,10 @@ $(WIT): $(WASM) $(INPUT) | ensure-run-dirs
 	$(call TS,log-parse,END)
 	@echo "🧾 [Logs] Parsed → $(LOGTXT)"
 
-$(PUB): $(WIT)
+$(STATEMENT_THETA): $(WITNESS)
 	$(call TS,export-public,START)
-	@echo "📤 [Witness] Export public → $(PUB)"
-	snarkjs wtns export json $(WIT) $(PUB)
+	@echo "📤 [Witness] Export public → $(STATEMENT_THETA)"
+	snarkjs wtns export json $(WITNESS) $(STATEMENT_THETA)
 	$(call TS,export-public,END)
 
 # --- Setup (static under setup/) ---
@@ -356,20 +356,20 @@ $(VK): $(ZKEY)
 prove: $(PROOF)
 
 # Extract only the portion needed by proof/verification
-$(MSG_PUB): $(INPUT) | $(PROOF_DIR)
-	@jq '.message_public_part // {}' "$(INPUT)" > "$(MSG_PUB)" 2>/dev/null || echo "{}" > "$(MSG_PUB)"
-	@echo "🧾 [Proof] message_public_part extracted → $(MSG_PUB)"
+$(MSG_PUBLIC_PART): $(INPUT) | $(PROOF_DIR)
+	@jq '.message_public_part // {}' "$(INPUT)" > "$(MSG_PUBLIC_PART)" 2>/dev/null || echo "{}" > "$(MSG_PUBLIC_PART)"
+	@echo "🧾 [Proof] message_public_part extracted → $(MSG_PUBLIC_PART)"
 
-$(PROOF): $(ZKEY) $(WIT) $(PUB) $(MSG_PUB) | $(PROOF_DIR)
+$(PROOF): $(ZKEY) $(WITNESS) $(STATEMENT_THETA) $(MSG_PUBLIC_PART) | $(PROOF_DIR)
 	$(call TS,prove,START)
 	@echo "🛡️  [Prove] Generating proof"
-	snarkjs groth16 prove $(ZKEY) $(WIT) $(PROOF) $(PUB)
+	snarkjs groth16 prove $(ZKEY) $(WITNESS) $(PROOF) $(STATEMENT_THETA)
 	$(call TS,prove,END)
 
-verify: $(VK) $(PUB) $(PROOF)
+verify: $(VK) $(STATEMENT_THETA) $(PROOF)
 	$(call TS,verify,START)
 	@echo "✅ [Verify] Checking proof"
-	snarkjs groth16 verify $(VK) $(PUB) $(PROOF)
+	snarkjs groth16 verify $(VK) $(STATEMENT_THETA) $(PROOF)
 	$(call TS,verify,END)
 
 # ----------------------------------------------------------------------
@@ -394,7 +394,7 @@ bench-report:
 	    order[2]="input";          names["input"]="Prepare input"; \
 	    order[3]="witness";        names["witness"]="Witness (WASM)"; \
 	    order[4]="log-parse";      names["log-parse"]="Parse circuit logs"; \
-	    order[5]="export-public";  names["export-public"]="Export public signals"; \
+	    order[5]="export-public";  names["export-public"]="Export Statement  θ (theta)"; \
 	    order[6]="setup-phase1";   names["setup-phase1"]="Setup Phase 1 (powersoftau new)"; \
 	    order[7]="setup-phase2";   names["setup-phase2"]="Setup Phase 2 (prepare phase2)"; \
 	    order[8]="keygen";         names["keygen"]="Groth16 Keygen (setup)"; \
@@ -449,13 +449,13 @@ show-paths:
 	@echo "witness_calculator.js:$(WITCALC_JS)"
 	@echo "Input (example):      $(EXAMPLE_INPUT)"
 	@echo "Input (this run):     $(INPUT)"
-	@echo "Witness:              $(WIT)"
-	@echo "Public signals:       $(PUB)"
+	@echo "Witness:              $(WITNESS)"
+	@echo "Statement  θ (theta):       $(STATEMENT_THETA)"
 	@echo "Raw logs:             $(WITLOG)"
 	@echo "Parsed (txt):         $(LOGTXT)"
 	@echo "Parsed (json):        $(LOGJSON)"
 	@echo "Proof:                $(PROOF)"
-	@echo "message_public_part:  $(MSG_PUB)"
+	@echo "message_public_part:  $(MSG_PUBLIC_PART)"
 	@echo "PTAU1:                $(PTAU1)"
 	@echo "PTAU2:                $(PTAU2)"
 	@echo "ZKey:                 $(ZKEY)"
