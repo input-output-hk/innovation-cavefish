@@ -1,0 +1,33 @@
+# ====================================================
+# Haskell / Cabal / GHC build artifacts
+# ====================================================
+dist-newstyle/
+dist/
+dist-*/
+*.hi
+*.o
+*.hie
+.ghc.environment.*
+.deps-src/
+tags
+TAGS
+.local/
+.cabal/
+.cache/
+.cabal-local/
+.cabal.project.local
+.reos/
+.config/
+hie.yaml
+#
+# ====================================================
+# Nix build results
+# ====================================================
+cavefish-server/result
+cavefish-server/result-*
+
+# ====================================================
+# Nix .direnv
+# ====================================================
+.direnv
+.envrc

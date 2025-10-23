@@ -1,0 +1,23 @@
+# ====================================================
+# LaTeX build artifacts (restricted to ./paper)
+# ====================================================
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.synctex(busy)
+*.synctex*
+*.toc
+*.lot
+*.lof
+
+# Local PDFs inside ./paper (we keep only timestamped builds in ../publication/)
+lc_main.pdf
+light-clients.pdf
+
+# Temporary build directory
+tmp/
