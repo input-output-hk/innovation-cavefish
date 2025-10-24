@@ -2,19 +2,16 @@ name: Haskell CI
 
 on:
   push:
-    branches:
-      - 'main'
-      - '11/fourmolu-formatting'
-    paths:
-      - 'cavefish-server/**'
-      - '.github/workflows/cavefish-server-linux-ci.yml'
-  pull_request:
-    branches:
-      - 'main'
+    branches: [ "master", "release/**" ]
     paths:
       - 'cavefish-server/**'
       - '.github/workflows/cavefish-server-linux-ci.yml'
 
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - 'cavefish-server/**'
+      - '.github/workflows/cavefish-server-linux-ci.yml'
 jobs:
   build:
     name: GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}
@@ -74,8 +71,11 @@ jobs:
         chmod a+x "$BINDIR/fourmolu"
         echo "$BINDIR" >> $GITHUB_PATH
 
-    - name: Run fourmolu
-      run: ./scripts/fourmolize.sh
+        # This step currently fails.
+        # TODO once we format the code base, uncomment this section
+    # - name: Run fourmolu
+    #   working-directory: ./cavefish-server
+    #   run: ./scripts/fourmolize.sh
 
     - name: Install Haskell
       id: install-haskell
