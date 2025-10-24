@@ -82,7 +82,6 @@ let
     tools.cabal
     tools.cabal-fmt
     tools.hlint
-    tools.cabal-fmt
 
     pkgs.shellcheck
     pkgs.nixpkgs-fmt
