@@ -1,12 +1,16 @@
+-- | Cavefish server main module.
+--
+--  This module initializes and starts the Cavefish server, setting up the necessary
+--  environment and configurations.
 module Main where
 
 import Control.Concurrent.STM (newTVarIO)
 import Cooked (wallet)
 import Core.Pke (deriveSecretKey)
 import Crypto.Error (CryptoFailable (..))
-import qualified Crypto.PubKey.Ed25519 as Ed
-import qualified Data.ByteString as BS
-import qualified Network.Wai.Handler.Warp as Warp
+import Crypto.PubKey.Ed25519 qualified as Ed
+import Data.ByteString qualified as BS
+import Network.Wai.Handler.Warp qualified as Warp
 import Sp.Emulator (initialMockState, mkCookedEnv)
 import Sp.Server (mkApp)
 import System.IO (hPutStrLn, stderr)

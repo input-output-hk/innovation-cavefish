@@ -198,6 +198,7 @@ cavefishApi = Proxy
 mkApp :: Env -> Application
 mkApp env = serve cavefishApi (hoistServer cavefishApi (runApp env) server)
 
+-- | Request to prepare a transaction.
 data PrepareReq = PrepareReq
   { intent :: IntentW
   , observer :: ByteString

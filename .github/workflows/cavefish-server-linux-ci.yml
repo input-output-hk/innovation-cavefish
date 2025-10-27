@@ -71,11 +71,9 @@ jobs:
         chmod a+x "$BINDIR/fourmolu"
         echo "$BINDIR" >> $GITHUB_PATH
 
-        # This step currently fails.
-        # TODO once we format the code base, uncomment this section
-    # - name: Run fourmolu
-    #   working-directory: ./cavefish-server
-    #   run: ./scripts/fourmolize.sh
+    - name: Run fourmolu
+      working-directory: ./cavefish-server
+      run: ./scripts/fourmolize.sh
 
     - name: Install Haskell
       id: install-haskell

@@ -41,7 +41,9 @@ newtype ClientRegistration = ClientRegistration
   { publicKey :: PublicKey
   }
   deriving (Eq, Show, Generic)
+
 instance FromJSON ClientRegistration
+
 instance ToJSON ClientRegistration
 
 type ClientRegistrationStore = TVar (Map ClientId ClientRegistration)

@@ -105,7 +105,7 @@ decrypt ::
   PkeSecretKey ->
   PkeCiphertext ->
   Either PkeError ByteString
-decrypt (PkeSecretKey serverSk) PkeCiphertext{ephemeralPublic, nonce = nonceBytes, payload, authTag} = do
+decrypt (PkeSecretKey serverSk) PkeCiphertext {ephemeralPublic, nonce = nonceBytes, payload, authTag} = do
   ephemeralPk <-
     case Curve25519.publicKey ephemeralPublic of
       CryptoFailed _ -> Left PkeInvalidSeed
@@ -139,7 +139,7 @@ deriveEphemeral seed =
         CryptoPassed sk -> Right (sk, nonceBytes)
 
 serialiseCiphertext :: PkeCiphertext -> ByteString
-serialiseCiphertext PkeCiphertext{ephemeralPublic, nonce, payload, authTag} =
+serialiseCiphertext PkeCiphertext {ephemeralPublic, nonce, payload, authTag} =
   Write.toStrictByteString $
     E.encodeListLen 4
       <> E.encodeBytes ephemeralPublic
@@ -164,14 +164,14 @@ deserialiseCiphertext bytes = do
   if BL.null rest
     then fromTerm term
     else Left "unexpected trailing bytes when decoding ciphertext"
- where
-  fromTerm :: Term -> Either Text PkeCiphertext
-  fromTerm (TList [TBytes eph, TBytes nonceBs, TBytes payloadBs, TBytes authBs]) =
-    Right
-      PkeCiphertext
-        { ephemeralPublic = eph
-        , nonce = nonceBs
-        , payload = payloadBs
-        , authTag = authBs
-        }
-  fromTerm _ = Left "invalid ciphertext encoding"
+  where
+    fromTerm :: Term -> Either Text PkeCiphertext
+    fromTerm (TList [TBytes eph, TBytes nonceBs, TBytes payloadBs, TBytes authBs]) =
+      Right
+        PkeCiphertext
+          { ephemeralPublic = eph
+          , nonce = nonceBs
+          , payload = payloadBs
+          , authTag = authBs
+          }
+    fromTerm _ = Left "invalid ciphertext encoding"
