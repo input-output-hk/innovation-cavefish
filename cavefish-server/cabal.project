@@ -1,9 +1,6 @@
 packages:
   ./cavefish
 
-package cavefish
-  flags: +ide-stub
-
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
