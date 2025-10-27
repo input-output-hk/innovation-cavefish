@@ -1,5 +1,11 @@
 {-# LANGUAGE PatternSynonyms #-}
 
+-- | Module providing an implementation of the transaction building and submission
+--    functions using the Cooked mock chain.
+--
+--    This module defines functions to create a Cooked environment, build transactions,
+--    and submit them to the mock chain. It also includes utilities to manage the
+--    mock chain state.
 module Sp.Emulator where
 
 import Cardano.Api qualified as Api
@@ -19,7 +25,7 @@ import Core.Intent (
   ChangeDelta,
   Intent,
  )
-import Core.Pke (PkePublicKey, PkeSecretKey, toPublicKey)
+import Core.Pke (PkeSecretKey, toPublicKey)
 import Core.TxAbs (TxAbs (..), cardanoTxToTxAbs)
 import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.ByteString (ByteString)
@@ -41,6 +47,8 @@ import Sp.App (Env (..), defaultWalletResolver)
 import Sp.State (ClientRegistrationStore, CompleteStore, PendingStore)
 import Sp.TxBuilder (buildTx)
 
+-- | Create a Cooked environment for the Cavefish server using the provided
+-- parameters.
 mkCookedEnv ::
   TVar MockChainState ->
   PendingStore ->
@@ -71,6 +79,7 @@ mkCookedEnv mockState pendingStore completeStore clientRegStore spSk pkeSk spWal
         , submit = submitWithCooked mockState env
         }
 
+-- | Build a transaction using the Cooked mock chain.
 buildWithCooked ::
   TVar MockChainState ->
   Env ->
@@ -105,6 +114,7 @@ buildWithCooked mockState env intent observerBytes = do
           , mockState = st1
           }
 
+-- | Submit a transaction to the mock chain by updating the mock chain state.
 submitWithCooked ::
   TVar MockChainState ->
   Env ->
@@ -115,6 +125,7 @@ submitWithCooked mockState _env _tx newState = do
   atomically $ writeTVar mockState newState
   pure (Right ())
 
+-- | Run a 'MockChain' action purely, returning the result and the new state.
 runMockChainPure ::
   MockChainState ->
   MockChain a ->
@@ -126,6 +137,7 @@ runMockChainPure st action =
             runStateT (runExceptT (unMockChain action)) st
    in (result, newState)
 
+-- | Calculate the total value produced by a list of transaction outputs.
 producedTotal ::
   [Api.TxOut Api.CtxTx Api.ConwayEra] ->
   ChangeDelta
@@ -135,6 +147,7 @@ producedTotal outs =
     | Api.TxOut _ val _ _ <- outs
     ]
 
+-- | The initial mock chain state used by the Cavefish server.
 initialMockState :: MockChainState
 initialMockState =
   case runMockChainPure def mockChainState0 of

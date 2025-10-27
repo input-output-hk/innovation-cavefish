@@ -3,42 +3,42 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeApplications #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Spec (spec) where
 
-import qualified Cardano.Api as Api
-import qualified Client.Impl as Client
+import Cardano.Api qualified as Api
+import Client.Impl qualified as Client
 import Client.Mock (mkFinaliseReq)
-import qualified Client.Mock as Mock
+import Client.Mock qualified as Mock
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Cooked.MockChain.MockChainState (MockChainState)
 import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
-import qualified Core.CborSpec as CborSpec
+import Core.CborSpec qualified as CborSpec
 import Core.Intent (BuildTxResult (..), IntentW (..), satisfies, toInternalIntent)
 import Core.PaymentProof (ProofResult (..), hashTxAbs)
 import Core.Pke (ciphertextDigest)
 import Core.Proof (mkProof, renderHex)
 import Core.TxAbs (cardanoTxToTxAbs)
-import qualified Crypto.PubKey.Ed25519 as Ed
+import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Bits (xor)
-import qualified Data.ByteArray as BA
-import qualified Data.ByteArray.Encoding as BAE
+import Data.ByteArray qualified as BA
+import Data.ByteArray.Encoding qualified as BAE
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import qualified Data.Map.Strict as Map
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as TE
+import Data.ByteString qualified as BS
+import Data.Map.Strict qualified as Map
+import Data.Text qualified as Text
+import Data.Text.Encoding qualified as TE
 import Ledger.Tx (
   pattern CardanoEmulatorEraTx,
  )
 import Network.HTTP.Client (defaultManagerSettings, newManager)
-import qualified Network.Wai.Handler.Warp as Warp
+import Network.Wai.Handler.Warp qualified as Warp
 import Servant
 import Servant.Client (BaseUrl (..), Scheme (..))
-import qualified Servant.Client as SC
+import Servant.Client qualified as SC
 import Sp.App (Env (..), runApp)
 import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
 import Sp.Server (
@@ -344,11 +344,13 @@ spec = do
             ( prepareClient :<|> finaliseClient :<|> registerClient :<|> clientsClient :<|> pendingClient
                 :<|> transactionClient
               ) =
-              SC.client (Proxy @CavefishApi)
+                SC.client (Proxy @CavefishApi)
 
         -- Register the client to the server
         registerResp <-
-          runClientOrFail servantEnv (registerClient RegisterReq {publicKey = Ed.toPublic testClientSecretKey})
+          runClientOrFail
+            servantEnv
+            (registerClient RegisterReq {publicKey = Ed.toPublic testClientSecretKey})
         let expectedPublicKey = renderHex (BA.convert (Ed.toPublic testClientSecretKey))
 
         -- Test that the client was registered
@@ -395,10 +397,10 @@ spec = do
               ]
             , TransactionPending PendingSummary {pendingExpiresAt, pendingClientId}
             ) -> do
-            pendingTxId `shouldBe` txId
-            pendingExpiresAt `shouldBe` pendingExpiresAtExpected
-            pendingClientId `shouldBe` registeredId
-            pendingClientIdExpected `shouldBe` registeredId
+              pendingTxId `shouldBe` txId
+              pendingExpiresAt `shouldBe` pendingExpiresAtExpected
+              pendingClientId `shouldBe` registeredId
+              pendingClientIdExpected `shouldBe` registeredId
           (_, TransactionPending _) ->
             expectationFailure "expected exactly one pending item to compare with transaction response"
           (_, TransactionSubmitted _) ->

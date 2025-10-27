@@ -1,6 +1,6 @@
 module Main (main) where
 
-import qualified Spec
+import Spec qualified
 import Test.Hspec (hspec)
 
 main :: IO ()

@@ -1,3 +1,8 @@
+-- | Client implementation using a mock client to interact with the server.
+--
+--  This module defines the `ClientM` monad and associated functions to perform
+--  client operations such as preparing intents, validating proofs, finalizing
+--  transactions, and listing pending requests and registered clients.
 module Client.Impl (
   ClientEnv (..),
   ClientM,
@@ -38,23 +43,33 @@ import Data.Text (Text)
 import Servant (Handler, ServerError)
 import Sp.Server (ClientsResp, FinaliseResp, PendingResp, PrepareResp)
 
+-- | Monad for client operations against the server.
 newtype ClientM a = ClientM (ReaderT ClientEnv Handler a)
   deriving newtype (Functor, Applicative, Monad, MonadReader ClientEnv, MonadError ServerError)
 
+-- | Environment required to run client operations against the server.
 data ClientEnv = ClientEnv
   { run :: RunServer
   , lcSk :: SecretKey
   , spPk :: PublicKey
   }
 
+-- | Represents a client session with the server.
 newtype ClientSession = ClientSession
   { client :: MockClient
   }
 
+-- | Run a ClientM action with the given ClientEnv.
 runClient :: ClientEnv -> ClientM a -> Handler a
 runClient env (ClientM m) = runReaderT m env
 
-withSession :: ClientEnv -> (ClientSession -> ClientM a) -> Handler a
+-- | Create a client session and run the given action within that session.
+withSession ::
+  -- | Environment for the client
+  ClientEnv ->
+  -- | Action to run with the session
+  (ClientSession -> ClientM a) ->
+  Handler a
 withSession env action = runClient env (startSession >>= action)
 
 startSession :: ClientM ClientSession
@@ -70,6 +85,7 @@ throw422 = throwError . as422
 eitherAs422 :: Either Text a -> ClientM a
 eitherAs422 = liftEither . first as422
 
+-- | Prepare an intent with the server.
 prepare :: ClientSession -> IntentW -> ClientM PrepareResp
 prepare ClientSession {client} intent = liftHandler (prepareWithClient client intent)
 

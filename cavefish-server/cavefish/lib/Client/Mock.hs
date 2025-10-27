@@ -1,8 +1,14 @@
 {-# LANGUAGE RankNTypes #-}
 
+-- | Module      : Client.Mock
+-- Description : Mock client implementation for testing against the server.
+--  This module provides a mock client that can register with the server,
+--  prepare intents, verify proofs, and finalize transactions. It is designed
+--  for testing purposes and simulates client-server interactions.
 module Client.Mock where
 
 import Cardano.Api qualified as Api
+import Control.Monad
 import Control.Monad.Error.Class (throwError)
 import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
 import Core.Intent (IntentW, satisfies, toInternalIntent)
@@ -60,12 +66,14 @@ initMockClient run lcSk spPk =
     , umcSpPk = spPk
     }
 
+-- | Create a PrepareReq from the given client ID and intent.
 mkPrepareReq :: ClientId -> IntentW -> Either Text PrepareReq
 mkPrepareReq clientId intentW = do
   internalIntent <- toInternalIntent intentW
   observerBytes <- intentStakeValidatorBytes internalIntent
   pure PrepareReq {intent = intentW, observer = observerBytes, clientId}
 
+-- | Create a FinaliseReq from the given secret key, transaction ID, and transaction abstract hash.
 mkFinaliseReq :: Ed.SecretKey -> Text -> ByteString -> FinaliseReq
 mkFinaliseReq secretKey txId txAbsHash =
   let message = clientSignatureMessage txAbsHash
@@ -82,41 +90,48 @@ verifyPrepareProof publicKey PrepareResp {txId = txIdText, txAbs, proof, witness
       Left err -> Left (Text.pack ("failed to deserialise tx id: " <> show err))
       Right v -> Right v
   let expectedTxIdBytes = Api.serialiseToRawBytes txId
-  if bundleTxId /= expectedTxIdBytes
-    then Left "witness bundle tx id mismatch"
-    else pure ()
+  when (bundleTxId /= expectedTxIdBytes) $ Left "witness bundle tx id mismatch"
   verifyPaymentProof publicKey proof txAbs txId ciphertext auxNonceBytes
 
+-- | Register the client with the server.
 registerClient :: RunServer -> Ed.PublicKey -> Handler RegisterResp
 registerClient run publicKey = run $ registerH RegisterReq {publicKey}
 
+-- | Register the mock client with the server.
 register :: UnregisteredMockClient -> Handler MockClient
 register UnregisteredMockClient {..} = do
   RegisterResp {id = uuid} <- registerClient umcRun (Ed.toPublic umcLcSk)
   pure MockClient {mcRun = umcRun, mcLcSk = umcLcSk, mcSpPk = umcSpPk, mcClientId = ClientId uuid}
 
+-- | List clients from the server.
 getClients :: RunServer -> Handler ClientsResp
 getClients run = run clientsH
 
+-- | List clients using the given mock client.
 getClientsWithClient :: MockClient -> Handler ClientsResp
 getClientsWithClient mockClient = getClients (mcRun mockClient)
 
+-- | List pending transactions from the server.
 getPending :: RunServer -> Handler PendingResp
 getPending run = run pendingH
 
+-- | List pending transactions using the given mock client.
 getPendingWithClient :: MockClient -> Handler PendingResp
 getPendingWithClient mockClient = getPending (mcRun mockClient)
 
+-- | Prepare an intent with the server.
 prepare :: RunServer -> ClientId -> IntentW -> Handler PrepareResp
 prepare run clientId intentW =
   case mkPrepareReq clientId intentW of
     Left err -> throwError (as422 err)
     Right req -> run (prepareH req)
 
+-- | Prepare an intent using the given mock client.
 prepareWithClient :: MockClient -> IntentW -> Handler PrepareResp
 prepareWithClient mockClient intentW = do
   prepare (mcRun mockClient) mockClient.mcClientId intentW
 
+-- | Prepare an intent and verify the proof using the given mock client.
 prepareAndVerifyWithClient :: MockClient -> IntentW -> Handler PrepareResp
 prepareAndVerifyWithClient mockClient intentW = do
   resp <- prepareWithClient mockClient intentW
@@ -124,18 +139,22 @@ prepareAndVerifyWithClient mockClient intentW = do
     Left err -> throwError (as422 err)
     Right () -> pure resp
 
+-- | Finalise a prepared transaction with the server.
 finalise :: RunServer -> Ed.SecretKey -> PrepareResp -> Handler FinaliseResp
 finalise run secretKey PrepareResp {txId, txAbs} =
   let txAbsHash = hashTxAbs txAbs
       req = mkFinaliseReq secretKey txId txAbsHash
    in run (finaliseH req)
 
+-- | Finalise a prepared transaction using the given mock client.
 finaliseWithClient :: MockClient -> PrepareResp -> Handler FinaliseResp
 finaliseWithClient mockClient = finalise (mcRun mockClient) (mcLcSk mockClient)
 
+-- | Verify that the prepared transaction proof is valid with the given client.
 verifyPrepareProofWithClient :: MockClient -> PrepareResp -> Either Text ()
 verifyPrepareProofWithClient mockClient = verifyPrepareProof (mcSpPk mockClient)
 
+-- | Verify that the prepared transaction satisfies the intent.
 verifySatisfies :: IntentW -> PrepareResp -> Either Text Bool
 verifySatisfies intentW PrepareResp {txAbs, changeDelta} = do
   internal <- toInternalIntent intentW

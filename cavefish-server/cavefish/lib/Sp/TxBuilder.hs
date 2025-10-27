@@ -1,8 +1,31 @@
+-- | Module for building Cardano transactions based on high-level intents.
+--     This module provides functionality to construct transactions using the Cooked
+--     library, interpreting intents that specify spending sources, payment outputs,
+--     validity intervals, and change addresses.
 module Sp.TxBuilder where
 
 import Cardano.Api qualified as Api
 import Control.Monad (foldM, unless, when)
-import Cooked
+import Cooked (
+  BalanceOutputPolicy (DontAdjustExistingOutput),
+  BalancingPolicy (BalanceWith),
+  MonadBlockChain (..),
+  TxOpts (txOptBalanceOutputPolicy, txOptBalancingPolicy),
+  TxSkel (
+    txSkelOpts,
+    txSkelOuts,
+    txSkelSigners,
+    txSkelValidityRange,
+    txSkelWithdrawals
+  ),
+  TxSkelOut,
+  Wallet,
+  currentSlot,
+  emptyTxSkelRedeemer,
+  receives,
+  scriptWithdrawal,
+  txSkelTemplate,
+ )
 import Cooked.Skeleton.Payable qualified as Payable
 import Core.Intent (Intent (..), source)
 import Data.ByteString (ByteString)
@@ -15,6 +38,7 @@ import Plutus.Script.Utils.Value qualified as PSV
 import PlutusLedgerApi.V1.Interval qualified as Interval
 import Sp.App (Env (..))
 
+-- | Build a Cardano transaction based on the provided intent and observer
 buildTx :: MonadBlockChain m => Intent -> ByteString -> Env -> m CardanoTx
 buildTx intent observerBytes env@Env {..} = do
   let stakeValidator = stakeValidatorFromBytes observerBytes
@@ -72,9 +96,7 @@ buildTx intent observerBytes env@Env {..} = do
         }
 
     spFeeOutputs =
-      if spFee > 0
-        then [spWallet `receives` Payable.Value (PSV.ada spFee)]
-        else []
+      [spWallet `receives` Payable.Value (PSV.ada spFee) | spFee > 0]
 
     addPay :: MonadBlockChain m => TxSkel -> (Api.Value, Api.AddressInEra Api.ConwayEra) -> m TxSkel
     addPay skel (v, addr) = do

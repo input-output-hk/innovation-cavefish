@@ -1,4 +1,4 @@
-cabal-version: 3.4
+cabal-version: 3.12
 name:          cavefish
 version:       0.1.0.0
 license:       Apache-2.0
@@ -6,175 +6,154 @@ build-type:    Simple
 
 flag ide-stub
   description: Use IDE stub for PlutusTx compile (for HLS only)
-  default: False
-  manual: True
+  default:     False
+  manual:      True
+
+common base
+  build-depends: base >=4.9 && <5
+
+common project-config
+  default-language:   GHC2021
+  default-extensions:
+    DataKinds
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    DuplicateRecordFields
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    ImportQualifiedPost
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedRecordDot
+    OverloadedStrings
+    PolyKinds
+    RankNTypes
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    StandaloneKindSignatures
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+    ViewPatterns
+
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
+    -Wredundant-constraints -Wcompat
 
 library
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  import:          base, project-config
   hs-source-dirs:  lib
-  exposed-modules: 
+  exposed-modules:
+    Client.Impl
+    Client.Mock
     Core.Cbor
     Core.Intent
+    Core.PaymentProof
     Core.Pke
     Core.Proof
-    Core.PaymentProof
     Core.TxAbs
     Observers.Observer
     Sp.App
     Sp.Emulator
-    Client.Impl
-    Client.Mock
     Sp.Server
     Sp.State
     Sp.TxBuilder
-  default-language: GHC2021
-  default-extensions:
-    DerivingStrategies
-    GeneralizedNewtypeDeriving
-    DerivingVia
-    StandaloneDeriving
-    DeriveAnyClass
-    DeriveGeneric
-    OverloadedStrings
 
-    NamedFieldPuns
-    RecordWildCards
-    DuplicateRecordFields
-    LambdaCase
-    OverloadedRecordDot 
-    ViewPatterns
-
-    ScopedTypeVariables
-    TypeOperators
-    StandaloneKindSignatures
-
-    GADTs
-    TypeFamilies
-    DataKinds
-    PolyKinds
-    RankNTypes
-    MultiParamTypeClasses
-    FunctionalDependencies
   build-depends:
-    , base                         >=4.9   && <5
     , aeson
+    , bytestring
     , cardano-api
     , cardano-binary
+    , cardano-crypto-class
+    , cardano-ledger-alonzo
+    , cardano-ledger-core
+    , cborg
+    , containers
+    , cooked-validators
+    , crypton
+    , data-default
+    , memory
     , mtl
+    , plutus-core
+    , plutus-ledger
+    , plutus-ledger-api
+    , plutus-script-utils
+    , plutus-tx
+    , plutus-tx-plugin
     , servant
     , servant-server
-    , transformers
-    , transformers-either
-    , cardano-crypto-class
-    , cborg
-    , plutus-ledger-api
-    , plutus-tx
+    , stm
     , text
     , time
-    , containers
-    , data-default
-    , cooked-validators
-    , cardano-ledger-core
-    , cardano-ledger-alonzo
-    , plutus-script-utils
-    , plutus-core
-    , plutus-tx-plugin
-    , bytestring
-    , crypton
-    , plutus-ledger
-    , memory
-    , stm
+    , transformers
+    , transformers-either
     , uuid
+
   if flag(ide-stub)
     cpp-options: -DIDE_STUB
 
 executable cavefish-server
-  ghc-options: -Wall -Wcompat
+  import:         base, project-config
   hs-source-dirs: app
-  main-is: Main.hs
+  main-is:        Main.hs
   build-depends:
-    , base >=4.9 && <5
-    , cavefish
-    , warp
-    , cooked-validators
     , bytestring
+    , cavefish
+    , cooked-validators
     , crypton
     , stm
-  default-language: Haskell2010
+    , warp
 
 benchmark bench
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  import:         base, project-config
   type:           exitcode-stdio-1.0
   main-is:        Bench.hs
   hs-source-dirs: bench
-  build-depends:
-    , base >=4.9     && <5
-    , cavefish
+  build-depends:  cavefish
 
 test-suite test
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  import:         base, project-config
   type:           exitcode-stdio-1.0
   main-is:        Main.hs
   hs-source-dirs: test
-  default-extensions:
-    DerivingStrategies
-    GeneralizedNewtypeDeriving
-    DerivingVia
-    StandaloneDeriving
-    DeriveAnyClass
-    DeriveGeneric
-    OverloadedStrings
-
-    NamedFieldPuns
-    RecordWildCards
-    DuplicateRecordFields
-    LambdaCase
-    OverloadedRecordDot 
-    ViewPatterns
-
-    ScopedTypeVariables
-    TypeOperators
-    StandaloneKindSignatures
-
-    GADTs
-    TypeFamilies
-    DataKinds
-    PolyKinds
-    RankNTypes
-    MultiParamTypeClasses
-    FunctionalDependencies
   other-modules:
-    Spec
     Core.CborSpec
+    Spec
     Test.Common
+
   build-depends:
-    , base >=4.9     && <5
-    , cavefish
     , aeson
-    , bytestring
     , base16-bytestring
+    , bytestring
     , cardano-api
-    , cardano-ledger-core
+    , cardano-crypto-class
     , cardano-ledger-alonzo
+    , cardano-ledger-core
+    , cavefish
     , cborg
     , containers
-    , servant
-    , servant-server
-    , warp
-    , hspec
-    , servant-client
-    , http-client
-    , wai
-    , text
-    , stm
-    , crypton
-    , memory
-    , plutus-ledger-api
-    , plutus-ledger
-    , plutus-script-utils
     , cooked-validators
+    , crypton
     , data-default
-    , transformers
+    , hspec
+    , http-client
+    , memory
     , mtl
-    , cardano-crypto-class
+    , plutus-ledger
+    , plutus-ledger-api
+    , plutus-script-utils
+    , servant
+    , servant-client
+    , servant-server
+    , stm
+    , text
+    , transformers
     , uuid
+    , wai
+    , warp

@@ -1,3 +1,8 @@
+-- | Module      : Core.Intent
+--   Description : Core definitions for transaction intents.
+--     This module defines the data structures and functions related to transaction
+--     intents, including their representation, normalization, and satisfaction checks
+--     against built transactions.
 module Core.Intent where
 
 import Cardano.Api
@@ -23,29 +28,43 @@ import Ledger (
 
 type ChangeDelta = Api.Value
 
+-- Spend source address
 newtype Spend = Spend {source :: Api.AddressInEra Api.ConwayEra}
   deriving (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
 
+-- Result of building a transaction
 data BuildTxResult = BuildTxResult
   { tx :: Api.Tx Api.ConwayEra
+  -- ^ Built transaction
   , changeDelta :: ChangeDelta
+  -- ^ Change delta
   , txAbs :: TxAbs Api.ConwayEra
+  -- ^ Abstract representation of the transaction
   , mockState :: MockChainState
+  -- ^ Updated mock chain state
   }
   deriving (Show, Generic)
 
+-- Wallet address as represented in the API
 newtype AddressW = AddressW Text
   deriving (Eq, Ord, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
 
+-- Intent as represented in the API
 data IntentW
-  = MustMintW Value
-  | SpendFromW AddressW
-  | MaxIntervalW Integer
-  | PayToW Value AddressW
-  | ChangeToW AddressW
-  | MaxFeeW Integer
+  = -- | Must mint this value
+    MustMintW Value
+  | -- | Spend from this wallet address
+    SpendFromW AddressW
+  | -- | Maximum validity interval in slots
+    MaxIntervalW Integer
+  | -- | Pay this value to this address
+    PayToW Value AddressW
+  | -- | Send change to this address
+    ChangeToW AddressW
+  | -- | Maximum fee
+    MaxFeeW Integer
   | AndExpsW (NonEmpty IntentW)
   deriving (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
@@ -69,22 +88,34 @@ data IntentW
     We don't really need this type anymore, but I'm keeping it around for parity with the paper.
  -}
 data IntentExpr
-  = MustMint Value
-  | SpendFrom Spend
-  | MaxInterval Slot
-  | PayTo Value (Api.AddressInEra ConwayEra)
-  | ChangeTo (Api.AddressInEra ConwayEra)
-  | MaxFee Integer
+  = -- | Must mint this value
+    MustMint Value
+  | -- | Spend from this source
+    SpendFrom Spend
+  | -- | Maximum validity interval in slots
+    MaxInterval Slot
+  | -- | Pay this value to this address
+    PayTo Value (Api.AddressInEra ConwayEra)
+  | -- | Send change to this address
+    ChangeTo (Api.AddressInEra ConwayEra)
+  | -- | Maximum fee
+    MaxFee Integer
   | AndExps (NonEmpty IntentExpr)
   deriving (Eq, Show, Generic)
 
 data Intent = Intent
   { irSpendFrom :: [Spend]
+  -- ^ Spend from these sources
   , irPayTo :: [(Api.Value, Api.AddressInEra Api.ConwayEra)]
+  -- ^ Pay these values to these addresses
   , irMustMint :: [Api.Value]
+  -- ^ Must mint these values
   , irChangeTo :: Maybe (Api.AddressInEra Api.ConwayEra)
+  -- ^ Send change to this address
   , irMaxFee :: Maybe Integer
+  -- ^ Maximum fee
   , irMaxInterval :: Maybe Slot
+  -- ^ Maximum validity interval in slots
   }
 
 emptyIntent :: Intent
@@ -98,6 +129,7 @@ emptyIntent =
     , irMaxInterval = Nothing
     }
 
+-- | Normalize an IntentExpr into an Intent
 normalizeIntent :: IntentExpr -> Intent
 normalizeIntent = go emptyIntent
   where
@@ -139,6 +171,7 @@ toIntentExpr = \case
 toInternalIntent :: IntentW -> Either Text Intent
 toInternalIntent = fmap normalizeIntent . toIntentExpr
 
+-- | Check whether a transaction satisfies an intent, given the change delta.
 satisfies :: ChangeDelta -> Intent -> TxAbs Api.ConwayEra -> Bool
 satisfies cd Intent {..} tx =
   and
@@ -161,9 +194,7 @@ satisfies cd Intent {..} tx =
       case irChangeTo of
         Nothing -> True
         Just addr ->
-          if valuePositive cd
-            then any (outMatchesChange addr) tx.outputs
-            else True
+          not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
     , -- MaxFee (if any): tx.fee ≤ f
       maybe True (\f -> tx.absFee <= f) irMaxFee
     ]
@@ -213,6 +244,7 @@ outMatchesChange addrReq (Api.TxOut addr vOut _ _) =
 valueIsPlaceholder :: Api.Value -> Bool
 valueIsPlaceholder = valueEq mempty
 
+-- | Convert an interval to a closed finite interval, if possible.
 toClosedFinite :: (Num a, Ord a) => Interval a -> Maybe (a, a)
 toClosedFinite (Interval (LowerBound loE loC) (UpperBound hiE hiC)) = do
   lo <- case loE of Finite x -> Just x; _ -> Nothing

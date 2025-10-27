@@ -4,23 +4,26 @@
 -- TODO WG: Necessary because of `cooked` versioning...is there a way around this?
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:target-version=1.0.0 #-}
 
+-- | Module defining an ObserverScript that enforces transaction intents on-chain.
+--   This module provides the data structures and logic to create a Plutus stake validator
+--   script that checks whether a transaction satisfies a given intent, including spending
+--   from specified credentials, paying to certain addresses, minting required values,
+--   handling change, fee limits, and validity intervals.
 module Observers.Observer where
 
-import Cardano.Api (ScriptHash)
 import Cardano.Api qualified as Api
 import Cardano.Api.Shelley (PlutusScript (..))
 import Core.Intent (Intent (..), source)
+import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (fromShort, toShort)
 import Data.Coerce (coerce)
 import Data.Text (Text)
-import Data.Text qualified as T
 import GHC.Generics (Generic)
 import Ledger.Address qualified as LedgerAddr
 import Ledger.Slot (Slot (..))
 import Ledger.Tx.CardanoAPI (fromCardanoPlutusScript)
 import Ledger.Value.CardanoAPI qualified as LedgerValue
-import Plutus.Script.Utils.Address qualified as ScriptAddr
 import Plutus.Script.Utils.Scripts (
   Language (PlutusV2),
   Script (..),
@@ -28,7 +31,6 @@ import Plutus.Script.Utils.Scripts (
   ToStakeValidator (toStakeValidator),
   ToVersioned (..),
   Versioned (Versioned),
-  toCardanoScriptHash,
  )
 import Plutus.Script.Utils.V2 (toCardanoScript)
 import PlutusCore.Core (plcVersion100)
@@ -89,23 +91,19 @@ observerScriptBytes =
   stakeValidatorToBytes . observerStakeValidator
 
 -- TODO WG: HLS doesn't like Plutus it seems. Is there a way around needing an if def?
-#if defined(IDE_STUB)
-mkStakeValidator :: ObserverIntent -> StakeValidator
-mkStakeValidator _ = error "IDE_STUB: PlutusTx.compile disabled for HLS"
-#else
+
 mkStakeValidator :: ObserverIntent -> StakeValidator
 mkStakeValidator oi =
   toStakeValidator compiled
- where
-  intentData = PlutusTx.toBuiltinData oi
-  compiled =
-    $$(PlutusTx.compile [||wrap||])
-      `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 intentData
-  wrap :: BuiltinData -> BuiltinData -> BuiltinData -> P.BuiltinUnit
-  wrap rawData redeemerRaw ctxRaw =
-    let intent = PlutusTx.unsafeFromBuiltinData rawData
-     in untypedObserverStakeValidator intent redeemerRaw ctxRaw
-#endif
+  where
+    intentData = PlutusTx.toBuiltinData oi
+    compiled =
+      $$(PlutusTx.compile [||wrap||])
+        `PlutusTx.unsafeApplyCode` PlutusTx.liftCode plcVersion100 intentData
+    wrap :: BuiltinData -> BuiltinData -> BuiltinData -> P.BuiltinUnit
+    wrap rawData redeemerRaw ctxRaw =
+      let intent = PlutusTx.unsafeFromBuiltinData rawData
+       in untypedObserverStakeValidator intent redeemerRaw ctxRaw
 
 {-# INLINEABLE untypedObserverStakeValidator #-}
 untypedObserverStakeValidator :: ObserverIntent -> BuiltinData -> BuiltinData -> P.BuiltinUnit
@@ -167,7 +165,7 @@ payToSatisfied outputs =
       addressesEqual addr addrReq P.&& valueGeq valueOut valueReq
 
 mustMintSatisfied :: PV2.Value -> PV2.Value -> Bool
-mustMintSatisfied mintedValue required = valueGeq mintedValue required
+mustMintSatisfied = valueGeq
 
 changeSatisfied :: [PV2.TxInInfo] -> [PV2.TxOut] -> Maybe PV2.Address -> Bool
 changeSatisfied inputs outputs =
@@ -210,7 +208,7 @@ txOutValue :: PV2.TxOut -> PV2.Value
 txOutValue (PV2.TxOut _ valueOut _ _) = valueOut
 
 foldValues :: (a -> PV2.Value) -> [a] -> PV2.Value
-foldValues f xs = foldrList (\x acc -> f x P.+ acc) P.mempty xs
+foldValues f = foldrList (\x acc -> f x P.+ acc) P.mempty
 
 valueGeq :: PV2.Value -> PV2.Value -> Bool
 valueGeq have need = allList assetSatisfied (Value.flattenValue need)
@@ -269,7 +267,12 @@ toObserverIntent Intent {..} = do
   let mustMint = foldMap LedgerValue.fromCardanoValue irMustMint
       spendFrom = LedgerAddr.cardanoAddressCredential . source <$> irSpendFrom
       payTo =
-        fmap (\(val, addr) -> (LedgerValue.fromCardanoValue val, LedgerAddr.toPlutusAddress addr)) irPayTo
+        fmap
+          ( Data.Bifunctor.bimap
+              LedgerValue.fromCardanoValue
+              LedgerAddr.toPlutusAddress
+          )
+          irPayTo
       changeTo = LedgerAddr.toPlutusAddress <$> irChangeTo
       maxInterval = fmap ((slotLengthMillis *) . getSlot) irMaxInterval
   pure
