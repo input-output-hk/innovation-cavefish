@@ -80,8 +80,8 @@ let
     tools.stylish-haskell
     tools.fourmolu
     tools.cabal
-    tools.hlint
     tools.cabal-fmt
+    tools.hlint
 
     pkgs.shellcheck
     pkgs.nixpkgs-fmt
