@@ -4,6 +4,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Spec (spec) where
 
@@ -16,12 +17,11 @@ import Control.Monad.Trans.Except (runExceptT)
 import Cooked.MockChain.MockChainState (MockChainState)
 import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
 import qualified Core.CborSpec as CborSpec
-import Core.Intent (AddressW (..), BuildTxResult (..), IntentW (..), satisfies, toInternalIntent)
+import Core.Intent (BuildTxResult (..), IntentW (..), satisfies, toInternalIntent)
 import Core.PaymentProof (ProofResult (..), hashTxAbs)
 import Core.Pke (ciphertextDigest)
 import Core.Proof (mkProof, renderHex)
 import Core.TxAbs (cardanoTxToTxAbs)
-import Crypto.Error (CryptoFailable (..))
 import qualified Crypto.PubKey.Ed25519 as Ed
 import Data.Bits (xor)
 import qualified Data.ByteArray as BA
@@ -29,7 +29,6 @@ import qualified Data.ByteArray.Encoding as BAE
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.Map.Strict as Map
-import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
 import Ledger.Tx (
@@ -365,7 +364,7 @@ spec = do
 
         -- Ask the SP to construct a transaction based on an intent
         prepareReq <- mkPrepareReqOrFail (ClientId registeredId) testIntentW
-        PrepareResp {txId, txAbs, proof, changeDelta} <-
+        PrepareResp {txId, txAbs} <-
           runClientOrFail servantEnv (prepareClient prepareReq)
         let unknownTxId =
               case Text.uncons txId of
@@ -409,7 +408,7 @@ spec = do
 
         -- Tell the SP to submit the transaction
         let finaliseReq = mkFinaliseReq testClientSecretKey txId (hashTxAbs txAbs)
-        finaliseResp@FinaliseResp {txId, submittedAt, result} <-
+        FinaliseResp {txId, submittedAt, result} <-
           runClientOrFail servantEnv (finaliseClient finaliseReq)
         result `shouldBe` Finalised
 
