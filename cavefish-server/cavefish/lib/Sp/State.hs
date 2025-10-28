@@ -20,6 +20,8 @@ data Pending = Pending
   , ciphertext :: PkeCiphertext
   , auxNonce :: ByteString
   , rho :: ByteString
+  , commitment :: Maybe PublicKey
+  , challenge :: Maybe ByteString
   }
 
 type PendingStore = TVar (Map TxId Pending)

@@ -58,6 +58,24 @@ instance FromJSON ProofResult where
       other -> fail ("unknown proof kind: " <> T.unpack other)
 
 -- TODO WG: Placeholder
+{- This will end up being split into a multi-step process, described in figure 3
+   of the paper:
+
+   Signer (LC)                     Service Provider (SP)
+  ----------------------------------------------------------------
+  WBPS Execution for m := tx||auxnt        Produce commitment comtx
+                                (comtx, TxAbs)
+                                <-----------
+  Produce blind sig. com. `R = g^r`
+                                      R
+                                ----------->
+                                           Produce challenge `c` and proof `π`
+                                    (c, π)
+                                <-----------
+          Check proof `π`
+                                      s
+          Produce `s = r + cx`  -----------> Produce signature `σ = (R, s)`
+  -}
 mkPaymentProof ::
   SecretKey ->
   Intent ->

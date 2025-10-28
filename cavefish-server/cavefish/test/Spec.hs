@@ -311,7 +311,7 @@ spec = do
         manager <- newManager defaultManagerSettings
         let baseUrl = BaseUrl Http "127.0.0.1" port ""
             servantEnv = SC.mkClientEnv manager baseUrl
-            (prepareClient :<|> finaliseClient :<|> registerClient :<|> clientsClient :<|> pendingClient :<|> transactionClient) =
+            (prepareClient :<|> _commitClient :<|> finaliseClient :<|> registerClient :<|> clientsClient :<|> pendingClient :<|> transactionClient) =
               SC.client (Proxy @CavefishApi)
 
         -- Register the client to the server
