@@ -1,5 +1,3 @@
-{-# LANGUAGE PartialTypeSignatures #-}
-
 module Client.Impl (
   ClientEnv (..),
   ClientState (..),
@@ -7,6 +5,7 @@ module Client.Impl (
   ClientM,
   runClient,
   withSession,
+  commit,
   startSession,
   throw422,
   eitherAs422,
@@ -103,7 +102,7 @@ commit txId = do
   randomBytes :: ByteString <- liftHandler $ liftIO $ getRandomBytes 32
   r <- case Ed.secretKey randomBytes of
     CryptoPassed c -> pure c
-    CryptoFailed e -> throwError (as422 "TODO")
+    CryptoFailed _ -> throwError (as422 "couldn't generate secret key during commit")
   modify (\ClientState {littleRs} -> ClientState $ Map.insert txId r littleRs)
   let bigR = Ed.toPublic r
   pure bigR
