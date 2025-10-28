@@ -1,0 +1,30 @@
+name: Check Fourmolu formatting
+
+on:
+  push:
+    branches: [ "master", "release/**" ]
+    paths:
+      - 'cavefish-server/**'
+      - '.github/workflows/cavefish-server-fourmolu-ci.yml'
+
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - 'cavefish-server/**'
+      - '.github/workflows/cavefish-server-fourmolu-ci.yml'
+
+jobs:
+  fourmolu-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./cavefish-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Fourmolu check
+        uses: haskell-actions/run-fourmolu@v9
+        with:
+          version: "latest"
+          pattern: |
+            cavefish-server/cavefish/**/*.hs
