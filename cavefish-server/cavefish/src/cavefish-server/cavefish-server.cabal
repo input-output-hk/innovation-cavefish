@@ -1,0 +1,129 @@
+cabal-version:   3.12
+name:            cavefish-server
+version:         0.1.0.0
+
+-- synopsis:
+-- description:
+license:         MIT
+license-file:    LICENSE
+
+-- author:
+-- maintainer:
+-- copyright:
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+-- extra-source-files:
+
+flag ide-stub
+  description: Use IDE stub for PlutusTx compile (for HLS only)
+  default:     False
+  manual:      True
+
+common base
+  build-depends: base >=4.9 && <5
+
+common project-config
+  default-language:   GHC2021
+  default-extensions:
+    DataKinds
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    DuplicateRecordFields
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    ImportQualifiedPost
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedRecordDot
+    OverloadedStrings
+    PolyKinds
+    RankNTypes
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    StandaloneKindSignatures
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+    ViewPatterns
+
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
+    -Wredundant-constraints -Wcompat
+
+library
+  import:          base, project-config
+  hs-source-dirs:  src
+  exposed-modules:
+    Sp.App
+    Sp.Emulator
+    Sp.Server
+    Sp.State
+    Sp.TxBuilder
+
+  build-depends:
+    , aeson
+    , bytestring
+    , cardano-api
+    , cardano-binary
+    , cardano-crypto-class
+    , cardano-ledger-alonzo
+    , cardano-ledger-core
+    , cavefish-core
+    , cborg
+    , containers
+    , cooked-validators
+    , crypton
+    , data-default
+    , memory
+    , mtl
+    , plutus-core
+    , plutus-ledger
+    , plutus-ledger-api
+    , plutus-script-utils
+    , plutus-tx
+    , plutus-tx-plugin
+    , servant
+    , servant-server
+    , stm
+    , text
+    , time
+    , transformers
+    , transformers-either
+    , uuid
+
+  if flag(ide-stub)
+    cpp-options: -DIDE_STUB
+
+executable cavefish-server
+  import:         base, project-config
+  hs-source-dirs: app
+  main-is:        Main.hs
+  build-depends:
+    , bytestring
+    , cavefish-server
+    , cavefish-core
+    , cooked-validators
+    , crypton
+    , stm
+    , warp
+
+  if flag(ide-stub)
+    cpp-options: -DIDE_STUB
+
+test-suite test
+  import:         base, project-config
+  type:           exitcode-stdio-1.0
+  main-is:        Main.hs
+  hs-source-dirs: test
+  other-modules:  Spec
+  build-depends:
+    , cavefish-core
+    , cavefish-server
+    , hspec
