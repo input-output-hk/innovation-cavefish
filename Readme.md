@@ -140,5 +140,3 @@ We encourage contributions! This project follows standard GitHub workflows.
 - Review focuses on security, efficiency, and alignment with UTxO model.
 
 Design values: Prioritize minimal trust, communication efficiency, and real-world deployability. Trade-offs resolved via peer-reviewed crypto primitives.
-
-For more, see [CONTRIBUTING.md](CONTRIBUTING.md) (if expanded).
