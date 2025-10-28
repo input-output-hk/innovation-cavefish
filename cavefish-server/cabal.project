@@ -1,5 +1,10 @@
 packages:
+  -- remove cavefis
   ./cavefish
+  ./cavefish/src/cavefish-core
+  ./cavefish/src/cavefish-client
+  ./cavefish/src/cavefish-server
+  ./cavefish/src/cavefish-tests
 
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
