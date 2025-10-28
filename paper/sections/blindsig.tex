@@ -2,7 +2,7 @@
 
  \section{Blind Signatures for Abstract Transactions}
  \label{sec:blind}
- In order to allow the light to sign an abstract transaction we implement blind signatures on (partially) blinded transaction objects.
+ In order to allow the light client to sign an abstract transaction we implement blind signatures on (partially) blinded transaction objects.
  At the minimum the SP hides the inputs to the transaction, i.e., the references to UTxO objects which are present in the ledger and required to cover the transaction.
  This ensures that the light client cannot simply obtain the transaction from the SP, then edit it to remove the SPs compensation.
 
@@ -18,7 +18,7 @@
  It realizes a concurrently secure blind and partially blind signing protocol resulting in standard Schnorr signatures. This is a core property as it allows our protocol to be compatible with popular blockchains such as Bitcoin and Cardano without any modifications.
 %The signature scheme builds upon the original protocol proposed in~\cite{10.1007/3-540-48071-4_7} with the addition of a commitment phase that binds the signer to her secrets (blinding value and message), preventing a forgery attack (described in~\cite{bibid}) and making the scheme unforgeable under concurrent sessions.
 
-Given our application, the unlinkability property of blind signatures is not of much benefit: signed transactions are somewhat infrequent, often have different payees or payment sums (i.e different predicates) and re indirectly timestamped due to their time of posting on the blockchain. Further, there seems to be little benefit in preventing the light client from knowing which protocol section produced which payment. For this reason, we do away with the requirement of the signer being unable to distinguish between messages signed on different sessions. We only require that the singer is unable to distinguish the message \emph{before}  the signature-message pair is posted. 
+Given our application, the unlinkability property of blind signatures is not of much benefit: signed transactions are somewhat infrequent, often have different payees or payment sums (i.e different predicates) and are indirectly timestamped due to their time of posting on the blockchain. Further, there seems to be little benefit in preventing the light client from knowing which protocol section produced which payment. For this reason, we do away with the requirement of the signer being unable to distinguish between messages signed on different sessions. We only require that the singer is unable to distinguish the message \emph{before}  the signature-message pair is posted.
 
 This weakening of the blindness property brings about the benefit that we can remove the blinding operations from the protocol (for a small efficiency increase) and also from the proof of correctness of the challenge generation (where the gain is more significant as it removes group exponentiations using foreign field arithmetic). The resulting scheme is similar in operation to the Signatures over Blocks of Committed Messages construction of Bobolz et. al. \cite{10.1007/978-3-031-78679-2_7} with the addition of predicate checking.
  
