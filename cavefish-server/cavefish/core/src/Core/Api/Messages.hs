@@ -5,7 +5,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-
 module Core.Api.Messages where
 
 import Cardano.Api qualified as Api
@@ -14,7 +13,9 @@ import Control.Monad (unless, when)
 import Control.Monad.Except (liftEither)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (..))
-import Core.Cbor (mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
+import Core.Api.AppContext (AppM, Env (..))
+import Core.Api.State (ClientId (ClientId), ClientRegistration (..), Completed (..), Pending (..))
+import Core.Cbor (WitnessBundle (..), mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
 import Core.Intent (BuildTxResult (..), ChangeDelta, IntentW, satisfies, toInternalIntent)
 import Core.PaymentProof (ProofResult (..), hashTxAbs)
 import Core.Pke (ciphertextDigest, decrypt, encrypt, renderError)
@@ -40,8 +41,6 @@ import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
 import Ledger.Tx.CardanoAPI (CardanoTx, pattern CardanoEmulatorEraTx)
 import Servant
-import Core.Api.AppContext (AppM, Env (..))
-import Core.Api.State (ClientId (ClientId), ClientRegistration (..), Completed (..), Pending (..))
 
 -- | Cavefish API a
 data TransactionResp

@@ -15,6 +15,32 @@ import Client.Mock qualified as Mock
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Cooked.MockChain.MockChainState (MockChainState)
+import Core.Api.AppContext (Env (..), runApp)
+import Core.Api.Messages (
+  ClientInfo (..),
+  ClientsResp (..),
+  FinaliseReq (..),
+  FinaliseResp (..),
+  FinaliseResult (..),
+  PendingItem (..),
+  PendingResp (..),
+  PendingSummary (..),
+  PrepareReq (..),
+  PrepareResp (..),
+  RegisterReq (..),
+  RegisterResp (..),
+  SubmittedSummary (..),
+  TransactionResp (..),
+  finaliseH,
+  transactionH,
+ )
+import Core.Api.State (
+  ClientId (..),
+  ClientRegistrationStore,
+  CompleteStore,
+  Pending (..),
+  PendingStore,
+ )
 import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
 import Core.CborSpec qualified as CborSpec
 import Core.Intent (BuildTxResult (..), IntentW (..), satisfies, toInternalIntent)
@@ -39,29 +65,8 @@ import Network.Wai.Handler.Warp qualified as Warp
 import Servant
 import Servant.Client (BaseUrl (..), Scheme (..))
 import Servant.Client qualified as SC
-import Core.Api.AppContext (Env (..), runApp)
 import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
-import Sp.Server(mkApp, CavefishApi, mkApp)
-import Core.Api.Messages (
-  ClientInfo (..),
-  ClientsResp (..),
-  CommitReq (..),
-  FinaliseReq (..),
-  FinaliseResp (..),
-  FinaliseResult (..),
-  PendingItem (..),
-  PendingResp (..),
-  PendingSummary (..),
-  PrepareReq (..),
-  PrepareResp (..),
-  RegisterReq (..),
-  RegisterResp (..),
-  SubmittedSummary (..),
-  TransactionResp (..),
-  finaliseH,
-  transactionH,
- )
-import Core.Api.State (ClientId (..), ClientRegistrationStore, CompleteStore, Pending (..), PendingStore)
+import Sp.Server (CavefishApi, mkApp)
 import Test.Common
 import Test.Hspec
 

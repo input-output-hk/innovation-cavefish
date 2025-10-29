@@ -6,6 +6,7 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Cooked (MockChainState)
 import Cooked.Wallet (Wallet, knownWallets)
+import Core.Api.State (ClientRegistrationStore, CompleteStore, PendingStore)
 import Core.Intent (BuildTxResult, Intent)
 import Core.Pke (PkePublicKey, PkeSecretKey)
 import Crypto.PubKey.Ed25519 (SecretKey)
@@ -17,7 +18,6 @@ import Ledger.Address qualified as Ledger
 import Ledger.CardanoWallet qualified as CW
 import Servant.Server (Handler)
 import Servant.Server.Internal.ServerError (ServerError)
-import Core.Api.State (ClientRegistrationStore, CompleteStore, PendingStore)
 
 data Env = Env
   { spSk :: SecretKey
