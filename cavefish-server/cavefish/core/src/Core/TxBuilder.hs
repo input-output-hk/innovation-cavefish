@@ -27,16 +27,16 @@ import Cooked (
   txSkelTemplate,
  )
 import Cooked.Skeleton.Payable qualified as Payable
+import Core.Api.AppContext (Env (..))
 import Core.Intent (Intent (..), source)
+import Core.Observers.Observer (stakeValidatorFromBytes)
 import Data.ByteString (ByteString)
 import Data.List (nub)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Ledger.Tx (CardanoTx)
-import Core.Observers.Observer (stakeValidatorFromBytes)
 import Plutus.Script.Utils.Value qualified as PSV
 import PlutusLedgerApi.V1.Interval qualified as Interval
-import Core.Api.AppContext (Env (..))
 
 -- | Build a Cardano transaction based on the provided intent and observer
 buildTx :: MonadBlockChain m => Intent -> ByteString -> Env -> m CardanoTx
