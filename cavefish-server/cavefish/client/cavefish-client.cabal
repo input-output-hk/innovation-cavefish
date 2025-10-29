@@ -1,0 +1,147 @@
+cabal-version:   3.4
+name:            cavefish-client
+version:         0.1.0.0
+
+-- synopsis:
+-- description:
+license:         MIT
+license-file:    LICENSE
+
+-- author:
+-- maintainer:
+-- copyright:
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+-- extra-source-files:
+
+flag ide-stub
+  description: Use IDE stub for PlutusTx compile (for HLS only)
+  default:     False
+  manual:      True
+
+common base
+  build-depends: base >=4.9 && <5
+
+common project-config
+  default-language:   GHC2021
+  default-extensions:
+    DataKinds
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    DuplicateRecordFields
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    ImportQualifiedPost
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedRecordDot
+    OverloadedStrings
+    PolyKinds
+    RankNTypes
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    StandaloneKindSignatures
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+    ViewPatterns
+
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
+    -Wredundant-constraints -Wcompat
+
+library
+  import:          base, project-config
+  hs-source-dirs:  src
+  exposed-modules:
+    Client.Impl
+    Client.Mock
+
+  build-depends:
+    , aeson
+    , bytestring
+    , cardano-api
+    , cardano-binary
+    , cardano-crypto-class
+    , cardano-ledger-alonzo
+    , cardano-ledger-core
+    , cavefish-core
+    , cborg
+    , containers
+    , cooked-validators
+    , crypton
+    , data-default
+    , memory
+    , mtl
+    , plutus-core
+    , plutus-ledger
+    , plutus-ledger-api
+    , plutus-script-utils
+    , plutus-tx
+    , plutus-tx-plugin
+    , servant
+    , servant-server
+    , stm
+    , text
+    , time
+    , transformers
+    , transformers-either
+    , uuid
+
+  -- TODO need to remove this dependency
+  if flag(ide-stub)
+    cpp-options: -DIDE_STUB
+
+executable cavefish-client
+  import:         base, project-config
+  hs-source-dirs: app
+  main-is:        Main.hs
+  build-depends:
+    , bytestring
+    , cooked-validators
+    , crypton
+    , stm
+    , warp
+
+  if flag(ide-stub)
+    cpp-options: -DIDE_STUB
+
+test-suite test
+  import:         base, project-config
+  type:           exitcode-stdio-1.0
+  main-is:        Main.hs
+  hs-source-dirs: test
+  other-modules:
+  build-depends:
+    , aeson
+    , base16-bytestring
+    , bytestring
+    , cardano-api
+    , cardano-crypto-class
+    , cardano-ledger-alonzo
+    , cardano-ledger-core
+    , cavefish-client
+    , cavefish-core
+    , cborg
+    , containers
+    , cooked-validators
+    , crypton
+    , data-default
+    , hspec
+    , http-client
+    , memory
+    , mtl
+    , plutus-ledger
+    , plutus-ledger-api
+    , plutus-script-utils
+    , stm
+    , text
+    , transformers
+    , uuid

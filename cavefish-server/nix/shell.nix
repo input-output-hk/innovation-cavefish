@@ -95,6 +95,7 @@ let
     pkgs.bash
     pkgs.git
     pkgs.which
+    pkgs.watchexec
 
     pkgs.nix-prefetch-git
 
