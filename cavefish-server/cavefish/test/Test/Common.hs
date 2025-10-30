@@ -66,6 +66,12 @@ testSecretKey =
     CryptoPassed sk -> sk
     CryptoFailed err -> error ("invalid static secret key: " <> show err)
 
+testCommitSecretKey :: Ed.SecretKey
+testCommitSecretKey =
+  case Ed.secretKey (BS.pack [133 .. 164]) of
+    CryptoPassed sk -> sk
+    CryptoFailed err -> error ("invalid commit secret key: " <> show err)
+
 testPkeSecretKey :: PkeSecretKey
 testPkeSecretKey =
   case deriveSecretKey (BS.pack [33 .. 64]) of

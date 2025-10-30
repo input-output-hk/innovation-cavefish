@@ -23,7 +23,7 @@ module Client.Impl (
 ) where
 
 import Client.Mock (
-  MockClient,
+  MockClient (..),
   RunServer,
   as422,
   finaliseWithClient,
@@ -32,7 +32,8 @@ import Client.Mock (
   initMockClient,
   prepareWithClient,
   register,
-  verifyPrepareProofWithClient,
+  runCommit,
+  verifyCommitProofWithClient,
   verifySatisfies,
  )
 import Control.Monad.Except (MonadError, liftEither, throwError)
@@ -40,7 +41,8 @@ import Control.Monad.Reader (MonadIO (liftIO), MonadReader, ReaderT, ask, runRea
 import Control.Monad.State (MonadState (..), StateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Core.Intent (IntentW)
-import Crypto.PubKey.Ed25519 (PublicKey, SecretKey)
+import Crypto.Error (CryptoFailable (..))
+import Crypto.PubKey.Ed25519 (SecretKey)
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Crypto.Random (MonadRandom (..))
 import Data.Bifunctor (first)
@@ -49,7 +51,7 @@ import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Text (Text)
 import Servant (Handler, ServerError)
-import Sp.Server (ClientsResp, FinaliseResp, PendingResp, PrepareResp)
+import Sp.Server (ClientsResp, CommitResp, FinaliseResp, PendingResp, PrepareResp, txId)
 
 -- | Monad for client operations against the server.
 newtype ClientM a = ClientM (ReaderT ClientEnv Handler a)
@@ -59,7 +61,6 @@ newtype ClientM a = ClientM (ReaderT ClientEnv Handler a)
 data ClientEnv = ClientEnv
   { run :: RunServer
   , lcSk :: SecretKey
-  , spPk :: PublicKey
   }
 
 -- | Represents a client session with the server.
@@ -83,8 +84,8 @@ withSession env action = runClient env (startSession >>= action)
 
 startSession :: ClientM ClientSession
 startSession = do
-  ClientEnv {run, lcSk, spPk} <- ask
-  let unregistered = initMockClient run lcSk spPk
+  ClientEnv {run, lcSk} <- ask
+  let unregistered = initMockClient run lcSk
   client <- liftHandler (register unregistered)
   pure (ClientSession client)
 
@@ -101,20 +102,21 @@ prepare ClientSession {client} intent = liftHandler (prepareWithClient client in
 prepareAndValidate :: ClientSession -> IntentW -> ClientM PrepareResp
 prepareAndValidate session intent = do
   resp <- prepare session intent
+  commitResp <- commit (mcRun session.client) resp.txId
   eitherAs422 $
     (verifySatisfies intent resp >>= ensure "Satisfies failed")
-      >> verifyPrepareProofWithClient (client session) resp
+      >> verifyCommitProofWithClient (client session) resp commitResp
   pure resp
 
-commit :: Text -> ClientM Ed.PublicKey
-commit txId = do
+commit :: RunServer -> Text -> ClientM CommitResp
+commit run txId = do
   randomBytes :: ByteString <- liftHandler $ liftIO $ getRandomBytes 32
   r <- case Ed.secretKey randomBytes of
     CryptoPassed c -> pure c
     CryptoFailed _ -> throwError (as422 "couldn't generate secret key during commit")
   modify (\ClientState {littleRs} -> ClientState $ Map.insert txId r littleRs)
   let bigR = Ed.toPublic r
-  pure bigR
+  liftHandler (runCommit run txId bigR)
 
 finalise :: ClientSession -> PrepareResp -> ClientM FinaliseResp
 finalise ClientSession {client} resp = liftHandler (finaliseWithClient client resp)

@@ -27,6 +27,8 @@ import Servant (Handler, ServerError, err422, errBody)
 import Sp.App (AppM)
 import Sp.Server (
   ClientsResp (..),
+  CommitReq (..),
+  CommitResp (..),
   FinaliseReq (..),
   FinaliseResp (..),
   PendingResp (..),
@@ -36,6 +38,7 @@ import Sp.Server (
   RegisterResp (..),
   clientSignatureMessage,
   clientsH,
+  commitH,
   finaliseH,
   pendingH,
   prepareH,
@@ -48,7 +51,6 @@ type RunServer = forall a. AppM a -> Handler a
 data UnregisteredMockClient = UnregisteredMockClient
   { umcRun :: RunServer
   , umcLcSk :: Ed.SecretKey
-  , umcSpPk :: Ed.PublicKey
   }
 
 data MockClient = MockClient
@@ -58,12 +60,11 @@ data MockClient = MockClient
   , mcClientId :: ClientId
   }
 
-initMockClient :: RunServer -> Ed.SecretKey -> Ed.PublicKey -> UnregisteredMockClient
-initMockClient run lcSk spPk =
+initMockClient :: RunServer -> Ed.SecretKey -> UnregisteredMockClient
+initMockClient run lcSk =
   UnregisteredMockClient
     { umcRun = run
     , umcLcSk = lcSk
-    , umcSpPk = spPk
     }
 
 -- | Create a PrepareReq from the given client ID and intent.
@@ -80,8 +81,8 @@ mkFinaliseReq secretKey txId txAbsHash =
       signature = Ed.sign secretKey (Ed.toPublic secretKey) message
    in FinaliseReq {txId = txId, lcSig = BA.convert signature}
 
-verifyPrepareProof :: Ed.PublicKey -> PrepareResp -> Either Text ()
-verifyPrepareProof publicKey PrepareResp {txId = txIdText, txAbs, proof, witnessBundleHex} = do
+verifyCommitProof :: Ed.PublicKey -> PrepareResp -> CommitResp -> Either Text ()
+verifyCommitProof publicKey PrepareResp {txId = txIdText, txAbs, witnessBundleHex} CommitResp {pi} = do
   witnessBytes <- decodeHex "witness bundle" witnessBundleHex
   ClientWitnessBundle {cwbCiphertext = ciphertext, cwbAuxNonce = auxNonceBytes, cwbTxId = bundleTxId} <-
     first (const "failed to decode witness bundle") (deserialiseClientWitnessBundle witnessBytes)
@@ -91,7 +92,7 @@ verifyPrepareProof publicKey PrepareResp {txId = txIdText, txAbs, proof, witness
       Right v -> Right v
   let expectedTxIdBytes = Api.serialiseToRawBytes txId
   when (bundleTxId /= expectedTxIdBytes) $ Left "witness bundle tx id mismatch"
-  verifyPaymentProof publicKey proof txAbs txId ciphertext auxNonceBytes
+  verifyPaymentProof publicKey pi txAbs txId ciphertext auxNonceBytes
 
 -- | Register the client with the server.
 registerClient :: RunServer -> Ed.PublicKey -> Handler RegisterResp
@@ -100,8 +101,8 @@ registerClient run publicKey = run $ registerH RegisterReq {publicKey}
 -- | Register the mock client with the server.
 register :: UnregisteredMockClient -> Handler MockClient
 register UnregisteredMockClient {..} = do
-  RegisterResp {id = uuid} <- registerClient umcRun (Ed.toPublic umcLcSk)
-  pure MockClient {mcRun = umcRun, mcLcSk = umcLcSk, mcSpPk = umcSpPk, mcClientId = ClientId uuid}
+  RegisterResp {id = uuid, spPk} <- registerClient umcRun (Ed.toPublic umcLcSk)
+  pure MockClient {mcRun = umcRun, mcLcSk = umcLcSk, mcSpPk = spPk, mcClientId = ClientId uuid}
 
 -- | List clients from the server.
 getClients :: RunServer -> Handler ClientsResp
@@ -131,13 +132,14 @@ prepareWithClient :: MockClient -> IntentW -> Handler PrepareResp
 prepareWithClient mockClient intentW = do
   prepare (mcRun mockClient) mockClient.mcClientId intentW
 
+-- | Submit a commit message (big R) for the given transaction.
+runCommit :: RunServer -> Text -> Ed.PublicKey -> Handler CommitResp
+runCommit run txId bigR = run (commitH CommitReq {txId, bigR})
+
 -- | Prepare an intent and verify the proof using the given mock client.
 prepareAndVerifyWithClient :: MockClient -> IntentW -> Handler PrepareResp
 prepareAndVerifyWithClient mockClient intentW = do
-  resp <- prepareWithClient mockClient intentW
-  case verifyPrepareProofWithClient mockClient resp of
-    Left err -> throwError (as422 err)
-    Right () -> pure resp
+  prepareWithClient mockClient intentW
 
 -- | Finalise a prepared transaction with the server.
 finalise :: RunServer -> Ed.SecretKey -> PrepareResp -> Handler FinaliseResp
@@ -151,8 +153,8 @@ finaliseWithClient :: MockClient -> PrepareResp -> Handler FinaliseResp
 finaliseWithClient mockClient = finalise (mcRun mockClient) (mcLcSk mockClient)
 
 -- | Verify that the prepared transaction proof is valid with the given client.
-verifyPrepareProofWithClient :: MockClient -> PrepareResp -> Either Text ()
-verifyPrepareProofWithClient mockClient = verifyPrepareProof (mcSpPk mockClient)
+verifyCommitProofWithClient :: MockClient -> PrepareResp -> CommitResp -> Either Text ()
+verifyCommitProofWithClient mockClient = verifyCommitProof (mcSpPk mockClient)
 
 -- | Verify that the prepared transaction satisfies the intent.
 verifySatisfies :: IntentW -> PrepareResp -> Either Text Bool

@@ -179,7 +179,7 @@ data ClientWitnessBundle = ClientWitnessBundle
   , cwbTxAbs :: ByteString
   , cwbTxBodyMasked :: ByteString
   , cwbAuxNonce :: ByteString
-  , cwbCiphertext :: PkeCiphertext
+  , cwbCiphertext :: PkeCiphertext -- This is `comTx`
   }
 
 deserialiseClientWitnessBundle :: ByteString -> Either Text ClientWitnessBundle

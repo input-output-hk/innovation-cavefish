@@ -14,11 +14,11 @@ import Control.Monad (unless, when)
 import Control.Monad.Except (liftEither)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (..))
-import Core.Cbor (WitnessBundle (..), mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
+import Core.Cbor (mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
 import Core.Intent (BuildTxResult (..), ChangeDelta, IntentW, satisfies, toInternalIntent)
-import Core.PaymentProof (ProofResult, hashTxAbs, mkPaymentProof)
-import Core.Pke (decrypt, encrypt, renderError)
-import Core.Proof (parseHex, renderHex)
+import Core.PaymentProof (ProofResult (..), hashTxAbs)
+import Core.Pke (ciphertextDigest, decrypt, encrypt, renderError)
+import Core.Proof (mkProof, parseHex, renderHex)
 import Core.TxAbs (TxAbs)
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 qualified as Ed
@@ -30,6 +30,7 @@ import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
 import Data.Map.Strict qualified as Map
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
@@ -183,8 +184,9 @@ instance ToJSON RegisterReq where
   toJSON RegisterReq {..} =
     object ["publicKey" .= renderHex (BA.convert publicKey)]
 
-newtype RegisterResp = RegisterResp
+data RegisterResp = RegisterResp
   { id :: UUID
+  , spPk :: Ed.PublicKey
   }
   deriving (Eq, Show, Generic)
 
@@ -225,7 +227,6 @@ instance ToJSON PrepareReq where
 data PrepareResp = PrepareResp
   { txId :: Text
   , txAbs :: TxAbs Api.ConwayEra
-  , proof :: ProofResult
   , -- We need to include a `consumed - produced` here, otherwise the client can't run `satisfies` for `ChangeTo`
     changeDelta :: ChangeDelta
   , witnessBundleHex :: Text
@@ -242,7 +243,7 @@ instance FromJSON CommitReq
 
 instance ToJSON CommitReq
 
-data CommitResp = CommitResp {pi :: Int, c :: Int} deriving (Eq, Show, Generic)
+data CommitResp = CommitResp {pi :: ProofResult, c :: Int} deriving (Eq, Show, Generic)
 
 instance FromJSON CommitResp
 
@@ -318,6 +319,7 @@ prepareH PrepareReq {..} = do
   let payload = serialiseTx tx <> auxNonceBytes
       toServerErr msg = err500 {errBody = BL.fromStrict (TE.encodeUtf8 msg)}
       toPkeErr err = err500 {errBody = BL.fromStrict (TE.encodeUtf8 ("pke encryption failed: " <> renderError err))}
+  -- The part from the paper: C ← PKE.Enc(ek, m; ρ) with ek = pkePublic, m = serialiseTx tx <> auxNonceBytes
   ciphertext <- liftEither $ first toPkeErr (encrypt pkePublic payload rhoBytes)
   witnessBundle <-
     liftEither $ first toServerErr $ mkWitnessBundle tx txAbs observer auxNonceBytes ciphertext
@@ -331,9 +333,6 @@ prepareH PrepareReq {..} = do
       txIdTxt = Api.serialiseToRawBytesHexText txId
       txAbsHash :: ByteString
       txAbsHash = hashTxAbs txAbs
-  proof <-
-    liftIO
-      (mkPaymentProof spSk internalIntent tx txAbs (encryptedTx witnessBundle) auxNonceBytes rhoBytes)
   now <- liftIO getCurrentTime
   let expiry = addUTCTime ttl now
   liftIO . atomically $
@@ -357,7 +356,6 @@ prepareH PrepareReq {..} = do
     PrepareResp
       { txId = txIdTxt
       , txAbs
-      , proof
       , changeDelta = cd
       , witnessBundleHex
       }
@@ -397,7 +395,10 @@ commitH CommitReq {..} = do
                 Nothing -> do
                   liftIO . atomically $
                     modifyTVar' pending (Map.adjust (\p -> p {commitment = Just bigR}) wantedTxId)
-                  pure CommitResp {pi = 0, c = 0}
+                  let txIdVal = Api.getTxId (Api.getTxBody tx)
+                      commitmentBytes = ciphertextDigest ciphertext
+                      proof = ProofEd25519 (mkProof spSk txIdVal txAbsHash commitmentBytes)
+                  pure CommitResp {pi = proof, c = 0}
 
 finaliseH :: FinaliseReq -> AppM FinaliseResp
 finaliseH FinaliseReq {..} = do
@@ -421,6 +422,9 @@ finaliseH FinaliseReq {..} = do
           if now > expiry
             then pure $ FinaliseResp txId now (Rejected "pending expired")
             else do
+              unless
+                (isJust commitment)
+                (throwError err410 {errBody = "commitment must be made before submission"})
               _payload <- either throwError pure (decryptPendingPayload env pendingEntry)
               mClient <- liftIO . atomically $ do
                 registry <- readTVar clientRegistration
@@ -445,12 +449,12 @@ finaliseH FinaliseReq {..} = do
 
 registerH :: RegisterReq -> AppM RegisterResp
 registerH RegisterReq {publicKey} = do
-  Env {clientRegistration} <- ask
+  Env {clientRegistration, spSk} <- ask
   uuid <- liftIO nextRandom
   liftIO $
     atomically $
       modifyTVar' clientRegistration (Map.insert (ClientId uuid) (ClientRegistration publicKey))
-  pure RegisterResp {id = uuid}
+  pure RegisterResp {id = uuid, spPk = Ed.toPublic spSk}
 
 clientsH :: AppM ClientsResp
 clientsH = do
