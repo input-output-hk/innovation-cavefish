@@ -12,6 +12,7 @@ The main circuit, `wbps_cardano.circom`, implements **Cardano-style ElGamal encr
 
 ```
 wbps/
+├─ flake.nix                       # Nix shell, development environment
 ├─ circuits/
 │  └─ wbps_cardano.circom          # Main WBPS encryption + Schnorr challenge circuit
 │
@@ -35,6 +36,21 @@ wbps/
 
 ## ⚙️ Prerequisites
 
+- Using [NixOS](https://nixos.org/)
+- No NixOS
+
+###  Using NixOS
+
+All dependencies are managed via Nix flakes. To enter the development environment, run:
+
+```shell
+nix develop
+```
+This will drop you into a shell where [circom](https://docs.circom.io/), [snarkjs](https://github.com/iden3/snarkjs), Node.js, and Python are available.
+
+### No NixOS
+Install the following:
+
 - **circom** ≥ 2.1.0  
   Install globally:
   ```bash
@@ -51,17 +67,16 @@ wbps/
 
 ## 🚀 Quick Start
 
-You can build and verify the full proof in one command:
+From the `wps` folder, you can build and verify the full proof in one command:
 
 ```bash
-cd wbps
 make
 ```
 
 This performs:
 ```
 1. Clone circomlib into vendor/
-2. Compile wbps_cardano.circom → R1CS + WASM
+2. Compile wbps_cardano.circom → R1CS + WASM 
 3. Use example input (examples/wbps_cardano_input.json)
 4. Compute witness
 5. Setup proving keys (Powers of Tau)

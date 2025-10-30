@@ -29,3 +29,7 @@ tooling/inputgen/generated/
 
 # Keep curated example inputs
 !examples/*.json
+
+# nix
+.direnv/
+.envrc
