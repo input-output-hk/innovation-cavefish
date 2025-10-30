@@ -19,8 +19,8 @@
 //  signer_key                           |  X      — Signer’s public key (EdDSA/LC)
 //  solver_encryption_key                |  ek     — ElGamal encryption key of the SP
 //  commitment_randomizer_rho            |  ρ      — Random scalar used for commitment
-//  commitment_point                     |  R      — g^ρ (bit representation for transcript)
-//  commitment_g_rho                     |  C₀=g^ρ — Commitment base (curve point)
+//  commitment_point_bits                     |  R      — g^ρ (bit representation for transcript)
+//  f                     |  C₀=g^ρ — Commitment base (curve point)
 //  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, μ; ρ)
 //  message_public_part                  |  m_pub  — Public portion of μ
 //  message_private_part                 |  m_priv — Private overlay portion of μ
@@ -41,6 +41,24 @@
 //
 //   P1 – Commitment Scalar Correctness
 //        Confirms that the commitment scalar ρ is valid and used consistently:
+// ======================================================================
+// Mapping between Circuit Signals and Paper Notation
+// ----------------------------------------------------------------------
+//  Circuit Name                         |  Paper Symbol / Meaning
+// --------------------------------------|------------------------------------------
+//  signer_key                           |  X      — Signer’s public key (EdDSA/LC)
+//  solver_encryption_key                |  ek     — ElGamal encryption key of the SP
+//  commitment_randomizer_rho            |  ρ      — Random scalar used for commitment
+//  commitment_point_bits                |  C₀ = g^ρ — Commitment base (BabyJub affine point (x,y))
+//  commitment_point_affine              |  C₀=g^ρ — Commitment base (curve point)
+//  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, μ; ρ)
+//  message_public_part                  |  m_pub  — Public portion of μ
+//  message_private_part                 |  m_priv — Private overlay portion of μ
+//  rebuildMessage.out_message           |  μ      — Full reconstructed message bits
+//  rebuildCommitment.out_message_chunk  |  μ̂[i]  — Message limbs packed to Fr
+//  (internal) PRF in RebuildCommitment  |  PRF[i] — Pseudorandom mask from ek^ρ
+//  rebuildChallenge.out_challenge       |  c      — SHA-512 transcript digest
+// --------------------------------------|------------------------------------------
 //        (a) ρ is range-checked to [0, 2^251)
 //        (b) g^ρ is computed from the fixed BabyJub base g
 //        (c) ek^ρ is computed from the encryption key ek
@@ -130,7 +148,7 @@ template RebuildMessage(message_size, message_private_part_size, message_private
 //   out_commitment_g_rho[2]                       : g^ρ
 //
 // Property (P1):
-//   CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ) and top-level asserts commitment_g_rho == g^ρ
+//   CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ) and top-level asserts commitment_point_affine == g^ρ
 //   (range-limit ρ via Num2Bits(251); compute ek^ρ via EscalarMulAny; g^ρ via EscalarMulFix)
 // ======================================================================
 template CommitmentScalars() {
@@ -292,7 +310,7 @@ template RebuildChallenge(message_size) {
 // ----------------------------------------------------------------------
 // Orchestration (explicit):
 //   - P0: RebuildMessage(m_pub, m_priv) → μ
-//   - P1: CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ) and assert commitment_g_rho == g^ρ
+//   - P1: CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ) and assert commitment_point_affine == g^ρ
 //   - P2: RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF) and assert Cmsg[i] == μ̂[i] + PRF[i]
 //   - P3: RebuildChallenge(R, X, μ) → digest and assert challenge == digest
 // ======================================================================
@@ -306,8 +324,8 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
     signal input solver_encryption_key[2];
 
     // R = g^ρ (bits for transcript), C0 = g^ρ (affine), payload limbs, challenge
-    signal input commitment_point[256];
-    signal input commitment_g_rho[2];
+    signal input commitment_point_bits[256];
+    signal input commitment_point_affine[2];
     signal input commitment_randomizer_rho;
     signal input commitment_payload[nb_commitment_limbs];
     signal input challenge[64];
@@ -332,8 +350,8 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
     log(900010); log(commitmentScalars.out_commitment_g_rho[0]);
     log(900011); log(commitmentScalars.out_commitment_g_rho[1]);
 
-    commitment_g_rho[0] === commitmentScalars.out_commitment_g_rho[0];
-    commitment_g_rho[1] === commitmentScalars.out_commitment_g_rho[1];
+    commitment_point_affine[0] === commitmentScalars.out_commitment_g_rho[0];
+    commitment_point_affine[1] === commitmentScalars.out_commitment_g_rho[1];
 
     // P2
     component rebuildCommitment = RebuildCommitment(message_size, commitment_limb_size, nb_commitment_limbs);
@@ -353,7 +371,7 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
     // P3
     component rebuildChallenge = RebuildChallenge(message_size);
     for (var r = 0; r < 256; r++) {
-        rebuildChallenge.in_commitment_point[r] <== commitment_point[r];
+        rebuildChallenge.in_commitment_point[r] <== commitment_point_bits[r];
         rebuildChallenge.in_signer_key[r]       <== signer_key[r];
     }
     for (var m = 0; m < message_size; m++) {
@@ -369,12 +387,10 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
 // Public exposure (unchanged API & parameters)
 // ======================================================================
 component main { public [
-    signer_key,
-    solver_encryption_key,
-    commitment_point,
-    commitment_g_rho,
-    commitment_randomizer_rho,
-    commitment_payload,
-    challenge,
-    message_public_part
+    signer_key, // X
+    commitment_point_bits, // R
+    commitment_point_affine, // C₀=g^ρ
+    commitment_payload, // Com_tx   
+    challenge, // c
+    message_public_part // TxAbs
 ] } = CardanoWBPS(9*254, 333, 32);
