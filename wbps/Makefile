@@ -160,7 +160,9 @@ $(VENDOR_DIR):
 $(VENDOR_DIR)/circomlib/circuits/poseidon.circom: | $(VENDOR_DIR)
 	@echo "📥 [Deps] Cloning circomlib (shallow)"
 	rm -rf $(VENDOR_DIR)/circomlib
-	cd $(VENDOR_DIR) && git clone --depth=1 https://github.com/iden3/circomlib.git circomlib
+	cd $(VENDOR_DIR) && git clone https://github.com/iden3/circomlib.git circomlib
+	cd circomlib && git -c advice.detachedHead=false checkout 35e54ea21da3e8762557234298dbb553c175ea8d
+	cd ../..
 	@test -f $(VENDOR_DIR)/circomlib/circuits/poseidon.circom || { echo "❌ poseidon.circom missing"; exit 1; }
 
 deps-circomlib: $(VENDOR_DIR)/circomlib/circuits/poseidon.circom
