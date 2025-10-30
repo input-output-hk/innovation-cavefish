@@ -41,7 +41,7 @@ import Control.Monad.Reader (MonadIO (liftIO), MonadReader, ReaderT, ask, runRea
 import Control.Monad.State (MonadState (..), StateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (evalStateT)
-import Core.Api.Messages (ClientsResp, FinaliseResp, PendingResp, PrepareResp)
+import Core.Api.Messages (ClientsResp, CommitResp, FinaliseResp, PendingResp, PrepareResp (txId))
 import Core.Intent (IntentW)
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 (SecretKey)
