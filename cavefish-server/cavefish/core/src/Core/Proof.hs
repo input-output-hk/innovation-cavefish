@@ -2,10 +2,10 @@
 
 module Core.Proof where
 
-import Cardano.Api qualified as Api
-import Crypto.Error (CryptoFailable (..))
+import Cardano.Api (TxId, serialiseToRawBytes)
+import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed
-import Data.Aeson
+import Data.Aeson (FromJSON (parseJSON), ToJSON (toJSON), object, withObject, (.:), (.=))
 import Data.Aeson.Types (Parser)
 import Data.ByteArray qualified as BA
 import Data.ByteArray.Encoding qualified as BAE
@@ -17,8 +17,8 @@ import GHC.Generics (Generic)
 domainTag :: ByteString
 domainTag = "cavefish/v1"
 
-serializeTxId :: Api.TxId -> ByteString
-serializeTxId = Api.serialiseToRawBytes
+serializeTxId :: TxId -> ByteString
+serializeTxId = serialiseToRawBytes
 
 newtype Proof
   = Proof ByteString
@@ -35,14 +35,14 @@ instance FromJSON Proof where
     dataHex :: Text <- o .: "data"
     Proof <$> parseHex dataHex
 
-mkProof :: Ed.SecretKey -> Api.TxId -> ByteString -> ByteString -> Proof
+mkProof :: Ed.SecretKey -> TxId -> ByteString -> ByteString -> Proof
 mkProof sk txid txAbsHash commitmentBytes =
   let message = domainTag <> serializeTxId txid <> txAbsHash <> commitmentBytes
       signature = Ed.sign sk (Ed.toPublic sk) message
    in Proof (BA.convert signature)
 
 -- What the LC would call to verify
-verifyProof :: Ed.PublicKey -> Api.TxId -> ByteString -> ByteString -> Proof -> Bool
+verifyProof :: Ed.PublicKey -> TxId -> ByteString -> ByteString -> Proof -> Bool
 verifyProof pk txid txAbsHash commitmentBytes (Proof dataBs) =
   case Ed.signature dataBs of
     CryptoFailed _ -> False

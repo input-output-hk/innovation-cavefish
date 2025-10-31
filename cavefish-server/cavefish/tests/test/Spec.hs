@@ -10,43 +10,51 @@ module Spec (spec) where
 
 import Cardano.Api qualified as Api
 import Client.Impl qualified as Client
-import Client.Mock (MockClient (..), mkFinaliseReq)
+import Client.Mock (MockClient (mcRun), mkFinaliseReq)
 import Client.Mock qualified as Mock
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Cooked.MockChain.MockChainState (MockChainState)
-import Core.Api.AppContext (Env (..), runApp)
+import Core.Api.AppContext (Env (spSk), runApp)
 import Core.Api.Messages (
-  ClientInfo (..),
-  ClientsResp (..),
-  CommitReq (..),
-  CommitResp (..),
-  FinaliseReq (..),
-  FinaliseResp (..),
-  FinaliseResult (..),
-  PendingItem (..),
-  PendingResp (..),
-  PendingSummary (..),
-  PrepareReq (..),
-  PrepareResp (..),
-  RegisterReq (..),
-  RegisterResp (..),
-  SubmittedSummary (..),
-  TransactionResp (..),
+  ClientInfo (ClientInfo, clientId, publicKey),
+  ClientsResp (ClientsResp, clients),
+  CommitReq (CommitReq, bigR, txId),
+  CommitResp (CommitResp, pi),
+  FinaliseReq (FinaliseReq, lcSig, txId),
+  FinaliseResp (FinaliseResp, result, submittedAt, txId),
+  FinaliseResult (Finalised, Rejected),
+  PendingItem (PendingItem, clientId, expiresAt, txAbsHash, txId),
+  PendingResp (PendingResp, pending),
+  PendingSummary (PendingSummary, pendingClientId, pendingExpiresAt),
+  PrepareReq (PrepareReq, intent, observer),
+  PrepareResp (PrepareResp, txAbs, txId, witnessBundleHex),
+  RegisterReq (RegisterReq, publicKey),
+  RegisterResp (RegisterResp, id),
+  SubmittedSummary (SubmittedSummary, submittedAt, submittedClientId, submittedTx),
+  TransactionResp (TransactionMissing, TransactionPending, TransactionSubmitted),
   finaliseH,
   transactionH,
  )
 import Core.Api.State (
-  ClientId (..),
+  ClientId (ClientId),
   ClientRegistrationStore,
   CompleteStore,
-  Pending (..),
+  Pending (Pending, auxNonce, ciphertext, creator, expiry, rho, tx, txAbsHash),
   PendingStore,
  )
-import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
+import Core.Cbor (
+  ClientWitnessBundle (cwbAuxNonce, cwbCiphertext),
+  deserialiseClientWitnessBundle,
+ )
 import Core.CborSpec qualified as CborSpec
-import Core.Intent (BuildTxResult (..), IntentW (..), satisfies, toInternalIntent)
-import Core.PaymentProof (ProofResult (..), hashTxAbs)
+import Core.Intent (
+  BuildTxResult (BuildTxResult, changeDelta, tx, txAbs),
+  IntentW,
+  satisfies,
+  toInternalIntent,
+ )
+import Core.PaymentProof (ProofResult (ProofEd25519), hashTxAbs)
 import Core.Pke (ciphertextDigest)
 import Core.Proof (mkProof, renderHex)
 import Core.TxAbs (cardanoTxToTxAbs)
@@ -64,13 +72,20 @@ import Ledger.Tx (
  )
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.Wai.Handler.Warp qualified as Warp
-import Servant
-import Servant.Client (BaseUrl (..), Scheme (..))
+import Servant (Handler, Proxy (Proxy), runHandler', (:<|>) ((:<|>)))
+import Servant.Client (BaseUrl (BaseUrl))
 import Servant.Client qualified as SC
 import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
 import Sp.Server (CavefishApi, mkApp)
-import Test.Common
-import Test.Hspec
+import Test.Common (
+  testClientSecretKey,
+  testCommitSecretKey,
+  testIntentW,
+  testPkeSecretKey,
+  testSecretKey,
+  testSpWallet,
+ )
+import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
 
 runHandlerOrFail :: Handler a -> IO a
 runHandlerOrFail handler = do
@@ -350,7 +365,7 @@ spec = do
       let application = pure (mkApp env)
       Warp.testWithApplication application $ \port -> do
         manager <- newManager defaultManagerSettings
-        let baseUrl = BaseUrl Http "127.0.0.1" port ""
+        let baseUrl = BaseUrl SC.Http "127.0.0.1" port ""
             servantEnv = SC.mkClientEnv manager baseUrl
             ( prepareClient :<|> commitClient :<|> finaliseClient :<|> registerClient :<|> clientsClient
                 :<|> pendingClient

@@ -9,7 +9,7 @@ import Control.Monad (foldM, unless, when)
 import Cooked (
   BalanceOutputPolicy (DontAdjustExistingOutput),
   BalancingPolicy (BalanceWith),
-  MonadBlockChain (..),
+  MonadBlockChain (validateTxSkel),
   TxOpts (txOptBalanceOutputPolicy, txOptBalancingPolicy),
   TxSkel (
     txSkelOpts,
@@ -27,8 +27,8 @@ import Cooked (
   txSkelTemplate,
  )
 import Cooked.Skeleton.Payable qualified as Payable
-import Core.Api.AppContext (Env (..))
-import Core.Intent (Intent (..), source)
+import Core.Api.AppContext (Env (Env, resolveWallet, spFee, spWallet))
+import Core.Intent (Intent (irChangeTo, irMaxInterval, irMustMint, irPayTo, irSpendFrom), source)
 import Core.Observers.Observer (stakeValidatorFromBytes)
 import Data.ByteString (ByteString)
 import Data.List (nub)

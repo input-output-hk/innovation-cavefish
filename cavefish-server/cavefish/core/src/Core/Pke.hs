@@ -18,11 +18,11 @@ module Core.Pke (
 
 import Codec.CBOR.Encoding qualified as E
 import Codec.CBOR.Read (deserialiseFromBytes)
-import Codec.CBOR.Term (Term (..), decodeTerm)
+import Codec.CBOR.Term (Term (TBytes, TList), decodeTerm)
 import Codec.CBOR.Write qualified as Write
 import Crypto.Cipher.ChaChaPoly1305 qualified as ChaCha
-import Crypto.Error (CryptoFailable (..))
-import Crypto.Hash (SHA512 (..), hash)
+import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
+import Crypto.Hash (SHA512, hash)
 import Crypto.PubKey.Curve25519 qualified as Curve25519
 import Data.Bifunctor (first)
 import Data.ByteArray qualified as BA

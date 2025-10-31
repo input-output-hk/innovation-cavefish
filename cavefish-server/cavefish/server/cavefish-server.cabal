@@ -55,7 +55,8 @@ common project-config
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
-    -Wredundant-constraints -Wcompat
+    -Wredundant-constraints -Wcompat -Wunused-packages
+    -Wmissing-import-lists
 
 library
   import:          base, project-config
@@ -65,35 +66,21 @@ library
     Sp.Server
 
   build-depends:
-    , aeson
     , bytestring
     , cardano-api
-    , cardano-binary
-    , cardano-crypto-class
-    , cardano-ledger-alonzo
-    , cardano-ledger-core
     , cavefish-core
-    , cborg
-    , containers
     , cooked-validators
     , crypton
     , data-default
-    , memory
     , mtl
-    , plutus-core
     , plutus-ledger
-    , plutus-ledger-api
     , plutus-script-utils
-    , plutus-tx
-    , plutus-tx-plugin
     , servant
     , servant-server
     , stm
     , text
     , time
     , transformers
-    , transformers-either
-    , uuid
 
   if flag(ide-stub)
     cpp-options: -DIDE_STUB
@@ -120,7 +107,4 @@ test-suite test
   main-is:        Main.hs
   hs-source-dirs: test
   other-modules:  Spec
-  build-depends:
-    , cavefish-core
-    , cavefish-server
-    , hspec
+  build-depends:  hspec

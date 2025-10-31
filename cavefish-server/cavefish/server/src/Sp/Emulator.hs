@@ -10,26 +10,43 @@ module Sp.Emulator where
 
 import Cardano.Api qualified as Api
 import Control.Concurrent.STM (TVar, atomically, readTVarIO, writeTVar)
-import Control.Monad.Identity (Identity (..))
+import Control.Monad.Identity (runIdentity)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.State.Strict (runStateT)
-import Control.Monad.Trans.Writer (WriterT (..))
-import Cooked (MockChain, MockChainError, MockChainT (..), Wallet)
+import Control.Monad.Trans.Writer (WriterT (runWriterT))
+import Cooked (MockChain, MockChainError, MockChainT (unMockChain), Wallet)
 import Cooked.MockChain (registerStakingCred)
 import Cooked.MockChain.MockChainState (
-  MockChainState (..),
+  MockChainState,
   mockChainState0,
  )
-import Core.Api.AppContext (Env (..), defaultWalletResolver)
+import Core.Api.AppContext (
+  Env (
+    Env,
+    build,
+    clientRegistration,
+    complete,
+    pending,
+    pkePublic,
+    pkeSecret,
+    resolveWallet,
+    spFee,
+    spSk,
+    spWallet,
+    submit,
+    ttl
+  ),
+  defaultWalletResolver,
+ )
 import Core.Api.State (ClientRegistrationStore, CompleteStore, PendingStore)
 import Core.Intent (
-  BuildTxResult (..),
+  BuildTxResult (BuildTxResult, changeDelta, mockState, tx, txAbs),
   ChangeDelta,
   Intent,
  )
 import Core.Observers.Observer (stakeValidatorFromBytes)
 import Core.Pke (PkeSecretKey, toPublicKey)
-import Core.TxAbs (TxAbs (..), cardanoTxToTxAbs)
+import Core.TxAbs (TxAbs (outputs), cardanoTxToTxAbs)
 import Core.TxBuilder (buildTx)
 import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.ByteString (ByteString)
@@ -45,7 +62,7 @@ import Ledger.Tx (
  )
 import Ledger.Tx qualified as LedgerTx
 import Plutus.Script.Utils.Address qualified as ScriptAddr
-import Plutus.Script.Utils.Scripts (Language (PlutusV2), Versioned (..))
+import Plutus.Script.Utils.Scripts (Language (PlutusV2), Versioned (Versioned))
 
 -- | Create a Cooked environment for the Cavefish server using the provided
 -- parameters.

@@ -5,10 +5,10 @@ module Core.CborSpec (spec) where
 import Cardano.Api qualified as Api
 import Client.Mock qualified as Mock
 import Control.Concurrent.STM (newTVarIO)
-import Core.Api.Messages (PrepareReq (..))
-import Core.Api.State (ClientId (..))
+import Core.Api.Messages (PrepareReq (observer))
+import Core.Api.State (ClientId (ClientId))
 import Core.Cbor (maskTxBody, serialiseTxBody)
-import Core.Intent (BuildTxResult (..), toInternalIntent)
+import Core.Intent (BuildTxResult (BuildTxResult, tx), toInternalIntent)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
 import Data.UUID qualified as UUID

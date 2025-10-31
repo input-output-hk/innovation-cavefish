@@ -12,8 +12,11 @@
 module Core.Observers.Observer where
 
 import Cardano.Api qualified as Api
-import Cardano.Api.Shelley (PlutusScript (..))
-import Core.Intent (Intent (..), source)
+import Cardano.Api.Shelley (PlutusScript (PlutusScriptSerialised))
+import Core.Intent (
+  Intent (Intent, irChangeTo, irMaxFee, irMaxInterval, irMustMint, irPayTo, irSpendFrom),
+  source,
+ )
 import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (fromShort, toShort)
@@ -21,15 +24,15 @@ import Data.Coerce (coerce)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Ledger.Address qualified as LedgerAddr
-import Ledger.Slot (Slot (..))
+import Ledger.Slot (getSlot)
 import Ledger.Tx.CardanoAPI (fromCardanoPlutusScript)
 import Ledger.Value.CardanoAPI qualified as LedgerValue
 import Plutus.Script.Utils.Scripts (
   Language (PlutusV2),
-  Script (..),
+  Script,
   StakeValidator (StakeValidator, getStakeValidator),
   ToStakeValidator (toStakeValidator),
-  ToVersioned (..),
+  ToVersioned (toVersioned),
   Versioned (Versioned),
  )
 import Plutus.Script.Utils.V2 (toCardanoScript)

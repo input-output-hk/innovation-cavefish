@@ -10,7 +10,7 @@ let
     { config, pkgs, ... }:
 
     {
-      name = "my-project";
+      name = "cavefish";
 
       compiler-nix-name = lib.mkDefault "ghc966";
 
