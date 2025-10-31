@@ -14,6 +14,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Data.Text (Text)
+import GHC.Exts (IsList (toList))
 import GHC.Generics (Generic)
 import Ledger (
   Extended (Finite),
@@ -176,8 +177,8 @@ satisfies :: ChangeDelta -> Intent -> TxAbs Api.ConwayEra -> Bool
 satisfies cd Intent {..} tx =
   and
     [ -- MustMint: v ≤ tx.mint
-      let need = Map.fromList . Api.valueToList $ mconcat irMustMint
-          have = Map.fromList (Api.valueToList tx.absMint)
+      let need = Map.fromList . toList $ mconcat irMustMint
+          have = Map.fromList (toList tx.absMint)
        in Map.isSubmapOfBy (<=) need have
     , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
       -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
@@ -209,14 +210,14 @@ valueLeq :: Api.Value -> Api.Value -> Bool
 valueLeq need have =
   Map.isSubmapOfBy
     (<=)
-    (Map.fromList (Api.valueToList need))
-    (Map.fromList (Api.valueToList have))
+    (Map.fromList (toList need))
+    (Map.fromList (toList have))
 
 valueEq :: Api.Value -> Api.Value -> Bool
 valueEq a b = valueLeq a b && valueLeq b a
 
 valuePositive :: Api.Value -> Bool
-valuePositive = any (\(_, Api.Quantity q) -> q > 0) . Api.valueToList
+valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList
 
 outMatches ::
   Api.AddressInEra Api.ConwayEra ->
