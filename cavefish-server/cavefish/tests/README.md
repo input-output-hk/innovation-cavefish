@@ -1,8 +1,8 @@
 # Cavefish server
-Cavefish tests is a sub-project of the [cavefish](../../cabal.project).
+Cavefish tests is the test suite for cavefish server application. It contains integration tests and end-to-end tests to ensure the correctness and reliability of the cavefish server.
 
 ## Installing / Getting started
-> Using `nix` is most convinent way to install all dependencies.  Non nix user, may refer to the [github action script][def] to build their developement environment
+> Using `nix` is the most convenient way to install all dependencies.  Non nix user, may refer to the [github action script][def] to build their development environment.
 
 From cavefish-server folder:
 ```shell
