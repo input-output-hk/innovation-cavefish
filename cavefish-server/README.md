@@ -53,8 +53,8 @@ This produces:
 ### 5. Cleaning and Rebuilding Tags
 To start from scratch (e.g., after dependency changes):
 ```bash
-./gen-tags.sh clean
-./gen-tags.sh
+./scripts/gen-tags.sh clean
+./scripts/gen-tags.sh
 ```
 The `clean` command removes:
 - `.deps-src/` (cached dependency sources).
@@ -87,3 +87,6 @@ With the `ctagsx` extension installed:
 - For Vim/Emacs users, the `tags` file supports native tag navigation (e.g., `:tag` in Vim or `M-.` in Emacs).
 - If you modify `cabal.project` or dependencies, re-run `./gen-tags.sh` to update tags.
 - For large projects, tag generation may take a few minutes due to dependency fetching.
+
+## Runtime environment
+The nix shell adds the [cardano-nod](https://github.com/IntersectMBO/cardano-node/releases/tag/10.5.1) binary to the PATH. There is also the [node-runner.sh](./scripts/node-runner.sh) script that can be used to start a cardano node with the appropriate parameters for local testing. The [share](./share/) folder contains the correponding cardano-node 1.5.1 

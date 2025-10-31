@@ -2,9 +2,9 @@
 Cavefish server, http server, is a sub-project of the [cavefish](../../cabal.project).
 
 ## Installing / Getting started
-> Using `nix` is most convinent way to install all dependencies.  Non nix user, may refer to the [github action script][def] to build their developement environment
+> Using `nix` is the most convenient way to install all dependencies.  Non nix user, may refer to the [github action script][def] to build their development environment.
 
-From cavefish-server folder:
+From the cavefish-server folder:
 ```shell
 nix develope
 ```

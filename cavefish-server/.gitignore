@@ -31,3 +31,5 @@ cavefish-server/result-*
 # ====================================================
 .direnv
 .envrc
+
+var/
