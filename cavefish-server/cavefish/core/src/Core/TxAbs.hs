@@ -9,6 +9,7 @@ import Cardano.Ledger.Alonzo.Tx (AlonzoTx (AlonzoTx, wits))
 import Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits (AlonzoTxWits, txwitsVKey))
 import Cardano.Ledger.Keys.WitVKey qualified as LedgerWit
 import Data.Set qualified as Set
+import GHC.Exts (IsList (toList))
 import GHC.Generics (Generic)
 import Ledger (
   CardanoTx (CardanoEmulatorEraTx),
@@ -81,7 +82,7 @@ maskChangeOutput signerKeys =
           out : go rest
 
 valuePositive :: Api.Value -> Bool
-valuePositive = any (\(_, Api.Quantity q) -> q > 0) . Api.valueToList
+valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList
 
 zeroTxOutValue :: TxOut CtxTx Api.ConwayEra -> TxOut CtxTx Api.ConwayEra
 zeroTxOutValue (TxOut addr value datum refScript) =

@@ -34,6 +34,7 @@ import Data.ByteString (ByteString)
 import Data.List (nub)
 import Data.Text (Text)
 import Data.Text qualified as T
+import GHC.Exts (IsList (toList))
 import Ledger.Tx (CardanoTx)
 import Plutus.Script.Utils.Value qualified as PSV
 import PlutusLedgerApi.V1.Interval qualified as Interval
@@ -124,7 +125,7 @@ mkPayTo value addr Env {..} = do
 
 toLovelace :: Api.Value -> Either Text Integer
 toLovelace =
-  foldM step 0 . Api.valueToList
+  foldM step 0 . toList
   where
     step :: Integer -> (Api.AssetId, Api.Quantity) -> Either Text Integer
     step acc (aid, Api.Quantity q) =
