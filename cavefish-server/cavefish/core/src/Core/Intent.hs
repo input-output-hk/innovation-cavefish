@@ -5,23 +5,23 @@
 --     against built transactions.
 module Core.Intent where
 
-import Cardano.Api
+import Cardano.Api (ConwayEra, FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
 import Cooked (MockChainState)
-import Core.TxAbs (TxAbs (..))
+import Core.TxAbs (TxAbs (absFee, absMint, outputs, sigKeys, validityInterval))
 import Data.Foldable (foldl)
 import Data.List.NonEmpty (NonEmpty)
-import Data.Map as Map
+import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Data.Text (Text)
-import GHC.Generics
+import GHC.Generics (Generic)
 import Ledger (
-  Extended (..),
-  Interval (..),
-  LowerBound (..),
+  Extended (Finite),
+  Interval (Interval),
+  LowerBound (LowerBound),
   PubKey,
   Slot,
-  UpperBound (..),
+  UpperBound (UpperBound),
   cardanoPubKeyHash,
   pubKeyHash,
  )
@@ -176,8 +176,8 @@ satisfies :: ChangeDelta -> Intent -> TxAbs Api.ConwayEra -> Bool
 satisfies cd Intent {..} tx =
   and
     [ -- MustMint: v ≤ tx.mint
-      let need = Map.fromList . valueToList $ mconcat irMustMint
-          have = Map.fromList (valueToList tx.absMint)
+      let need = Map.fromList . Api.valueToList $ mconcat irMustMint
+          have = Map.fromList (Api.valueToList tx.absMint)
        in Map.isSubmapOfBy (<=) need have
     , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
       -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)

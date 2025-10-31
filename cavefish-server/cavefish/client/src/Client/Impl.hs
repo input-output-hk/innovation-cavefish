@@ -23,7 +23,7 @@ module Client.Impl (
 ) where
 
 import Client.Mock (
-  MockClient (..),
+  MockClient (mcRun),
   RunServer,
   as422,
   finaliseWithClient,
@@ -38,15 +38,15 @@ import Client.Mock (
  )
 import Control.Monad.Except (MonadError, liftEither, throwError)
 import Control.Monad.Reader (MonadIO (liftIO), MonadReader, ReaderT, ask, runReaderT)
-import Control.Monad.State (MonadState (..), StateT, modify)
+import Control.Monad.State (MonadState, StateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (evalStateT)
 import Core.Api.Messages (ClientsResp, CommitResp, FinaliseResp, PendingResp, PrepareResp (txId))
 import Core.Intent (IntentW)
-import Crypto.Error (CryptoFailable (..))
+import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 (SecretKey)
 import Crypto.PubKey.Ed25519 qualified as Ed
-import Crypto.Random (MonadRandom (..))
+import Crypto.Random (MonadRandom (getRandomBytes))
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import Data.Map (Map)

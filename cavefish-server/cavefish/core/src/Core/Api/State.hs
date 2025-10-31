@@ -1,6 +1,6 @@
 module Core.Api.State where
 
-import Cardano.Api
+import Cardano.Api (ConwayEra, FromJSON, ToJSON, Tx, TxId)
 import Cooked.MockChain.MockChainState (MockChainState)
 import Core.Pke (PkeCiphertext)
 import Crypto.PubKey.Ed25519 (PublicKey)

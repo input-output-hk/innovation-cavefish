@@ -4,8 +4,27 @@
 
 module Sp.Server where
 
-import Core.Api.AppContext (AppM, Env (..), runApp)
-import Core.Api.Messages
+import Core.Api.AppContext (AppM, Env, runApp)
+import Core.Api.Messages (
+  ClientsResp,
+  CommitReq,
+  CommitResp,
+  FinaliseReq,
+  FinaliseResp,
+  PendingResp,
+  PrepareReq,
+  PrepareResp,
+  RegisterReq,
+  RegisterResp,
+  TransactionResp,
+  clientsH,
+  commitH,
+  finaliseH,
+  pendingH,
+  prepareH,
+  registerH,
+  transactionH,
+ )
 import Data.Text (Text)
 import Servant (
   Application,
@@ -14,13 +33,12 @@ import Servant (
   HasServer (ServerT),
   JSON,
   Post,
-  Proxy (..),
+  Proxy (Proxy),
   ReqBody,
   hoistServer,
   serve,
-  type (:<|>) (..),
-  type (:>),
  )
+import Servant.API ((:<|>) ((:<|>)), (:>))
 
 type CavefishApi =
   "prepare" :> ReqBody '[JSON] PrepareReq :> Post '[JSON] PrepareResp

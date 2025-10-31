@@ -55,7 +55,8 @@ common project-config
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
-    -Wredundant-constraints -Wcompat
+    -Wredundant-constraints -Wcompat -Wunused-packages
+    -Wmissing-import-lists
 
 library
   import:          base, project-config
@@ -65,35 +66,16 @@ library
     Client.Mock
 
   build-depends:
-    , aeson
     , bytestring
     , cardano-api
-    , cardano-binary
-    , cardano-crypto-class
-    , cardano-ledger-alonzo
-    , cardano-ledger-core
     , cavefish-core
-    , cborg
     , containers
-    , cooked-validators
     , crypton
-    , data-default
     , memory
     , mtl
-    , plutus-core
-    , plutus-ledger
-    , plutus-ledger-api
-    , plutus-script-utils
-    , plutus-tx
-    , plutus-tx-plugin
-    , servant
     , servant-server
-    , stm
     , text
-    , time
     , transformers
-    , transformers-either
-    , uuid
 
   -- TODO need to remove this dependency
   if flag(ide-stub)
@@ -104,11 +86,6 @@ executable cavefish-client
   hs-source-dirs: app
   main-is:        Main.hs
   build-depends:
-    , bytestring
-    , cooked-validators
-    , crypton
-    , stm
-    , warp
 
   if flag(ide-stub)
     cpp-options: -DIDE_STUB
@@ -120,28 +97,5 @@ test-suite test
   hs-source-dirs: test
   other-modules:
   build-depends:
-    , aeson
-    , base16-bytestring
-    , bytestring
-    , cardano-api
-    , cardano-crypto-class
-    , cardano-ledger-alonzo
-    , cardano-ledger-core
     , cavefish-client
-    , cavefish-core
-    , cborg
-    , containers
-    , cooked-validators
-    , crypton
-    , data-default
     , hspec
-    , http-client
-    , memory
-    , mtl
-    , plutus-ledger
-    , plutus-ledger-api
-    , plutus-script-utils
-    , stm
-    , text
-    , transformers
-    , uuid

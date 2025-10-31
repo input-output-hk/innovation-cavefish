@@ -7,7 +7,7 @@ module Main where
 import Control.Concurrent.STM (newTVarIO)
 import Cooked (wallet)
 import Core.Pke (deriveSecretKey)
-import Crypto.Error (CryptoFailable (..))
+import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.ByteString qualified as BS
 import Network.Wai.Handler.Warp qualified as Warp
