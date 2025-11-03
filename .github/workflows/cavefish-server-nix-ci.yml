@@ -1,0 +1,24 @@
+name: Haskell build and test
+
+on:
+  push:
+    branches: [ "master", "release/**" ]
+    paths:
+      - 'cavefish-server/**'
+      - '.github/workflows/cavefish-server-nix-ci.yml'
+
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - 'cavefish-server/**'
+      - '.github/workflows/cavefish-server-nix-ci.yml'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./cavefish-server
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - run: nix develop --command cabal build all
