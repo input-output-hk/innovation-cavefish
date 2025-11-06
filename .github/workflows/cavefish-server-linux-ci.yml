@@ -61,6 +61,32 @@ jobs:
       with:
         use-sodium-vrf: false # default is true
 
+    - name: Setup Node.js (for snarkjs)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Setup Rust (for circom)
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Cargo registry (circom build)
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.cache/sccache
+        key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-${{ runner.os }}-
+
+    - name: Install circom & snarkjs
+      run: |
+        cargo install --git https://github.com/iden3/circom --locked --force
+        npm install -g snarkjs@^0.7.0
+        circom --version
+        snarkjs -v || true
+
     - name: Install Haskell
       id: install-haskell
       uses: input-output-hk/actions/haskell@latest
