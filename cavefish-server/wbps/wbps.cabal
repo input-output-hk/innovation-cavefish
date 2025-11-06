@@ -84,7 +84,7 @@ test-suite wbps-unit-tests
     type:             exitcode-stdio-1.0
     hs-source-dirs:   tests/unit
     main-is:          Main.hs
-    other-modules:  Spec
+    other-modules:  
     build-depends:
         , wbps
         , tasty

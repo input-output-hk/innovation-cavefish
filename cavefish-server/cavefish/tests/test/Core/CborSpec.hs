@@ -14,7 +14,8 @@ import Data.Text qualified as T
 import Data.UUID qualified as UUID
 import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
 import Test.Common
-import Test.Hspec
+    ( testIntentW, testSpWallet, testSecretKey, testPkeSecretKey )
+import Test.Hspec ( Spec, describe, it, expectationFailure )
 
 spec :: Spec
 spec =

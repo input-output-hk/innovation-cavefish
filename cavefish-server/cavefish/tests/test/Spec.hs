@@ -21,7 +21,7 @@ import Core.Api.Messages (
   ClientsResp (ClientsResp, clients),
   CommitReq (CommitReq, bigR, txId),
   CommitResp (CommitResp, pi),
-  FinaliseReq (FinaliseReq, lcSig, txId),
+  FinaliseReq (FinaliseReq, lcSig),
   FinaliseResp (FinaliseResp, result, submittedAt, txId),
   FinaliseResult (Finalised, Rejected),
   PendingItem (PendingItem, clientId, expiresAt, txAbsHash, txId),

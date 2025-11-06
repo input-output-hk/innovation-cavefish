@@ -4,12 +4,12 @@ module Test.Common where
 
 import Cardano.Api qualified as Api
 import Cooked (Wallet, wallet)
-import Core.Intent (AddressW (..), IntentW (..))
+import Core.Intent (AddressW (AddressW), IntentW(AndExpsW, PayToW,SpendFromW)  )
 import Core.Pke (PkeSecretKey, deriveSecretKey)
-import Crypto.Error (CryptoFailable (..))
+import Crypto.Error (CryptoFailable (CryptoPassed, CryptoFailed))
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.ByteString qualified as BS
-import Data.List.NonEmpty
+import Data.List.NonEmpty ( NonEmpty((:|)) )
 import Data.Text (Text)
 import Ledger.Tx.CardanoAPI (toCardanoAddressInEra)
 import Plutus.Script.Utils.Address qualified as ScriptAddr
