@@ -1,0 +1,113 @@
+cabal-version:      3.4
+name:               wbps
+
+-- The package version.
+-- See the Haskell package versioning policy (PVP) for standards
+-- guiding when and how versions should be incremented.
+-- https://pvp.haskell.org
+-- PVP summary:     +-+------- breaking API changes
+--                  | | +----- non-breaking API additions
+--                  | | | +--- code changes with no API change
+version:            0.1.0.0
+homepage:           https://github.com/input-output-hk/innovation-cavefish
+license:            Apache-2.0
+license-file:       LICENSE
+author:             Nicolas Henin
+maintainer:         mr.henin@gmail.com
+category:           Cryptography
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+
+common base
+  build-depends: base >=4.9 && <5
+
+common project-config
+  default-language:   GHC2021
+  default-extensions:
+    DataKinds
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    DuplicateRecordFields
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    ImportQualifiedPost
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedRecordDot
+    OverloadedStrings
+    PolyKinds
+    RankNTypes
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    StandaloneKindSignatures
+    TypeApplications
+    TypeFamilies
+    TypeOperators
+    ViewPatterns
+
+library
+    import: base, project-config
+    hs-source-dirs: lib
+    exposed-modules:  
+        WBPS
+        WBPS.Core
+        WBPS.Core.Primitives.Snarkjs
+        WBPS.Core.Primitives.SnarkjsOverFileScheme
+        WBPS.Core.Primitives.Circom
+        WBPS.Core.FileScheme
+        WBPS.Adapter.CardanoCryptoClass.Crypto
+        WBPS.Adapter.Data  
+    build-depends:
+      ,  bytestring
+      ,  shh ^>= 0.7.3
+      ,  path ^>= 0.9.6
+      ,  path-io ^>= 1.8.2
+      , transformers
+      , validation
+      , mtl
+      , cardano-crypto-class
+      , text
+      , hex-text
+      , aeson
+
+
+
+test-suite wbps-unit-tests
+
+    import: base, project-config
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   tests/unit
+    main-is:          Main.hs
+    other-modules:  Spec
+    build-depends:
+        , wbps
+        , tasty
+        , tasty-hunit
+        , tasty-quickcheck
+
+test-suite wbps-integration-tests
+
+    import: base, project-config
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   tests/integration
+    main-is:          Main.hs
+    other-modules:  
+      WBPS.Specs.NominalCase
+      WBPS.Specs.Adapter.GenCardanoKeys
+      WBPS.Specs.Adapter.Test
+    build-depends:
+        , path ^>=0.9.6
+        , path-io ^>=1.8.2
+        , wbps
+        , tasty
+        , tasty-hunit
+        , tasty-quickcheck
+        , bytestring
+        , QuickCheck
+        , cardano-crypto-class

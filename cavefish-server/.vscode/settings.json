@@ -3,5 +3,6 @@
   "ctags.executeAtStartup": true,
   "ctags.onSave": true,
   "ctags.command": "./gen-tags.sh",
-  "editor.gotoLocation.multipleDefinitions": "goto"
+  "editor.gotoLocation.multipleDefinitions": "goto",
+  "editor.fontLigatures": true
 }

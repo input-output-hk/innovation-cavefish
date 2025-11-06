@@ -86,7 +86,7 @@ mkFinaliseReq secretKey txId txAbsHash =
    in FinaliseReq {txId = txId, lcSig = BA.convert signature}
 
 verifyCommitProof :: Ed.PublicKey -> PrepareResp -> CommitResp -> Either Text ()
-verifyCommitProof publicKey PrepareResp {txId = txIdText, txAbs, witnessBundleHex} CommitResp {pi} = do
+verifyCommitProof publicKey PrepareResp {txId = txIdText, txAbs, witnessBundleHex} CommitResp {pi = piGiven} = do
   witnessBytes <- decodeHex "witness bundle" witnessBundleHex
   ClientWitnessBundle {cwbCiphertext = ciphertext, cwbAuxNonce = auxNonceBytes, cwbTxId = bundleTxId} <-
     first (const "failed to decode witness bundle") (deserialiseClientWitnessBundle witnessBytes)
@@ -96,7 +96,7 @@ verifyCommitProof publicKey PrepareResp {txId = txIdText, txAbs, witnessBundleHe
       Right v -> Right v
   let expectedTxIdBytes = Api.serialiseToRawBytes txId
   when (bundleTxId /= expectedTxIdBytes) $ Left "witness bundle tx id mismatch"
-  verifyPaymentProof publicKey pi txAbs txId ciphertext auxNonceBytes
+  verifyPaymentProof publicKey piGiven txAbs txId ciphertext auxNonceBytes
 
 -- | Register the client with the server.
 registerClient :: RunServer -> Ed.PublicKey -> Handler RegisterResp

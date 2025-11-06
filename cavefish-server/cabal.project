@@ -1,9 +1,11 @@
 packages:
-  -- remove cavefis
+  wbps/wbps.cabal
   cavefish/core/cavefish-core.cabal
   cavefish/client/cavefish-client.cabal
   cavefish/server/cavefish-server.cabal
   cavefish/tests/cavefish-tests.cabal
+
+tests: True
 
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
