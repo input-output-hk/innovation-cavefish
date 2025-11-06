@@ -35,12 +35,13 @@ import Data.ByteString.Lazy qualified as BL
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
+import GHC.IsList (IsList (toList))
 import Ledger (Slot (Slot))
 import Ledger.Crypto (PubKey (PubKey))
 import PlutusLedgerApi.V1 (fromBuiltin)
 import PlutusLedgerApi.V1.Bytes (LedgerBytes (LedgerBytes))
 import PlutusLedgerApi.V1.Interval qualified as Interval
-import GHC.IsList(IsList(toList))
+
 serialiseTxAbs :: TxAbs Api.ConwayEra -> ByteString
 serialiseTxAbs = Write.toStrictByteString . encodeTxAbs
 

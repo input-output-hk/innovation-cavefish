@@ -1,23 +1,22 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
+module WBPS.Core.Primitives.Circom (
 
-module WBPS.Core.Primitives.Circom 
-    ( 
-    ) where
+) where
 
-import Shh
+import Control.Monad.Trans.Maybe
+import Data.Bool (bool)
+import Data.ByteString
 import Path
 import Path.IO
-import Data.ByteString
-import Data.Bool (bool)
-import Control.Monad.Trans.Maybe
+import Shh
 
-load SearchPath
-    [ "echo"
-    , "circom"
-    ]
+load
+  SearchPath
+  [ "echo"
+  , "circom"
+  ]
 
-
--- compile 
+-- compile

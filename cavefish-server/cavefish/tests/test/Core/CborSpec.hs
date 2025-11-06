@@ -13,9 +13,13 @@ import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
 import Data.UUID qualified as UUID
 import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
-import Test.Common
-    ( testIntentW, testSpWallet, testSecretKey, testPkeSecretKey )
-import Test.Hspec ( Spec, describe, it, expectationFailure )
+import Test.Common (
+  testIntentW,
+  testPkeSecretKey,
+  testSecretKey,
+  testSpWallet,
+ )
+import Test.Hspec (Spec, describe, expectationFailure, it)
 
 spec :: Spec
 spec =
