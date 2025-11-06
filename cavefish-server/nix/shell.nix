@@ -44,8 +44,17 @@ let
 
   tools = allTools.${ghc};
 
-  cardano-node = inputs.cardano-node.legacyPackages.${pkgs.system}.cardano-node;
-  cardano-cli = inputs.cardano-node.legacyPackages.${pkgs.system}.cardano-cli;
+  cardanoPackages =
+    if pkgs.hostPlatform.isAarch64 then
+      [ ]
+    else
+      let
+        legacy = inputs.cardano-node.legacyPackages.${pkgs.system};
+      in
+      [
+        legacy.cardano-node
+        legacy.cardano-cli
+      ];
   preCommitCheck = inputs.pre-commit-hooks.lib.${pkgs.system}.run {
 
     src = lib.cleanSources ../.;
@@ -132,10 +141,7 @@ let
       commonPkgs
       darwinPkgs
       linuxPkgs
-      [
-        cardano-node
-        cardano-cli
-      ]
+      cardanoPackages
     ];
 
     withHoogle = true;
