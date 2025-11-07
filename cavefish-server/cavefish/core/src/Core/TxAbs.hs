@@ -57,6 +57,7 @@ extractSignerKeys (ShelleyTx _ AlonzoTx {wits = AlonzoTxWits {txwitsVKey}}) =
       let rawKey = rawSerialiseVerKeyDSIGN (unVKey vkey)
        in PubKey (fromBytes rawKey)
 
+-- TODO WG: make these comments clearer
 -- This is in accordance with the paper's statement (section 23:9):
 -- The value of the first output is zeroed out to allow for
 -- any leftover input funds to be returned to the LC’s change address.
@@ -64,22 +65,24 @@ maskChangeOutput ::
   Set.Set PubKey ->
   [TxOut CtxTx Api.ConwayEra] ->
   [TxOut CtxTx Api.ConwayEra]
-maskChangeOutput signerKeys =
-  go
+maskChangeOutput signerKeys outs =
+  snd (foldr step (False, []) outs)
   where
     signerHashes = Set.fromList (map pubKeyHash (Set.toList signerKeys))
 
-    go :: [TxOut CtxTx Api.ConwayEra] -> [TxOut CtxTx Api.ConwayEra]
-    go [] = []
-    go (out@(TxOut addr value datum refScript) : rest)
+    step ::
+      TxOut CtxTx Api.ConwayEra ->
+      (Bool, [TxOut CtxTx Api.ConwayEra]) ->
+      (Bool, [TxOut CtxTx Api.ConwayEra])
+    step out@(TxOut addr value datum refScript) (masked, acc)
+      | masked = (masked, out : acc)
       | Just pkh <- cardanoPubKeyHash addr
       , Set.member pkh signerHashes
       , valuePositive (Api.txOutValueToValue value) =
-          -- Mask the first positive output controlled by a signer; this is the
+          -- Mask the first (from the right) positive output controlled by a signer; this is the
           -- change output that the paper requires us to hide.
-          zeroTxOutValue (TxOut addr value datum refScript) : go rest
-      | otherwise =
-          out : go rest
+          (True, zeroTxOutValue (TxOut addr value datum refScript) : acc)
+      | otherwise = (masked, out : acc)
 
 valuePositive :: Api.Value -> Bool
 valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList

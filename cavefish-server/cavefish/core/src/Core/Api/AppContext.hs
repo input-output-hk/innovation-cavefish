@@ -32,7 +32,7 @@ data Env = Env
   , pkePublic :: PkePublicKey
   , build ::
       Intent ->
-      ByteString ->
+      Maybe ByteString ->
       IO BuildTxResult
   , submit ::
       Api.Tx Api.ConwayEra ->

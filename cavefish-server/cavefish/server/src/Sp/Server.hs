@@ -26,8 +26,9 @@ import Core.Api.Messages (
   transactionH,
  )
 import Data.Text (Text)
+import Network.Wai (Application)
+import Network.Wai.Middleware.Cors (CorsResourcePolicy (..), cors, simpleCorsResourcePolicy)
 import Servant (
-  Application,
   Capture,
   Get,
   HasServer (ServerT),
@@ -75,7 +76,14 @@ cavefishApi :: Proxy CavefishApi
 cavefishApi = Proxy
 
 mkApp :: Env -> Application
-mkApp env = serve cavefishApi (hoistServer cavefishApi (runApp env) server)
+mkApp env =
+  let policy =
+        simpleCorsResourcePolicy
+          { corsRequestHeaders = ["Content-Type"]
+          , corsMethods = ["GET", "POST", "OPTIONS"]
+          }
+   in cors (const $ Just policy) $
+        serve cavefishApi (hoistServer cavefishApi (runApp env) server)
 
 server :: ServerT CavefishApi AppM
 server = prepareH :<|> commitH :<|> finaliseH :<|> registerH :<|> clientsH :<|> pendingH :<|> transactionH

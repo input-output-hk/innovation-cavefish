@@ -76,7 +76,7 @@ mkPrepareReq :: ClientId -> IntentW -> Either Text PrepareReq
 mkPrepareReq clientId intentW = do
   internalIntent <- toInternalIntent intentW
   observerBytes <- intentStakeValidatorBytes internalIntent
-  pure PrepareReq {intent = intentW, observer = observerBytes, clientId}
+  pure PrepareReq {intent = intentW, observer = Just observerBytes, clientId}
 
 -- | Create a FinaliseReq from the given secret key, transaction ID, and transaction abstract hash.
 mkFinaliseReq :: Ed.SecretKey -> Text -> ByteString -> FinaliseReq

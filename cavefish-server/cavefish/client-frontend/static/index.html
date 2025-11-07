@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Cavefish Demo Wizard</title>
+  <style>
+    .step {
+      display: none;
+    }
+
+    .step.active {
+      display: block;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .actions>* {
+      flex: 0 0 auto;
+    }
+
+    .addressPickerControls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 8px;
+      align-items: end;
+    }
+
+    .addressPickerControls>div {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .addressPickerControls select,
+    .addressPickerControls button {
+      width: 100%;
+    }
+
+    .intentBuilder {
+      border: 1px solid;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 16px 0;
+    }
+
+    .intentItem {
+      border: 1px solid;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 12px;
+    }
+
+    .intentItemHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .intentItemHeader h4 {
+      margin: 0;
+    }
+
+    .removeIntentBtn {
+      background: none;
+      border: 1px solid;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .intentAddActions {
+      margin-bottom: 8px;
+    }
+
+    .intentPayToList {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .payToCard textarea {
+      min-height: 60px;
+    }
+
+    .payToPicker {
+      margin-top: 8px;
+    }
+
+    .payToPickerRow {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .payToPickerRow select {
+      flex: 1 1 auto;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Cavefish Demo</h2>
+
+  <form id="wizardForm" autocomplete="off">
+    <label for="apiBase">Service URL</label>
+    <input id="apiBase" type="text" value="http://localhost:8080">
+
+    <label for="helperBase">Helpers URL</label>
+    <input id="helperBase" type="text" value="http://localhost:8081">
+
+    <!-- Step 1 -->
+    <section class="step active" id="step1">
+      <h3>Step 1: Register Client</h3>
+      <label for="clientSecret">Client Secret (hex)</label>
+      <textarea id="clientSecret" spellcheck="false"></textarea>
+
+      <label for="pk">Derived Public Key (hex)</label>
+      <input id="pk" type="text" spellcheck="false" autocomplete="off" readonly>
+
+      <div class="actions">
+        <button id="generateKeyBtn" type="button">Generate Key Pair</button>
+        <button id="registerBtn" type="button">Register</button>
+      </div>
+
+      <p>Generated secret:</p>
+      <pre id="clientSecretDisplay"></pre>
+      <div class="status" id="registerStatus"></div>
+      <pre id="registerOutput"></pre>
+    </section>
+
+    <!-- Step 2 -->
+    <section class="step" id="step2">
+      <h3>Step 2: Build Intent</h3>
+      <label for="clientId">Client ID</label>
+      <input id="clientId" type="text" spellcheck="false" autocomplete="off">
+
+      <div class="intentBuilder">
+        <p>Select which intent clauses to include. Add one or more PayTo outputs, then optional constraints.</p>
+        <div class="actions intentAddActions">
+          <button type="button" id="addPayToBtn">+ Add PayTo</button>
+          <button type="button" id="addMaxFeeBtn" disabled>+ Add Max Fee</button>
+          <button type="button" id="addMaxIntervalBtn" disabled>+ Add Max Interval</button>
+        </div>
+
+        <div id="payToList" class="intentPayToList"></div>
+        <p class="hint" id="payToEmptyHint">No PayTo outputs yet. Click “+ Add PayTo” to add recipients.</p>
+
+        <div class="intentItem" id="fundingIntentItem">
+          <div class="intentItemHeader">
+            <h4>Funding & Change</h4>
+          </div>
+
+          <label for="spendFromAddress">Spend from address</label>
+          <textarea id="spendFromAddress" spellcheck="false"></textarea>
+
+          <label for="changeToAddress">Change to address</label>
+          <textarea id="changeToAddress" spellcheck="false"></textarea>
+
+          <div class="addressPicker">
+            <div class="addressPickerControls">
+              <div>
+                <label for="demoSpendSelect">SpendFrom Address</label>
+                <select id="demoSpendSelect"></select>
+                <button type="button" id="fillSpendBtn">Use</button>
+              </div>
+              <div>
+                <label for="demoChangeSelect">ChangeTo Address</label>
+                <select id="demoChangeSelect"></select>
+                <button type="button" id="fillChangeBtn">Use</button>
+              </div>
+            </div>
+            <div class="status" id="addressStatus"></div>
+          </div>
+        </div>
+
+        <div class="intentItem" id="maxFeeIntentItem" hidden>
+          <div class="intentItemHeader">
+            <h4>Max Fee</h4>
+            <button type="button" id="removeMaxFeeBtn" class="removeIntentBtn">Remove</button>
+          </div>
+          <label for="maxFee">Max Fee (lovelace)</label>
+          <input id="maxFee" type="number" min="1" step="1" />
+        </div>
+
+        <div class="intentItem" id="maxIntervalIntentItem" hidden>
+          <div class="intentItemHeader">
+            <h4>Max Interval</h4>
+            <button type="button" id="removeMaxIntervalBtn" class="removeIntentBtn">Remove</button>
+          </div>
+          <label for="maxInterval">Max Interval (slots)</label>
+          <input id="maxInterval" type="number" min="1" step="1" />
+        </div>
+      </div>
+
+      <p>Constructed intent</p>
+      <pre id="intentPreview"></pre>
+
+      <div class="actions">
+        <button id="buildIntentBtn" type="button">Build Intent</button>
+        <button id="prepareBtn" type="button">Prepare</button>
+      </div>
+      <div class="status" id="buildStatus"></div>
+      <div class="status" id="prepareStatus"></div>
+      <pre id="prepareOutput"></pre>
+    </section>
+
+    <!-- Step 3 -->
+    <section class="step" id="step3">
+      <h3>Step 3: Check Intent Satisfaction</h3>
+      <p>Confirm the prepared transaction satisfies the intent.</p>
+      <div class="actions">
+        <button id="runSatisfiesBtn" type="button">Run Check</button>
+        <button id="toCommitBtn" type="button">Continue to Commit</button>
+      </div>
+      <div class="status" id="satisfiesStatus"></div>
+      <pre id="satisfiesOutput"></pre>
+    </section>
+
+    <!-- Step 4 -->
+    <section class="step" id="step4">
+      <h3>Step 4: Commit</h3>
+      <label for="commitTxId">Transaction ID</label>
+      <input id="commitTxId" type="text" spellcheck="false" autocomplete="off" readonly>
+
+      <label for="bigR">Big R</label>
+      <textarea id="bigR" spellcheck="false" readonly></textarea>
+
+      <label for="littleR">Little r</label>
+      <textarea id="littleR" spellcheck="false" readonly></textarea>
+
+      <div class="actions">
+        <button id="generateCommitBtn" type="button">Generate Commitment</button>
+        <button id="commitBtn" type="button">Commit</button>
+      </div>
+      <div class="status" id="commitStatus"></div>
+      <pre id="commitOutput"></pre>
+    </section>
+
+    <!-- Step 5 -->
+    <section class="step" id="step5">
+      <h3>Step 5: Verify Proof</h3>
+      <p>Verify the service provider's proof before finalising.</p>
+      <div class="actions">
+        <button id="runVerifyBtn" type="button">Run Verification</button>
+        <button id="toFinaliseBtn" type="button">Continue to Finalise</button>
+      </div>
+      <div class="status" id="verifyStatus"></div>
+      <pre id="verifyOutput"></pre>
+    </section>
+
+    <!-- Step 6 -->
+    <section class="step" id="step6">
+      <h3>Step 6: Finalise</h3>
+      <label for="finaliseTxId">Transaction ID</label>
+      <input id="finaliseTxId" type="text" spellcheck="false" autocomplete="off" readonly>
+
+      <label for="finaliseSecret">Client Secret (hex)</label>
+      <textarea id="finaliseSecret" spellcheck="false"></textarea>
+
+      <label for="lcSig">LC Signature (hex)</label>
+      <textarea id="lcSig" spellcheck="false"></textarea>
+
+      <div class="actions">
+        <button id="finaliseBtn" type="button">Submit</button>
+      </div>
+      <div class="status" id="finaliseStatus"></div>
+      <pre id="finaliseOutput"></pre>
+
+      <h4>Submitted Transaction</h4>
+      <div class="actions">
+        <button id="fetchTxBtn" type="button">Fetch Transaction</button>
+      </div>
+      <div class="status" id="transactionStatus"></div>
+      <pre id="transactionOutput"></pre>
+    </section>
+  </form>
+
+  <script>
+    (function () {
+      const elements = collectElements();
+      const steps = Array.from(document.querySelectorAll('.step'));
+      const state = createInitialState();
+      const formatJson = (value) => JSON.stringify(value, null, 2);
+      const { resetStatus, showError, showInfo } = createStatusHandlers(elements);
+      const { currentBase, currentHelperBase } = createBaseResolvers(elements);
+      const {
+        requestService,
+        requestHelper,
+        requestServiceGet,
+        requestHelperGet,
+        requestHelperSilent,
+      } = createRequestHelpers({ currentBase, currentHelperBase, resetStatus, showInfo });
+      const intentBuilder = createIntentBuilder({
+        elements,
+        state,
+        formatJson,
+        showError,
+        showInfo,
+      });
+
+      const updateSecretDisplay = (value) => {
+        elements.clientSecretDisplay.textContent = value ? value : 'No secret loaded.';
+      };
+
+      updateSecretDisplay(elements.clientSecret.value.trim());
+
+      if (elements.fillSpendBtn) {
+        elements.fillSpendBtn.disabled = true;
+      }
+      if (elements.fillChangeBtn) {
+        elements.fillChangeBtn.disabled = true;
+      }
+
+      const unwrapEither = (payload) => {
+        if (payload && typeof payload === 'object') {
+          if (Object.prototype.hasOwnProperty.call(payload, 'Left')) {
+            const leftVal = payload.Left;
+            throw new Error(
+              typeof leftVal === 'string' ? leftVal : JSON.stringify(leftVal),
+            );
+          }
+          if (Object.prototype.hasOwnProperty.call(payload, 'Right')) {
+            return payload.Right;
+          }
+        }
+        return payload;
+      };
+
+      const withBusy = async (phase, fn) => {
+        const button = elements.buttons[phase];
+        button.disabled = true;
+        try {
+          return await fn();
+        } finally {
+          button.disabled = false;
+        }
+      };
+
+      const readPositiveInteger = (rawValue, label) => {
+        const trimmed = rawValue.trim();
+        if (trimmed === '') {
+          throw new Error(`${label} is required.`);
+        }
+        const parsed = Number.parseInt(trimmed, 10);
+        if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+          throw new Error(`${label} must be a positive integer.`);
+        }
+        return parsed;
+      };
+
+      const loadDemoAddresses = async () => {
+        try {
+          const resp = await requestHelperGet('address', '/helpers/addresses');
+          const addresses = resp && Array.isArray(resp.addresses) ? resp.addresses : [];
+          intentBuilder.populateDemoAddresses(addresses);
+          if (addresses.length > 0) {
+            showInfo('address', `Loaded ${addresses.length} sample addresses.`);
+          } else {
+            showInfo('address', 'No sample addresses available.');
+          }
+        } catch (err) {
+          intentBuilder.populateDemoAddresses([]);
+          showError('address', err.message);
+        }
+      };
+
+      const fetchPayToIntent = async () => {
+        const payload = intentBuilder.buildPayload();
+        const resp = await requestHelper('prepare', '/helpers/intent/payto', payload);
+        return unwrapEither(resp);
+      };
+
+      const generateCommitment = async () => {
+        const txId = elements.commitTxId.value.trim();
+        if (!txId) {
+          showError('commit', 'Missing transaction ID from prepare response.');
+          return null;
+        }
+
+        const button = elements.generateCommitBtn;
+        if (button) {
+          button.disabled = true;
+        }
+
+        try {
+          resetStatus('commit');
+          const helperResponse = await requestHelper('commit', '/helpers/commit', {
+            txId: txId,
+          });
+          const helperPayload = unwrapEither(helperResponse);
+          if (
+            !helperPayload
+            || typeof helperPayload !== 'object'
+            || !helperPayload.commitReq
+            || !helperPayload.littleR
+          ) {
+            throw new Error('Helper did not return commit payload.');
+          }
+
+          state.commitHelper = helperPayload;
+          state.commitResp = null;
+          state.verifyResult = null;
+          resetStatus('verify');
+          elements.outputs.verify.textContent = '';
+          elements.littleR.value = helperPayload.littleR;
+          elements.bigR.value = helperPayload.commitReq.bigR ?? '';
+          elements.outputs.commit.textContent = formatJson({ helper: helperPayload });
+          showInfo('commit', 'Commitment generated. Copy the values or send them to the SP.');
+          return helperPayload;
+        } catch (err) {
+          showError('commit', err.message);
+          return null;
+        } finally {
+          if (button) {
+            button.disabled = false;
+          }
+        }
+      };
+
+      const runSatisfiesCheck = async (auto = false) => {
+        if (!state.prepareResp || !state.intentW) {
+          if (!auto) {
+            showError('satisfies', 'Prepare a transaction first.');
+          }
+          return null;
+        }
+
+        try {
+          resetStatus('satisfies');
+          showInfo('satisfies', 'Checking intent satisfaction…');
+          state.satisfiesResult = null;
+          const payload = {
+            intent: state.intentW,
+            txAbs: state.prepareResp.txAbs,
+            changeDelta: state.prepareResp.changeDelta,
+          };
+          const resp = await requestHelper('satisfies', '/satisfies', payload);
+          const result = unwrapEither(resp);
+          state.satisfiesResult = result;
+          elements.outputs.satisfies.textContent = formatJson({ request: payload, result });
+          showInfo('satisfies', result ? 'Transaction satisfies intent.' : 'Transaction does not satisfy intent.');
+          return result;
+        } catch (err) {
+          state.satisfiesResult = null;
+          elements.outputs.satisfies.textContent = '';
+          showError('satisfies', err.message);
+          return null;
+        }
+      };
+
+      const runVerifyCheck = async (auto = false) => {
+        if (!state.commitResp || !state.prepareResp || !state.spPublicKey) {
+          if (!auto) {
+            showError('verify', 'Complete commit step first.');
+          }
+          return null;
+        }
+
+        try {
+          resetStatus('verify');
+          showInfo('verify', 'Verifying proof…');
+          state.verifyResult = null;
+          const payload = {
+            publicKey: state.spPublicKey,
+            prepared: state.prepareResp,
+            proofResult: state.commitResp.pi,
+          };
+          const resp = await requestHelperSilent('/verify', payload);
+          const result = unwrapEither(resp);
+          const ok =
+            result === true
+            || (Array.isArray(result) && result.length === 0);
+          state.verifyResult = ok;
+          elements.outputs.verify.textContent = formatJson({ request: payload, result });
+          if (ok) {
+            showInfo('verify', 'Proof verified successfully.');
+          } else {
+            showError('verify', 'Proof verification failed.');
+          }
+          return ok;
+        } catch (err) {
+          state.verifyResult = null;
+          elements.outputs.verify.textContent = '';
+          showError('verify', err.message);
+          return null;
+        }
+      };
+
+      const showStep = (index) => {
+        steps.forEach((step, idx) => {
+          step.classList.toggle('active', idx === index);
+        });
+      };
+
+      elements.clientSecret.addEventListener('input', () => {
+        const value = elements.clientSecret.value.trim();
+        state.clientSecretHex = value || null;
+        updateSecretDisplay(value);
+        elements.finaliseSecret.value = value;
+      });
+
+      if (elements.spendFromAddress) {
+        elements.spendFromAddress.addEventListener('input', () => intentBuilder.refreshPreview());
+      }
+      if (elements.changeToAddress) {
+        elements.changeToAddress.addEventListener('input', () => intentBuilder.refreshPreview());
+      }
+      if (elements.maxFee) {
+        elements.maxFee.addEventListener('input', () => intentBuilder.refreshPreview());
+      }
+      if (elements.maxInterval) {
+        elements.maxInterval.addEventListener('input', () => intentBuilder.refreshPreview());
+      }
+
+      if (elements.addPayToBtn) {
+        elements.addPayToBtn.addEventListener('click', () => {
+          intentBuilder.addCard();
+        });
+      }
+      if (elements.addMaxFeeBtn) {
+        elements.addMaxFeeBtn.addEventListener('click', () => {
+          intentBuilder.showMaxFeeSection();
+        });
+      }
+      if (elements.removeMaxFeeBtn) {
+        elements.removeMaxFeeBtn.addEventListener('click', () => {
+          intentBuilder.hideMaxFeeSection();
+        });
+      }
+      if (elements.addMaxIntervalBtn) {
+        elements.addMaxIntervalBtn.addEventListener('click', () => {
+          intentBuilder.showMaxIntervalSection();
+        });
+      }
+      if (elements.removeMaxIntervalBtn) {
+        elements.removeMaxIntervalBtn.addEventListener('click', () => {
+          intentBuilder.hideMaxIntervalSection();
+        });
+      }
+
+      intentBuilder.updateState();
+      intentBuilder.refreshPreview();
+      loadDemoAddresses();
+
+      if (elements.fillSpendBtn) {
+        elements.fillSpendBtn.addEventListener('click', () => {
+          if (!elements.demoSpendSelect || elements.demoSpendSelect.disabled) {
+            showError('address', 'No sample spend-from address available.');
+            return;
+          }
+          const selectedSpend = elements.demoSpendSelect.value;
+          if (!selectedSpend) {
+            showError('address', 'Select a spend-from address.');
+            return;
+          }
+          if (elements.spendFromAddress) {
+            elements.spendFromAddress.value = selectedSpend;
+            intentBuilder.refreshPreview();
+            showInfo('address', 'Spend-from address updated from samples.');
+          }
+        });
+      }
+
+      if (elements.fillChangeBtn) {
+        elements.fillChangeBtn.addEventListener('click', () => {
+          if (!elements.demoChangeSelect || elements.demoChangeSelect.disabled) {
+            showError('address', 'No sample change-to address available.');
+            return;
+          }
+          const selectedChange = elements.demoChangeSelect.value;
+          if (!selectedChange) {
+            showError('address', 'Select a change-to address.');
+            return;
+          }
+          if (elements.changeToAddress) {
+            elements.changeToAddress.value = selectedChange;
+            intentBuilder.refreshPreview();
+            showInfo('address', 'Change-to address updated from samples.');
+          }
+        });
+      }
+
+      if (elements.buttons.build) {
+        elements.buttons.build.addEventListener('click', () =>
+          withBusy('build', async () => {
+            try {
+              resetStatus('build');
+              const payload = intentBuilder.buildPayload();
+              const resp = await requestHelperSilent('/helpers/intent/payto', payload);
+              const intent = unwrapEither(resp);
+              state.intentW = intent;
+              elements.intentPreview.textContent = formatJson(intent);
+              showInfo('build', 'Intent built.');
+            } catch (err) {
+              showError('build', err.message);
+            }
+          }),
+        );
+      }
+
+      if (elements.runSatisfiesBtn) {
+        elements.runSatisfiesBtn.addEventListener('click', () => {
+          runSatisfiesCheck(false);
+        });
+      }
+
+      if (elements.toCommitBtn) {
+        elements.toCommitBtn.addEventListener('click', () => {
+          if (state.satisfiesResult !== true) {
+            showError('satisfies', 'Run the satisfies check first.');
+            return;
+          }
+          showStep(3);
+        });
+      }
+
+      if (elements.generateCommitBtn) {
+        elements.generateCommitBtn.addEventListener('click', () => {
+          generateCommitment();
+        });
+      }
+
+      if (elements.runVerifyBtn) {
+        elements.runVerifyBtn.addEventListener('click', () => {
+          runVerifyCheck(false);
+        });
+      }
+
+      if (elements.toFinaliseBtn) {
+        elements.toFinaliseBtn.addEventListener('click', () => {
+          if (state.verifyResult !== true) {
+            showError('verify', 'Run verification first.');
+            return;
+          }
+          showStep(5);
+        });
+      }
+
+      if (elements.buttons.fetchTx) {
+        elements.buttons.fetchTx.addEventListener('click', async () => {
+          const txId = elements.finaliseTxId.value.trim();
+          if (!txId) {
+            showError('transaction', 'Missing transaction ID. Finalise first or copy it from Prepare.');
+            return;
+          }
+
+          try {
+            const resp = await requestServiceGet('transaction', `/transaction/${txId}`);
+            elements.outputs.transaction.textContent = formatJson(resp ?? {});
+            const status = resp && resp.status ? String(resp.status) : 'unknown';
+            showInfo('transaction', `Transaction status: ${status}.`);
+          } catch (err) {
+            elements.outputs.transaction.textContent = '';
+            showError('transaction', err.message);
+          }
+        });
+      }
+
+      elements.buttons.generate.addEventListener('click', async () => {
+        const generatorButton = elements.buttons.generate;
+        const registerButton = elements.buttons.register;
+        const previousRegisterDisabled = registerButton.disabled;
+        generatorButton.disabled = true;
+        registerButton.disabled = true;
+
+        try {
+          const helperResponse = await requestHelper('register', '/helpers/register', {
+            secretKey: null,
+          });
+          const helperPayload = unwrapEither(helperResponse);
+          if (
+            !helperPayload
+            || typeof helperPayload !== 'object'
+            || !helperPayload.registerReq
+            || !helperPayload.clientSecret
+          ) {
+            throw new Error('Helper did not return register payload.');
+          }
+
+          const { registerReq, clientSecret } = helperPayload;
+          state.clientSecretHex = clientSecret;
+          elements.clientSecret.value = clientSecret;
+          elements.finaliseSecret.value = clientSecret;
+          updateSecretDisplay(clientSecret);
+          elements.lcSig.value = '';
+          elements.pk.value = registerReq.publicKey ?? '';
+          elements.clientId.value = '';
+          state.registerResp = null;
+          state.spPublicKey = null;
+          state.intentW = null;
+          state.prepareResp = null;
+          state.satisfiesResult = null;
+          state.commitResp = null;
+          state.commitHelper = null;
+          state.verifyResult = null;
+          state.finaliseResp = null;
+          intentBuilder.reset();
+          ['prepare', 'satisfies', 'commit', 'verify', 'finalise'].forEach(resetStatus);
+          elements.outputs.register.textContent = formatJson({ helper: helperPayload });
+          showInfo('register', 'Key pair generated. Ready to register.');
+        } catch (err) {
+          showError('register', err.message);
+        } finally {
+          generatorButton.disabled = false;
+          registerButton.disabled = previousRegisterDisabled;
+        }
+      });
+
+      elements.buttons.register.addEventListener('click', () =>
+        withBusy('register', async () => {
+          const secretRaw = elements.clientSecret.value.trim() || state.clientSecretHex || '';
+          if (!secretRaw) {
+            showError('register', 'Generate or provide a client secret first.');
+            return;
+          }
+          elements.pk.value = '';
+
+          const generatorButton = elements.buttons.generate;
+          const previousGeneratorDisabled = generatorButton.disabled;
+          generatorButton.disabled = true;
+
+          try {
+            const helperResponse = await requestHelper('register', '/helpers/register', {
+              secretKey: secretRaw,
+            });
+            const helperPayload = unwrapEither(helperResponse);
+            if (
+              !helperPayload
+              || typeof helperPayload !== 'object'
+              || !helperPayload.registerReq
+              || !helperPayload.clientSecret
+            ) {
+              throw new Error('Helper did not return register payload.');
+            }
+
+            const { registerReq, clientSecret } = helperPayload;
+            state.clientSecretHex = clientSecret;
+            elements.clientSecret.value = clientSecret;
+            elements.finaliseSecret.value = clientSecret;
+            updateSecretDisplay(clientSecret);
+            elements.lcSig.value = '';
+            elements.pk.value = registerReq.publicKey ?? '';
+
+            showInfo('register', 'Submitting registration to service…');
+            const registerResp = await requestService('register', '/register', registerReq);
+            state.registerResp = registerResp;
+            state.spPublicKey = registerResp ? registerResp.spPk : null;
+            if (registerResp && registerResp.id) {
+              elements.clientId.value = registerResp.id;
+            }
+            state.prepareResp = null;
+            state.commitResp = null;
+            state.finaliseResp = null;
+            state.commitHelper = null;
+            state.satisfiesResult = null;
+            state.verifyResult = null;
+            intentBuilder.reset();
+            ['prepare', 'satisfies', 'commit', 'verify', 'finalise'].forEach(resetStatus);
+            elements.commitTxId.value = '';
+            elements.finaliseTxId.value = '';
+            elements.bigR.value = '';
+            elements.littleR.value = '';
+            elements.outputs.register.textContent = formatJson({
+              helper: helperPayload,
+              response: registerResp ?? {},
+            });
+            showInfo('register', 'Registered successfully.');
+            showStep(1);
+          } catch (err) {
+            showError('register', err.message);
+          } finally {
+            generatorButton.disabled = previousGeneratorDisabled;
+          }
+        }),
+      );
+
+      elements.buttons.prepare.addEventListener('click', () =>
+        withBusy('prepare', async () => {
+          const clientId = elements.clientId.value.trim();
+          if (!clientId) {
+            showError('prepare', 'Client ID is required.');
+            return;
+          }
+
+          let intent;
+          try {
+            intent = await fetchPayToIntent();
+            state.intentW = intent;
+            elements.intentPreview.textContent = formatJson(intent);
+          } catch (err) {
+            showError('prepare', err.message);
+            return;
+          }
+
+          const prepareReqBody = {
+            intent,
+            observer: null,
+            clientId,
+          };
+
+          try {
+            const data = await requestService('prepare', '/prepare', prepareReqBody);
+            state.prepareResp = data;
+            if (data && data.txId) {
+              elements.commitTxId.value = data.txId;
+              elements.finaliseTxId.value = data.txId;
+            }
+            elements.bigR.value = '';
+            elements.littleR.value = '';
+            state.commitResp = null;
+            state.commitHelper = null;
+            state.satisfiesResult = null;
+            state.verifyResult = null;
+            elements.outputs.prepare.textContent = formatJson({
+              request: prepareReqBody,
+              response: data ?? {},
+            });
+            showInfo('prepare', 'Intent prepared.');
+            showStep(2);
+          } catch (err) {
+            showError('prepare', err.message);
+          }
+        }),
+      );
+
+      elements.buttons.commit.addEventListener('click', () =>
+        withBusy('commit', async () => {
+          const txId = elements.commitTxId.value.trim();
+          if (!txId) {
+            showError('commit', 'Missing transaction ID from prepare response.');
+            return;
+          }
+
+          const helperPayload = state.commitHelper;
+          if (!helperPayload) {
+            showError('commit', 'Generate a commitment first.');
+            return;
+          }
+
+          try {
+            const data = await requestService('commit', '/commit', helperPayload.commitReq);
+            state.commitResp = data;
+            elements.outputs.commit.textContent = formatJson({
+              helper: helperPayload,
+              response: data ?? {},
+            });
+            showInfo('commit', 'Commit accepted.');
+            state.verifyResult = null;
+            elements.outputs.verify.textContent = '';
+            resetStatus('verify');
+            showStep(4);
+          } catch (err) {
+            showError('commit', err.message);
+          }
+        }),
+      );
+
+      elements.buttons.finalise.addEventListener('click', () =>
+        withBusy('finalise', async () => {
+          const txId = elements.finaliseTxId.value.trim();
+          if (!txId) {
+            showError('finalise', 'Missing transaction ID from prepare response.');
+            return;
+          }
+          const lcSig = elements.lcSig.value.trim();
+
+          try {
+            let finaliseReq;
+            let helperPayload = null;
+
+            if (lcSig) {
+              finaliseReq = { txId, lcSig };
+            } else {
+              const secret =
+                elements.finaliseSecret.value.trim()
+                || state.clientSecretHex
+                || '';
+              if (!secret) {
+                showError('finalise', 'Provide the client secret (hex) or a signature.');
+                return;
+              }
+              if (!state.prepareResp) {
+                showError('finalise', 'Prepare response missing; rerun prepare first.');
+                return;
+              }
+
+              const helperResp = await requestHelper('finalise', '/helpers/finalise', {
+                secretKey: secret,
+                helperPrepareResp: state.prepareResp,
+              });
+              helperPayload = unwrapEither(helperResp);
+              if (!helperPayload) {
+                throw new Error('Helper did not return finalise payload.');
+              }
+              finaliseReq = helperPayload;
+              elements.finaliseSecret.value = secret;
+              elements.lcSig.value = helperPayload.lcSig ?? '';
+            }
+
+            const data = await requestService('finalise', '/finalise', finaliseReq);
+            state.finaliseResp = data;
+            elements.outputs.finalise.textContent = formatJson(
+              helperPayload
+                ? { helper: helperPayload, response: data ?? {} }
+                : { request: finaliseReq, response: data ?? {} },
+            );
+            showInfo('finalise', 'Finalise response received.');
+          } catch (err) {
+            showError('finalise', err.message);
+          }
+        }),
+      );
+
+      function collectElements() {
+        const byId = (id) => document.getElementById(id);
+        return {
+          apiBase: byId('apiBase'),
+          helperBase: byId('helperBase'),
+          clientSecret: byId('clientSecret'),
+          pk: byId('pk'),
+          clientId: byId('clientId'),
+          spendFromAddress: byId('spendFromAddress'),
+          changeToAddress: byId('changeToAddress'),
+          payToContainer: byId('payToList'),
+          payToEmptyHint: byId('payToEmptyHint'),
+          intentPreview: byId('intentPreview'),
+          demoSpendSelect: byId('demoSpendSelect'),
+          demoChangeSelect: byId('demoChangeSelect'),
+          fillSpendBtn: byId('fillSpendBtn'),
+          fillChangeBtn: byId('fillChangeBtn'),
+          runSatisfiesBtn: byId('runSatisfiesBtn'),
+          toCommitBtn: byId('toCommitBtn'),
+          generateCommitBtn: byId('generateCommitBtn'),
+          runVerifyBtn: byId('runVerifyBtn'),
+          toFinaliseBtn: byId('toFinaliseBtn'),
+          fetchTxBtn: byId('fetchTxBtn'),
+          maxFee: byId('maxFee'),
+          maxInterval: byId('maxInterval'),
+          addPayToBtn: byId('addPayToBtn'),
+          addMaxFeeBtn: byId('addMaxFeeBtn'),
+          addMaxIntervalBtn: byId('addMaxIntervalBtn'),
+          removeMaxFeeBtn: byId('removeMaxFeeBtn'),
+          removeMaxIntervalBtn: byId('removeMaxIntervalBtn'),
+          maxFeeItem: byId('maxFeeIntentItem'),
+          maxIntervalItem: byId('maxIntervalIntentItem'),
+          commitTxId: byId('commitTxId'),
+          bigR: byId('bigR'),
+          littleR: byId('littleR'),
+          finaliseTxId: byId('finaliseTxId'),
+          finaliseSecret: byId('finaliseSecret'),
+          lcSig: byId('lcSig'),
+          clientSecretDisplay: byId('clientSecretDisplay'),
+          statuses: {
+            register: byId('registerStatus'),
+            build: byId('buildStatus'),
+            prepare: byId('prepareStatus'),
+            satisfies: byId('satisfiesStatus'),
+            commit: byId('commitStatus'),
+            verify: byId('verifyStatus'),
+            finalise: byId('finaliseStatus'),
+            transaction: byId('transactionStatus'),
+            address: byId('addressStatus'),
+          },
+          outputs: {
+            register: byId('registerOutput'),
+            prepare: byId('prepareOutput'),
+            satisfies: byId('satisfiesOutput'),
+            commit: byId('commitOutput'),
+            verify: byId('verifyOutput'),
+            finalise: byId('finaliseOutput'),
+            transaction: byId('transactionOutput'),
+          },
+          buttons: {
+            generate: byId('generateKeyBtn'),
+            register: byId('registerBtn'),
+            build: byId('buildIntentBtn'),
+            prepare: byId('prepareBtn'),
+            commit: byId('commitBtn'),
+            finalise: byId('finaliseBtn'),
+            fetchTx: byId('fetchTxBtn'),
+          },
+        };
+      }
+
+      function createInitialState() {
+        return {
+          registerResp: null,
+          prepareResp: null,
+          commitResp: null,
+          finaliseResp: null,
+          clientSecretHex: null,
+          commitHelper: null,
+          spPublicKey: null,
+          intentW: null,
+          satisfiesResult: null,
+          verifyResult: null,
+        };
+      }
+
+      function createStatusHandlers(elements) {
+        const { statuses, outputs } = elements;
+
+        const resetStatus = (phase) => {
+          const statusEl = statuses[phase];
+          if (statusEl) {
+            statusEl.classList.remove('error');
+            statusEl.textContent = '';
+          }
+          const outputEl = outputs[phase];
+          if (outputEl) {
+            outputEl.textContent = '';
+          }
+        };
+
+        const showError = (phase, message) => {
+          const statusEl = statuses[phase];
+          if (statusEl) {
+            statusEl.classList.add('error');
+            statusEl.textContent = message;
+          }
+        };
+
+        const showInfo = (phase, message) => {
+          const statusEl = statuses[phase];
+          if (statusEl) {
+            statusEl.classList.remove('error');
+            statusEl.textContent = message;
+          }
+        };
+
+        return { resetStatus, showError, showInfo };
+      }
+
+      function createBaseResolvers(elements) {
+        const normaliseBase = (rawValue) => {
+          const trimmed = (rawValue || '').trim();
+          if (trimmed === '') {
+            return '';
+          }
+          return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+        };
+
+        const currentBase = () =>
+          normaliseBase(elements.apiBase ? elements.apiBase.value : '');
+
+        const currentHelperBase = () => {
+          const helper = normaliseBase(elements.helperBase ? elements.helperBase.value : '');
+          return helper === '' ? currentBase() : helper;
+        };
+
+        return { currentBase, currentHelperBase };
+      }
+
+      function createRequestHelpers({ currentBase, currentHelperBase, resetStatus, showInfo }) {
+        const jsonRequest = async ({
+          base,
+          path,
+          method = 'POST',
+          body,
+          phase = null,
+          statusMessage,
+          includeStatus = true,
+          missingBaseMessage = 'Please configure the target URL.',
+        }) => {
+          if (includeStatus && phase) {
+            resetStatus(phase);
+            if (statusMessage) {
+              showInfo(phase, statusMessage);
+            }
+          }
+
+          if (!base) {
+            throw new Error(missingBaseMessage);
+          }
+
+          const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+          const fetchOptions = { method };
+          if (method !== 'GET') {
+            fetchOptions.headers = { 'Content-Type': 'application/json' };
+            if (body !== undefined) {
+              fetchOptions.body = JSON.stringify(body);
+            }
+          }
+
+          const response = await fetch(url, fetchOptions);
+          const responseBody = await response.text();
+
+          if (!response.ok) {
+            const trimmed = responseBody.trim();
+            const reason = trimmed ? trimmed : `HTTP ${response.status}`;
+            throw new Error(reason);
+          }
+
+          if (!responseBody) {
+            return null;
+          }
+
+          try {
+            return JSON.parse(responseBody);
+          } catch (err) {
+            throw new Error(`Failed to parse JSON response: ${err.message}`);
+          }
+        };
+
+        const requestService = (phase, path, body) =>
+          jsonRequest({
+            base: currentBase(),
+            path,
+            body,
+            phase,
+            statusMessage: 'Sending request…',
+            includeStatus: true,
+          });
+
+        const requestHelper = (phase, path, body) =>
+          jsonRequest({
+            base: currentHelperBase(),
+            path,
+            body,
+            phase,
+            statusMessage: 'Sending request…',
+            includeStatus: true,
+            missingBaseMessage: 'Please configure the helper URL.',
+          });
+
+        const requestServiceGet = (phase, path) =>
+          jsonRequest({
+            base: currentBase(),
+            path,
+            method: 'GET',
+            phase,
+            statusMessage: 'Loading…',
+            includeStatus: true,
+          });
+
+        const requestHelperGet = (phase, path) =>
+          jsonRequest({
+            base: currentHelperBase(),
+            path,
+            method: 'GET',
+            phase,
+            statusMessage: 'Loading…',
+            includeStatus: true,
+            missingBaseMessage: 'Please configure the helper URL.',
+          });
+
+        const requestHelperSilent = (path, body) =>
+          jsonRequest({
+            base: currentHelperBase(),
+            path,
+            body,
+            includeStatus: false,
+            missingBaseMessage: 'Please configure the helper URL.',
+          });
+
+        return {
+          requestService,
+          requestHelper,
+          requestServiceGet,
+          requestHelperGet,
+          requestHelperSilent,
+        };
+      }
+
+      function createIntentBuilder({ elements, state, formatJson, showError, showInfo }) {
+        let payToIdCounter = 0;
+        let activePayToId = null;
+        let demoAddresses = [];
+
+        const cards = () => {
+          if (!elements.payToContainer) {
+            return [];
+          }
+          return Array.from(elements.payToContainer.querySelectorAll('.payToCard'));
+        };
+
+        const hasOutputs = () => cards().length > 0;
+
+        const isMaxFeeActive = () => elements.maxFeeItem && !elements.maxFeeItem.hidden;
+        const isMaxIntervalActive = () =>
+          elements.maxIntervalItem && !elements.maxIntervalItem.hidden;
+
+        const findCardById = (id) => cards().find((card) => card.dataset.paytoId === id);
+
+        const setActiveCard = (card) => {
+          cards().forEach((node) => node.classList.remove('active'));
+          if (!card) {
+            activePayToId = null;
+            return;
+          }
+          card.classList.add('active');
+          activePayToId = card.dataset.paytoId;
+        };
+
+        const ensureActiveCard = () => {
+          if (activePayToId && findCardById(activePayToId)) {
+            return;
+          }
+          const [firstCard] = cards();
+          setActiveCard(firstCard ?? null);
+        };
+
+        const updateSampleSelectOptions = (card) => {
+          if (!card) {
+            return;
+          }
+          const select = card.querySelector('.payToSampleSelect');
+          const applyBtn = card.querySelector('.applyPayToSampleBtn');
+          if (!select) {
+            return;
+          }
+          const previousValue = select.value;
+          select.innerHTML = '';
+          if (demoAddresses.length === 0) {
+            const option = document.createElement('option');
+            option.textContent = 'No samples available';
+            option.disabled = true;
+            option.selected = true;
+            select.appendChild(option);
+            select.disabled = true;
+            if (applyBtn) {
+              applyBtn.disabled = true;
+            }
+            return;
+          }
+          select.disabled = false;
+          if (applyBtn) {
+            applyBtn.disabled = false;
+          }
+          demoAddresses.forEach((addr) => {
+            const option = document.createElement('option');
+            option.value = addr;
+            option.textContent = addr;
+            select.appendChild(option);
+          });
+          const addressInput = card.querySelector('.payToAddressInput');
+          const cardAddress = addressInput ? addressInput.value.trim() : '';
+          const desired =
+            (cardAddress && demoAddresses.includes(cardAddress))
+              ? cardAddress
+              : (previousValue && demoAddresses.includes(previousValue))
+                ? previousValue
+                : demoAddresses[0];
+          select.value = desired;
+        };
+
+        const attachInputListeners = (card) => {
+          const amountInput = card.querySelector('.payToAmountInput');
+          const addressInput = card.querySelector('.payToAddressInput');
+          const sampleSelect = card.querySelector('.payToSampleSelect');
+          const applySampleBtn = card.querySelector('.applyPayToSampleBtn');
+          const removeBtn = card.querySelector('.removePayToBtn');
+          const focusHandler = () => setActiveCard(card);
+
+          if (amountInput) {
+            amountInput.addEventListener('focus', focusHandler);
+            amountInput.addEventListener('input', () => refreshPreview());
+          }
+          if (addressInput) {
+            addressInput.addEventListener('focus', focusHandler);
+            addressInput.addEventListener('input', () => refreshPreview());
+          }
+          if (sampleSelect) {
+            sampleSelect.addEventListener('focus', focusHandler);
+            sampleSelect.addEventListener('change', () => {
+              setActiveCard(card);
+            });
+          }
+          card.addEventListener('click', () => setActiveCard(card));
+          if (removeBtn) {
+            removeBtn.addEventListener('click', () => {
+              card.remove();
+              updateState();
+              refreshPreview();
+            });
+          }
+          if (applySampleBtn) {
+            applySampleBtn.addEventListener('click', () => {
+              if (!sampleSelect || sampleSelect.disabled) {
+                showError('address', 'No sample addresses available.');
+                return;
+              }
+              const selectedValue = sampleSelect.value;
+              if (!selectedValue) {
+                showError('address', 'Select a sample address first.');
+                return;
+              }
+              const addrInput = card.querySelector('.payToAddressInput');
+              if (addrInput) {
+                addrInput.value = selectedValue;
+                sampleSelect.value = selectedValue;
+                setActiveCard(card);
+                refreshPreview();
+                const idx = cards().indexOf(card) + 1;
+                const label = Number.isInteger(idx) && idx > 0 ? `PayTo #${idx}` : 'PayTo';
+                showInfo('address', `${label} updated from samples.`);
+              }
+            });
+          }
+          updateSampleSelectOptions(card);
+        };
+
+        const createCard = () => {
+          payToIdCounter += 1;
+          const id = `payto-${payToIdCounter}`;
+          const index = cards().length + 1;
+          const card = document.createElement('div');
+          card.className = 'intentItem payToCard';
+          card.dataset.paytoId = id;
+          card.innerHTML = `
+            <div class="intentItemHeader">
+              <h4>PayTo #${index}</h4>
+              <button type="button" class="removeIntentBtn removePayToBtn">Remove</button>
+            </div>
+            <label>Amount (lovelace)</label>
+            <input type="number" class="payToAmountInput" min="1" step="1" value="2000000"/>
+            <label>Recipient address</label>
+            <textarea class="payToAddressInput" spellcheck="false"></textarea>
+            <div class="payToPicker">
+              <label>Sample recipients</label>
+              <div class="payToPickerRow">
+                <select class="payToSampleSelect"></select>
+                <button type="button" class="applyPayToSampleBtn">Use</button>
+              </div>
+            </div>
+          `;
+          attachInputListeners(card);
+          return card;
+        };
+
+        const updateIndices = () => {
+          cards().forEach((card, index) => {
+            const heading = card.querySelector('h4');
+            if (heading) {
+              heading.textContent = `PayTo #${index + 1}`;
+            }
+          });
+        };
+
+        const updateState = () => {
+          const currentCards = cards();
+          if (elements.payToEmptyHint) {
+            elements.payToEmptyHint.hidden = currentCards.length > 0;
+          }
+          if (!currentCards.length) {
+            activePayToId = null;
+            hideMaxFeeSection();
+            hideMaxIntervalSection();
+            state.intentW = null;
+            if (elements.addMaxFeeBtn) {
+              elements.addMaxFeeBtn.disabled = true;
+            }
+            if (elements.addMaxIntervalBtn) {
+              elements.addMaxIntervalBtn.disabled = true;
+            }
+          } else {
+            if (elements.addMaxFeeBtn) {
+              elements.addMaxFeeBtn.disabled = false;
+            }
+            if (elements.addMaxIntervalBtn) {
+              elements.addMaxIntervalBtn.disabled = false;
+            }
+          }
+          updateIndices();
+          ensureActiveCard();
+          cards().forEach((card) => updateSampleSelectOptions(card));
+        };
+
+        const addCard = () => {
+          if (!elements.payToContainer) {
+            return;
+          }
+          const card = createCard();
+          elements.payToContainer.appendChild(card);
+          setActiveCard(card);
+          state.intentW = null;
+          updateState();
+          ensureAddressDefaults();
+          refreshPreview();
+        };
+
+        const removeAllCards = () => {
+          cards().forEach((card) => card.remove());
+          activePayToId = null;
+          updateState();
+        };
+
+        const readPayToOutputs = () => {
+          const currentCards = cards();
+          if (currentCards.length === 0) {
+            throw new Error('Add at least one PayTo output.');
+          }
+          return currentCards.map((card, index) => {
+            const amountInput = card.querySelector('.payToAmountInput');
+            const addressInput = card.querySelector('.payToAddressInput');
+            if (!amountInput || !addressInput) {
+              throw new Error('PayTo fields not found.');
+            }
+            const amount = readPositiveInteger(
+              amountInput.value,
+              `PayTo amount #${index + 1}`,
+            );
+            const address = addressInput.value.trim();
+            if (address === '') {
+              throw new Error(`Recipient address #${index + 1} is required.`);
+            }
+            return { amount, address };
+          });
+        };
+
+        const readFundingInputs = () => {
+          const spendRaw = elements.spendFromAddress ? elements.spendFromAddress.value.trim() : '';
+          const changeRaw = elements.changeToAddress ? elements.changeToAddress.value.trim() : '';
+          return {
+            spend: spendRaw === '' ? null : spendRaw,
+            change: changeRaw === '' ? null : changeRaw,
+          };
+        };
+
+        const readMaxFee = () => {
+          if (!isMaxFeeActive()) {
+            return null;
+          }
+          const raw = elements.maxFee ? elements.maxFee.value.trim() : '';
+          if (raw === '') {
+            return null;
+          }
+          return readPositiveInteger(raw, 'Max fee (lovelace)');
+        };
+
+        const readMaxInterval = () => {
+          if (!isMaxIntervalActive()) {
+            return null;
+          }
+          const raw = elements.maxInterval ? elements.maxInterval.value.trim() : '';
+          if (raw === '') {
+            return null;
+          }
+          return readPositiveInteger(raw, 'Max interval (slots)');
+        };
+
+        const buildPayload = () => {
+          const outputs = readPayToOutputs();
+          const { spend, change } = readFundingInputs();
+          const maxFee = readMaxFee();
+          const maxInterval = readMaxInterval();
+          return {
+            payToOutputs: outputs.map(({ amount, address }) => ({
+              amount,
+              address,
+            })),
+            spendFromAddress: spend,
+            changeToAddress: change,
+            payToMaxFee: maxFee,
+            payToMaxInterval: maxInterval,
+          };
+        };
+
+        const refreshPreview = () => {
+          try {
+            const payload = buildPayload();
+            const preview = {
+              payTo: payload.payToOutputs.map(({ amount, address }) => ({
+                lovelace: amount,
+                recipient: address,
+              })),
+            };
+            preview.spendFrom =
+              payload.spendFromAddress === null ? '(helper default)' : payload.spendFromAddress;
+            preview.changeTo =
+              payload.changeToAddress === null ? '(helper default)' : payload.changeToAddress;
+            if (payload.payToMaxFee !== null) {
+              preview.maxFee = payload.payToMaxFee;
+            }
+            if (payload.payToMaxInterval !== null) {
+              preview.maxInterval = payload.payToMaxInterval;
+            }
+            elements.intentPreview.textContent = formatJson(preview);
+          } catch (_err) {
+            elements.intentPreview.textContent = '';
+          }
+        };
+
+        const ensureAddressDefaults = () => {
+          if (!demoAddresses.length) {
+            return;
+          }
+          cards().forEach((card, index) => {
+            const addressInput = card.querySelector('.payToAddressInput');
+            const defaultAddr = demoAddresses[Math.min(index, demoAddresses.length - 1)];
+            if (addressInput && addressInput.value.trim() === '') {
+              addressInput.value = defaultAddr;
+            }
+            const sampleSelect = card.querySelector('.payToSampleSelect');
+            if (sampleSelect && !sampleSelect.disabled) {
+              const chosen = addressInput ? addressInput.value.trim() : defaultAddr;
+              if (demoAddresses.includes(chosen)) {
+                sampleSelect.value = chosen;
+              } else {
+                sampleSelect.value = defaultAddr;
+              }
+            }
+          });
+          const spendDefault = demoAddresses.length > 1 ? demoAddresses[1] : demoAddresses[0];
+          const changeDefault =
+            demoAddresses.length > 2 ? demoAddresses[2] : spendDefault;
+          if (elements.spendFromAddress && elements.spendFromAddress.value.trim() === '') {
+            elements.spendFromAddress.value = spendDefault;
+          }
+          if (elements.changeToAddress && elements.changeToAddress.value.trim() === '') {
+            elements.changeToAddress.value = changeDefault;
+          }
+        };
+
+        const clearMaxFeeInput = () => {
+          if (elements.maxFee) {
+            elements.maxFee.value = '';
+          }
+        };
+
+        const clearMaxIntervalInput = () => {
+          if (elements.maxInterval) {
+            elements.maxInterval.value = '';
+          }
+        };
+
+        const showMaxFeeSection = () => {
+          if (!elements.maxFeeItem) {
+            return;
+          }
+          elements.maxFeeItem.hidden = false;
+          if (elements.addMaxFeeBtn) {
+            elements.addMaxFeeBtn.disabled = true;
+          }
+          refreshPreview();
+        };
+
+        const hideMaxFeeSection = () => {
+          if (!elements.maxFeeItem) {
+            return;
+          }
+          elements.maxFeeItem.hidden = true;
+          clearMaxFeeInput();
+          if (elements.addMaxFeeBtn) {
+            elements.addMaxFeeBtn.disabled = !hasOutputs();
+          }
+          refreshPreview();
+        };
+
+        const showMaxIntervalSection = () => {
+          if (!elements.maxIntervalItem) {
+            return;
+          }
+          elements.maxIntervalItem.hidden = false;
+          if (elements.addMaxIntervalBtn) {
+            elements.addMaxIntervalBtn.disabled = true;
+          }
+          refreshPreview();
+        };
+
+        const hideMaxIntervalSection = () => {
+          if (!elements.maxIntervalItem) {
+            return;
+          }
+          elements.maxIntervalItem.hidden = true;
+          clearMaxIntervalInput();
+          if (elements.addMaxIntervalBtn) {
+            elements.addMaxIntervalBtn.disabled = !hasOutputs();
+          }
+          refreshPreview();
+        };
+
+        const reset = () => {
+          removeAllCards();
+          hideMaxFeeSection();
+          hideMaxIntervalSection();
+          state.intentW = null;
+          refreshPreview();
+        };
+
+        const populateDemoAddresses = (addresses) => {
+          demoAddresses = Array.isArray(addresses) ? addresses : [];
+          const populateSelect = (select, preferredIndex) => {
+            if (!select) {
+              return;
+            }
+            const previous = select.value;
+            select.innerHTML = '';
+            if (demoAddresses.length === 0) {
+              const option = document.createElement('option');
+              option.textContent = 'No sample addresses available';
+              option.disabled = true;
+              option.selected = true;
+              select.appendChild(option);
+              select.disabled = true;
+              return;
+            }
+            select.disabled = false;
+            demoAddresses.forEach((addr) => {
+              const option = document.createElement('option');
+              option.value = addr;
+              option.textContent = addr;
+              select.appendChild(option);
+            });
+            const defaultIdx = Math.min(preferredIndex, demoAddresses.length - 1);
+            const desired =
+              previous && demoAddresses.includes(previous)
+                ? previous
+                : demoAddresses[defaultIdx];
+            select.value = desired;
+          };
+
+          populateSelect(elements.demoSpendSelect, 1);
+          populateSelect(elements.demoChangeSelect, 2);
+
+          if (elements.fillSpendBtn) {
+            elements.fillSpendBtn.disabled = demoAddresses.length === 0;
+          }
+          if (elements.fillChangeBtn) {
+            elements.fillChangeBtn.disabled = demoAddresses.length === 0;
+          }
+
+          cards().forEach((card) => updateSampleSelectOptions(card));
+          ensureAddressDefaults();
+          refreshPreview();
+        };
+
+        return {
+          addCard,
+          removeAllCards,
+          updateState,
+          buildPayload,
+          refreshPreview,
+          populateDemoAddresses,
+          showMaxFeeSection,
+          hideMaxFeeSection,
+          showMaxIntervalSection,
+          hideMaxIntervalSection,
+          reset,
+        };
+      }
+    })();
+  </script>
+</body>
+
+</html>

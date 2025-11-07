@@ -118,6 +118,7 @@ data Intent = Intent
   , irMaxInterval :: Maybe Slot
   -- ^ Maximum validity interval in slots
   }
+  deriving (Show)
 
 emptyIntent :: Intent
 emptyIntent =

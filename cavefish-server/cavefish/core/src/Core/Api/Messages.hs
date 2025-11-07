@@ -204,14 +204,26 @@ data RegisterResp = RegisterResp
   }
   deriving (Eq, Show, Generic)
 
-instance FromJSON RegisterResp
+instance ToJSON RegisterResp where
+  toJSON RegisterResp {..} =
+    object
+      [ "id" .= id
+      , "spPk" .= renderHex (BA.convert spPk)
+      ]
 
-instance ToJSON RegisterResp
+instance FromJSON RegisterResp where
+  parseJSON = withObject "RegisterResp" $ \o -> do
+    id <- o .: "id"
+    spHex :: Text <- o .: "spPk"
+    bytes <- parseHex spHex
+    case Ed.publicKey bytes of
+      CryptoFailed err -> fail ("invalid service public key: " <> show err)
+      CryptoPassed pk -> pure RegisterResp {spPk = pk, id}
 
 -- | Request to prepare a transaction.
 data PrepareReq = PrepareReq
   { intent :: IntentW
-  , observer :: ByteString
+  , observer :: Maybe ByteString
   , clientId :: ClientId
   }
   deriving (Eq, Show, Generic)
@@ -219,8 +231,8 @@ data PrepareReq = PrepareReq
 instance FromJSON PrepareReq where
   parseJSON = withObject "PrepareReq" $ \o -> do
     intent <- o .: "intent"
-    obsHex :: Text <- o .: "observer"
-    observer <- parseHex obsHex
+    obsHex :: Maybe Text <- o .: "observer"
+    observer <- traverse parseHex obsHex
     clientId <- o .: "clientId"
     pure PrepareReq {..}
 
@@ -228,7 +240,7 @@ instance ToJSON PrepareReq where
   toJSON PrepareReq {..} =
     object
       [ "intent" .= intent
-      , "observer" .= renderHex observer
+      , "observer" .= fmap renderHex observer
       , "clientId" .= clientId
       ]
 

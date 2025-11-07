@@ -7,10 +7,11 @@ module Core.TxBuilder where
 import Cardano.Api qualified as Api
 import Control.Monad (foldM, unless, when)
 import Cooked (
-  BalanceOutputPolicy (DontAdjustExistingOutput),
+  BalanceOutputPolicy (..),
   BalancingPolicy (BalanceWith),
-  MonadBlockChain (validateTxSkel),
-  TxOpts (txOptBalanceOutputPolicy, txOptBalancingPolicy),
+  FeePolicy (..),
+  MonadBlockChain (..),
+  TxOpts (..),
   TxSkel (
     txSkelOpts,
     txSkelOuts,
@@ -40,9 +41,9 @@ import Plutus.Script.Utils.Value qualified as PSV
 import PlutusLedgerApi.V1.Interval qualified as Interval
 
 -- | Build a Cardano transaction based on the provided intent and observer
-buildTx :: MonadBlockChain m => Intent -> ByteString -> Env -> m CardanoTx
+buildTx :: MonadBlockChain m => Intent -> Maybe ByteString -> Env -> m CardanoTx
 buildTx intent observerBytes env@Env {..} = do
-  let stakeValidator = stakeValidatorFromBytes observerBytes
+  let stakeValidator = fmap stakeValidatorFromBytes observerBytes
       skel0 = base stakeValidator
   signerWallets <-
     nub
@@ -58,7 +59,10 @@ buildTx intent observerBytes env@Env {..} = do
           (w : ws) ->
             skel0
               { txSkelSigners = w : ws
-              , txSkelOpts = (txSkelOpts skel0) {txOptBalancingPolicy = BalanceWith w}
+              , txSkelOpts =
+                  (txSkelOpts skel0)
+                    { txOptBalancingPolicy = BalanceWith w
+                    }
               }
   unless (null (irPayTo intent) || not (null signerWallets)) $
     fail "TxBuilder: pay outputs require at least one funding source"
@@ -81,23 +85,24 @@ buildTx intent observerBytes env@Env {..} = do
       wallet <- either (fail . T.unpack) pure (getWallet addr)
       let opts =
             (txSkelOpts skel2)
-              { -- TODO WG: Realism (maybe?)
-                txOptBalancingPolicy = BalanceWith wallet
+              { txOptBalancingPolicy = BalanceWith wallet
               , txOptBalanceOutputPolicy = DontAdjustExistingOutput
               }
-      pure skel2 {txSkelOpts = opts}
+          signers = txSkelSigners skel2
+          signers' = if wallet `elem` signers then signers else signers ++ [wallet]
+      pure skel2 {txSkelOpts = opts, txSkelSigners = signers'}
   -- MaxFee is a post-condition only; no builder action required
   validateTxSkel skel3
   where
     base stakeValidator' =
       txSkelTemplate
         { txSkelSigners = []
-        , txSkelWithdrawals = scriptWithdrawal stakeValidator' emptyTxSkelRedeemer 0
+        , txSkelWithdrawals = maybe mempty (\sv -> scriptWithdrawal sv emptyTxSkelRedeemer 0) stakeValidator'
         , txSkelOuts = spFeeOutputs
         }
 
     spFeeOutputs =
-      [spWallet `receives` Payable.Value (PSV.ada spFee) | spFee > 0]
+      [spWallet `receives` Payable.Value (PSV.lovelace spFee) | spFee > 0]
 
     addPay :: MonadBlockChain m => TxSkel -> (Api.Value, Api.AddressInEra Api.ConwayEra) -> m TxSkel
     addPay skel (v, addr) = do
@@ -121,7 +126,7 @@ mkPayTo value addr Env {..} = do
     Nothing -> Left "TxBuilder: address not recognised (resolveWallet failed)"
     Just w -> Right w
   lov <- toLovelace value
-  pure [payee `receives` Payable.Value (PSV.ada lov)]
+  pure [payee `receives` Payable.Value (PSV.lovelace lov)]
 
 toLovelace :: Api.Value -> Either Text Integer
 toLovelace =
