@@ -12,6 +12,7 @@ on:
     paths:
       - 'cavefish-server/**'
       - '.github/workflows/cavefish-server-linux-ci.yml'
+
 jobs:
   build:
     name: GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}
@@ -22,153 +23,143 @@ jobs:
         ghc-version: ['9.6.6']
       fail-fast: false
     env:
-      # Modify this value to "invalidate" the cabal cache.
       CABAL_CACHE_VERSION: "2025-10-23"
-
-      # current ref from: 27.02.2022
       SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
-
       SECP_CACHE_VERSION: "2022-12-30"
 
     defaults:
       run:
         shell: bash
 
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Free up disk space
-      run: |
-        # Remove software and language runtimes we're not using
-        sudo rm -rf \
-          "$AGENT_TOOLSDIRECTORY" \
-          /opt/google/chrome \
-          /opt/microsoft/msedge \
-          /opt/microsoft/powershell \
-          /opt/pipx \
-          /usr/lib/mono \
-          /usr/local/julia* \
-          /usr/local/lib/android \
-          /usr/local/lib/node_modules \
-          /usr/local/share/chromium \
-          /usr/local/share/powershell \
-          /usr/share/dotnet \
-          /usr/share/swift
-        df -h /
+      # ✅ Ensure LFS objects are fetched by the checkout itself
+      - uses: actions/checkout@v4
+        with:
+          lfs: true          # <— pull LFS blobs (not just pointers)
+          fetch-depth: 0     # <— needed if you pin to specific commits/tags
 
-    - name: Install system dependencies
-      uses: input-output-hk/actions/base@latest
-      with:
-        use-sodium-vrf: false # default is true
+      # (Optional but safe) Install/initialize git-lfs explicitly and verify files
+      - name: Initialize Git LFS and materialize files
+        run: |
+          git lfs install
+          # Double-ensure all LFS objects are fetched & checked out
+          git lfs fetch --all
+          git lfs checkout
+          # Quick sanity: show a few tracked files if present
+          git lfs ls-files || true
 
-    - name: Setup Node.js (for snarkjs)
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
+      - name: Free up disk space
+        run: |
+          sudo rm -rf \
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/google/chrome \
+            /opt/microsoft/msedge \
+            /opt/microsoft/powershell \
+            /opt/pipx \
+            /usr/lib/mono \
+            /usr/local/julia* \
+            /usr/local/lib/android \
+            /usr/local/lib/node_modules \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/share/dotnet \
+            /usr/share/swift
+          df -h /
 
-    - name: Setup Rust (for circom)
-      uses: dtolnay/rust-toolchain@stable
+      - name: Install system dependencies
+        uses: input-output-hk/actions/base@latest
+        with:
+          use-sodium-vrf: false
 
-    - name: Cache Cargo registry (circom build)
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          ~/.cache/sccache
-        key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          cargo-${{ runner.os }}-
+      - name: Setup Node.js (for snarkjs)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
-    - name: Install circom & snarkjs
-      run: |
-        cargo install --git https://github.com/iden3/circom --locked --force
-        npm install -g snarkjs@^0.7.0
-        circom --version
-        snarkjs -v || true
+      - name: Setup Rust (for circom)
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Install Haskell
-      id: install-haskell
-      uses: input-output-hk/actions/haskell@latest
-      with:
-        ghc-version: ${{ matrix.ghc-version }}
-        cabal-version: 3.12.1.0
+      - name: Cache Cargo registry (circom build)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cache/sccache
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
 
-    - name: Configure to use libsodium
-      run: |
-        cat >> cabal.project <<EOF
-        package cardano-crypto-praos
-          flags: -external-libsodium-vrf
-        EOF
+      - name: Install circom & snarkjs
+        run: |
+          cargo install --git https://github.com/iden3/circom --locked --force
+          npm install -g snarkjs@^0.7.0
+          circom --version
+          snarkjs -v || true
 
-    - name: Cabal update
-      working-directory: ./cavefish-server
-      run: cabal update
+      - name: Install Haskell
+        id: install-haskell
+        uses: input-output-hk/actions/haskell@latest
+        with:
+          ghc-version: ${{ matrix.ghc-version }}
+          cabal-version: 3.12.1.0
 
+      - name: Configure to use libsodium
+        run: |
+          cat >> cabal.project <<EOF
+          package cardano-crypto-praos
+            flags: -external-libsodium-vrf
+          EOF
 
-    # We create a dependencies.txt file that can be used to index the cabal
-    # store cache.
-    #
-    # We do not use plan.json directly because adding a dependency to our
-    # Cabal files which was already present somewhere else would result in a
-    # different plan, even though the set of dependencies is the same.
-    - name: Record dependencies to be used as cache keys
-      working-directory: ./cavefish-server
-      id: record-deps
-      run: |
-        cabal build all --enable-tests --dry-run --minimize-conflict-set
-        cat dist-newstyle/cache/plan.json \
-        | jq '.["install-plan"][].id' \
-        | sort \
-        | uniq \
-        | tee dependencies.txt
+      - name: Cabal update
+        working-directory: ./cavefish-server
+        run: cabal update
 
-    - name: Restore cache
-      uses: actions/cache/restore@v4
-      id: restore-cabal-cache
-      env:
-        cache-name: cache-cabal-build
-      with:
-        path: |
-          ${{ steps.install-haskell.outputs.cabal-store }}
-        # A new cache is created upon a change to the cabal build plan,
-        # cabal.project (and/or cabal.project.local), or a bump to
-        # CABAL_CACHE_VERSION.
-        key: ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-${{ hashFiles('dependencies.txt') }}-${{ hashFiles('cabal.project*') }}
-        # Restoring attempts are from current branch then master. The key above
-        # is by default already a restore-key.
-        restore-keys: |
-          ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-${{ hashFiles('dependencies.txt') }}
-          ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-
+      - name: Record dependencies to be used as cache keys
+        working-directory: ./cavefish-server
+        id: record-deps
+        run: |
+          cabal build all --enable-tests --dry-run --minimize-conflict-set
+          cat dist-newstyle/cache/plan.json \
+          | jq '.["install-plan"][].id' \
+          | sort \
+          | uniq \
+          | tee dependencies.txt
 
-    - name: Check workflow test matrix
-      working-directory: ./cavefish-server
-      run: cabal build all --dry-run 
+      - name: Restore cache
+        uses: actions/cache/restore@v4
+        id: restore-cabal-cache
+        env:
+          cache-name: cache-cabal-build
+        with:
+          path: |
+            ${{ steps.install-haskell.outputs.cabal-store }}
+          key: ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-${{ hashFiles('dependencies.txt') }}-${{ hashFiles('cabal.project*') }}
+          restore-keys: |
+            ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-${{ hashFiles('dependencies.txt') }}
+            ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-
 
-    - name: Build dependencies
-      working-directory: ./cavefish-server
-      id: build-dependencies
-      run: cabal build all --only-dependencies
+      - name: Check workflow test matrix
+        working-directory: ./cavefish-server
+        run: cabal build all --dry-run
 
-    # Save the cache of built dependencies early, so that it is available for
-    # the next GHA run if the Build step fails.
-    - name: Save cache
-      uses: actions/cache/save@v4
-      id: save-cabal-cache
-      # Note: cache-hit will be set to true only when cache hit occurs for the
-      # exact key match. For a partial key match via restore-keys or a cache
-      # miss, it will be set to false.
-      if: steps.build-dependencies.outcome == 'success' && steps.restore-cabal-cache.outputs.cache-hit != 'true'
-      with:
-        path: ${{ steps.install-haskell.outputs.cabal-store }}
-        key:  ${{ steps.restore-cabal-cache.outputs.cache-primary-key }}
+      - name: Build dependencies
+        working-directory: ./cavefish-server
+        id: build-dependencies
+        run: cabal build all --only-dependencies
 
-    - name: Build
-      working-directory: ./cavefish-server
-      run: | 
-        cabal build all
+      - name: Save cache
+        uses: actions/cache/save@v4
+        id: save-cabal-cache
+        if: steps.build-dependencies.outcome == 'success' && steps.restore-cabal-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.install-haskell.outputs.cabal-store }}
+          key:  ${{ steps.restore-cabal-cache.outputs.cache-primary-key }}
 
-    - name: Test
-      working-directory: ./cavefish-server
-      run: |
-        cabal test all
+      - name: Build
+        working-directory: ./cavefish-server
+        run: cabal build all
+
+      - name: Test
+        working-directory: ./cavefish-server
+        run: cabal test all
