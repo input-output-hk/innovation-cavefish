@@ -1,17 +1,19 @@
 {-# LANGUAGE TypeApplications #-}
 
-module ClientBackend.Helpers
-  ( demoAddresses
-  , demoChangeAddressW
-  , demoFundingAddressW
-  , parseAddress
-  , parseSecretKey
-  , generateSecret
-  ) where
+module ClientBackend.Helpers (
+  demoAddresses,
+  demoChangeAddressW,
+  demoFundingAddressW,
+  parseAddress,
+  parseSecretKey,
+  generateSecret,
+) where
 
 import Cardano.Api qualified as Api
+import Client.Mock (decodeHex)
 import Cooked (Wallet, wallet)
 import Core.Intent (AddressW (..))
+import Core.Proof (renderHex)
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Crypto.Random (getRandomBytes)
@@ -21,9 +23,6 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Ledger.Tx.CardanoAPI (toCardanoAddressInEra)
 import Plutus.Script.Utils.Address qualified as ScriptAddr
-
-import Client.Mock (decodeHex)
-import Core.Proof (renderHex)
 
 demoNetworkId :: Api.NetworkId
 demoNetworkId = Api.Testnet (Api.NetworkMagic 1)

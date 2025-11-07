@@ -2,16 +2,16 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module ClientBackend.Handlers
-  ( verifyH
-  , satisfiesH
-  , registerHelperH
-  , prepareHelperH
-  , commitHelperH
-  , finaliseHelperH
-  , payToIntentH
-  , demoAddressesH
-  ) where
+module ClientBackend.Handlers (
+  verifyH,
+  satisfiesH,
+  registerHelperH,
+  prepareHelperH,
+  commitHelperH,
+  finaliseHelperH,
+  payToIntentH,
+  demoAddressesH,
+) where
 
 import Cardano.Api qualified as Api
 import Client.Mock (decodeHex, mkFinaliseReq, mkPrepareReq)
@@ -26,11 +26,10 @@ import Core.Intent (ChangeDelta, IntentW (..), satisfies, toInternalIntent)
 import Core.PaymentProof (ProofResult, hashTxAbs, verifyPaymentProof)
 import Core.Proof (renderHex)
 import Core.TxAbs (TxAbs)
-import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Bifunctor (first)
-import Data.List.NonEmpty (NonEmpty (..))
 import Data.ByteArray qualified as BA
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE

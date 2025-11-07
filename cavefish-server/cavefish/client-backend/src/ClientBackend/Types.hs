@@ -3,10 +3,12 @@
 module ClientBackend.Types where
 
 import Cardano.Api qualified as Api
+import Client.Mock (decodeHex)
 import Core.Api.Messages
 import Core.Api.State (ClientId)
 import Core.Intent (ChangeDelta, IntentW)
 import Core.PaymentProof (ProofResult)
+import Core.Proof (renderHex)
 import Core.TxAbs (TxAbs)
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 qualified as Ed
@@ -17,9 +19,6 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import GHC.Generics (Generic)
-
-import Client.Mock (decodeHex)
-import Core.Proof (renderHex)
 
 -- TODO WG: I don't like PrepareResp as an input here
 data VerifyReq = VerifyReq

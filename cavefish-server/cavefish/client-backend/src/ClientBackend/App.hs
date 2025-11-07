@@ -1,10 +1,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module ClientBackend.App
-  ( Env (..)
-  , AppM (..)
-  , runApp
-  ) where
+module ClientBackend.App (
+  Env (..),
+  AppM (..),
+  runApp,
+) where
 
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.IO.Class (MonadIO)

@@ -1,13 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 
-module ClientBackend.Api
-  ( module ClientBackend.App
-  , ClientApi
-  , clientApi
-  , mkApp
-  , server
-  ) where
+module ClientBackend.Api (
+  module ClientBackend.App,
+  ClientApi,
+  clientApi,
+  mkApp,
+  server,
+) where
 
 import ClientBackend.App
 import ClientBackend.Handlers
