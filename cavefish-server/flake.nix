@@ -1,5 +1,5 @@
 {
-  description = "my-project description";
+  description = "A Nix flake for Cavefish Haskell packages";
 
   inputs = {
 
@@ -28,20 +28,22 @@
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
 
     flake-utils.url = "github:numtide/flake-utils";
+    # Provides cardano-node and cardano-cli executables.
+    cardano-node.url = "github:input-output-hk/cardano-node?ref=10.5.1";
   };
 
-  outputs = inputs: inputs.flake-utils.lib.eachDefaultSystem (system: 
-    import ./nix/outputs.nix { inherit inputs system; }
-  );
+  outputs =
+    inputs:
+    inputs.flake-utils.lib.eachDefaultSystem (
+      system: import ./nix/outputs.nix { inherit inputs system; }
+    );
 
   nixConfig = {
-    extra-substituters = [ 
-      "https://cache.iog.io" 
-      "https://cache.zw3rk.com" 
+    extra-substituters = [
+      "https://cache.iog.io"
     ];
     extra-trusted-public-keys = [
       "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
-      "loony-tools:pr9m4BkM/5/eSTZlkQyRt57Jz7OMBxNSUiMC4FkcNfk="
     ];
     allow-import-from-derivation = true;
     accept-flake-config = true;

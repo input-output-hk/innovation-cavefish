@@ -1,10 +1,10 @@
-# Cavefish server
-Cavefish server, http server, is a sub-project of the [cavefish](../../cabal.project).
+# Cavefish client
+Cavefish client is a light client for Cavefish server, written in Haskell. It provides a DSL and API to interact with the Cavefish server.
 
 ## Installing / Getting started
-> Using `nix` is most convinent way to install all dependencies.  Non nix user, may refer to the [github action script][def] to build their developement environment
+> Using `nix` is the most convenient way to install all dependencies.  Non nix user, may refer to the [github action script][def] to build their development environment.
 
-From cavefish-server folder:
+From the cavefish-server folder:
 ```shell
 nix develope
 ```
@@ -13,16 +13,16 @@ nix develope
 
 ```shell
 cabal clean && cabal update 
-cabal build cavefish-server
+cabal build cavefish-client
 ```
 
-To execute the client:
+To execute cavefish-client:
 ```shell
-cabal run cavefish-server:exe:cavefish-server
+cabal run cavefish-client:exe:cavefish-client
 ```
 Or you may invoke the executable:
 ```shel
-$(cabal exec which cavefish-server)
+$(cabal exec which cavefish-client)
 ```
 For continues build, you may use [watchexec](https://github.com/watchexec/watchexec)
 

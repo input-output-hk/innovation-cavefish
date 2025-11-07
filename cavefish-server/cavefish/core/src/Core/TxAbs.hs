@@ -1,20 +1,21 @@
 module Core.TxAbs where
 
-import Cardano.Api
+import Cardano.Api (CtxTx, TxOut (TxOut), TxOutValue (TxOutValueShelleyBased))
 import Cardano.Api qualified as Api
-import Cardano.Api.Ledger (VKey (..))
-import Cardano.Api.Shelley (Tx (..))
+import Cardano.Api.Ledger (VKey (unVKey))
+import Cardano.Api.Shelley (Tx (ShelleyTx))
 import Cardano.Crypto.DSIGN.Class (rawSerialiseVerKeyDSIGN)
-import Cardano.Ledger.Alonzo.Tx (AlonzoTx (..))
-import Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits (..))
+import Cardano.Ledger.Alonzo.Tx (AlonzoTx (AlonzoTx, wits))
+import Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits (AlonzoTxWits, txwitsVKey))
 import Cardano.Ledger.Keys.WitVKey qualified as LedgerWit
 import Data.Set qualified as Set
+import GHC.Exts (IsList (toList))
 import GHC.Generics (Generic)
 import Ledger (
   CardanoTx (CardanoEmulatorEraTx),
   Coin (Coin),
   Interval,
-  PubKey (..),
+  PubKey (PubKey),
   Slot,
   cardanoPubKeyHash,
   getCardanoTxFee,
@@ -24,17 +25,17 @@ import Ledger (
   pubKeyHash,
  )
 import Ledger.Tx qualified as LedgerTx
-import PlutusLedgerApi.V1.Bytes
+import PlutusLedgerApi.V1.Bytes (fromBytes)
 
 data TxAbs era = TxAbs
   { outputs :: [TxOut CtxTx era]
   , validityInterval :: Interval Slot
-  , absMint :: Value
+  , absMint :: Api.Value
   , absFee :: Integer
   , sigKeys :: Set.Set PubKey
   }
   deriving stock (Eq, Show, Generic)
-  deriving anyclass (ToJSON, FromJSON)
+  deriving anyclass (Api.ToJSON, Api.FromJSON)
 
 cardanoTxToTxAbs :: CardanoTx -> TxAbs Api.ConwayEra
 cardanoTxToTxAbs cardanoTx@(CardanoEmulatorEraTx tx) =
@@ -84,7 +85,7 @@ maskChangeOutput signerKeys outs =
       | otherwise = (masked, out : acc)
 
 valuePositive :: Api.Value -> Bool
-valuePositive = any (\(_, Api.Quantity q) -> q > 0) . Api.valueToList
+valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList
 
 zeroTxOutValue :: TxOut CtxTx Api.ConwayEra -> TxOut CtxTx Api.ConwayEra
 zeroTxOutValue (TxOut addr value datum refScript) =

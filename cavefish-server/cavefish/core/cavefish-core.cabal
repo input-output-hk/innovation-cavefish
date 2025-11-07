@@ -55,23 +55,24 @@ common project-config
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
-    -Wredundant-constraints -Wcompat
+    -Wredundant-constraints -Wcompat -Wunused-packages
+    -Wmissing-import-lists
 
 library
   import:          base, project-config
   hs-source-dirs:  src
   exposed-modules:
     Core.Api.AppContext
-    Core.Api.State
     Core.Api.Messages
+    Core.Api.State
     Core.Cbor
     Core.Intent
+    Core.Observers.Observer
     Core.PaymentProof
     Core.Pke
     Core.Proof
     Core.TxAbs
     Core.TxBuilder
-    Core.Observers.Observer
 
   build-depends:
     , aeson
@@ -85,7 +86,6 @@ library
     , containers
     , cooked-validators
     , crypton
-    , data-default
     , memory
     , mtl
     , plutus-core
@@ -94,13 +94,10 @@ library
     , plutus-script-utils
     , plutus-tx
     , plutus-tx-plugin
-    , servant
     , servant-server
     , stm
     , text
     , time
-    , transformers
-    , transformers-either
     , uuid
 
   if flag(ide-stub)
@@ -112,28 +109,4 @@ test-suite test
   main-is:        Main.hs
   hs-source-dirs: test
   other-modules:  Spec
-  build-depends:
-    , aeson
-    , base16-bytestring
-    , bytestring
-    , cardano-api
-    , cardano-crypto-class
-    , cardano-ledger-alonzo
-    , cardano-ledger-core
-    , cavefish-core
-    , cborg
-    , containers
-    , cooked-validators
-    , crypton
-    , data-default
-    , hspec
-    , http-client
-    , memory
-    , mtl
-    , plutus-ledger
-    , plutus-ledger-api
-    , plutus-script-utils
-    , stm
-    , text
-    , transformers
-    , uuid
+  build-depends:  hspec

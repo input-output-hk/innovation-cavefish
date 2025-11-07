@@ -9,16 +9,23 @@ module Core.PaymentProof (
   hashTxAbs,
 ) where
 
-import Cardano.Api (ConwayEra, Tx)
-import Cardano.Api qualified as Api
+import Cardano.Api (ConwayEra, Tx, TxId, getTxBody, getTxId)
 import Core.Cbor (serialiseTxAbs)
 import Core.Intent (Intent)
 import Core.Pke (PkeCiphertext, ciphertextDigest)
 import Core.Proof (Proof, mkProof, verifyProof)
 import Core.TxAbs (TxAbs)
-import Crypto.Hash (SHA256 (..), hash)
+import Crypto.Hash (SHA256, hash)
 import Crypto.PubKey.Ed25519 (PublicKey, SecretKey)
-import Data.Aeson (FromJSON (..), ToJSON (..), Value (..), object, withObject, (.:), (.=))
+import Data.Aeson (
+  FromJSON (parseJSON),
+  ToJSON (toJSON),
+  Value (String),
+  object,
+  withObject,
+  (.:),
+  (.=),
+ )
 import Data.ByteArray qualified as BA
 import Data.ByteString (ByteString)
 import Data.Text (Text)
@@ -79,14 +86,14 @@ instance FromJSON ProofResult where
 mkPaymentProof ::
   SecretKey ->
   Intent ->
-  Tx Api.ConwayEra ->
+  Tx ConwayEra ->
   TxAbs ConwayEra ->
   PkeCiphertext ->
   ByteString ->
   ByteString ->
   IO ProofResult
 mkPaymentProof secretKey _intent tx txAbs ciphertext _auxNonce _rho = do
-  let txId = Api.getTxId (Api.getTxBody tx)
+  let txId = getTxId (getTxBody tx)
       txAbsHash = hashTxAbs txAbs
       commitmentBytes = ciphertextDigest ciphertext
       proof = mkProof secretKey txId txAbsHash commitmentBytes
@@ -97,7 +104,7 @@ verifyPaymentProof ::
   PublicKey ->
   ProofResult ->
   TxAbs ConwayEra ->
-  Api.TxId ->
+  TxId ->
   PkeCiphertext ->
   ByteString ->
   Either Text ()
@@ -109,5 +116,5 @@ verifyPaymentProof publicKey (ProofEd25519 proof) txAbs txId ciphertext _auxNonc
         then Right ()
         else Left "ed25519 proof verification failed"
 
-hashTxAbs :: TxAbs Api.ConwayEra -> ByteString
+hashTxAbs :: TxAbs ConwayEra -> ByteString
 hashTxAbs = BA.convert . (hash @_ @SHA256) . serialiseTxAbs

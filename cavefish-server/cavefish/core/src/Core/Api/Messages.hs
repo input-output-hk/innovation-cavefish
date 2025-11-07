@@ -8,23 +8,57 @@
 module Core.Api.Messages where
 
 import Cardano.Api qualified as Api
-import Control.Concurrent.STM
+import Control.Concurrent.STM (atomically, modifyTVar', readTVar, readTVarIO)
 import Control.Monad (unless, when)
 import Control.Monad.Except (liftEither)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (MonadReader (..))
-import Core.Api.AppContext (AppM, Env (..))
-import Core.Api.State (ClientId (ClientId), ClientRegistration (..), Completed (..), Pending (..))
-import Core.Cbor (WitnessBundle (..), mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
-import Core.Intent (BuildTxResult (..), ChangeDelta, IntentW, satisfies, toInternalIntent)
-import Core.PaymentProof (ProofResult (..), hashTxAbs)
+import Control.Monad.Reader (MonadReader (ask))
+import Core.Api.AppContext (
+  AppM,
+  Env (Env, build, clientRegistration, complete, pending, pkePublic, pkeSecret, spSk, submit, ttl),
+ )
+import Core.Api.State (
+  ClientId (ClientId),
+  ClientRegistration (ClientRegistration, publicKey),
+  Completed (Completed, creator, submittedAt, tx),
+  Pending (
+    Pending,
+    auxNonce,
+    challenge,
+    ciphertext,
+    commitment,
+    creator,
+    expiry,
+    mockState,
+    rho,
+    tx,
+    txAbsHash
+  ),
+ )
+import Core.Cbor (mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
+import Core.Intent (
+  BuildTxResult (BuildTxResult, changeDelta, mockState, tx, txAbs),
+  ChangeDelta,
+  IntentW,
+  satisfies,
+  toInternalIntent,
+ )
+import Core.PaymentProof (ProofResult (ProofEd25519), hashTxAbs)
 import Core.Pke (ciphertextDigest, decrypt, encrypt, renderError)
 import Core.Proof (mkProof, parseHex, renderHex)
 import Core.TxAbs (TxAbs)
-import Crypto.Error (CryptoFailable (..))
+import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Crypto.Random (getRandomBytes)
-import Data.Aeson
+import Data.Aeson (
+  FromJSON (parseJSON),
+  ToJSON (toJSON),
+  Value (String),
+  object,
+  withObject,
+  (.:),
+  (.=),
+ )
 import Data.Bifunctor (first)
 import Data.ByteArray qualified as BA
 import Data.ByteString (ByteString)
@@ -35,12 +69,23 @@ import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Data.Time
-import Data.UUID
+import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime)
+import Data.UUID (UUID)
 import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
 import Ledger.Tx.CardanoAPI (CardanoTx, pattern CardanoEmulatorEraTx)
-import Servant
+import Servant (
+  ServerError,
+  err400,
+  err403,
+  err404,
+  err409,
+  err410,
+  err422,
+  err500,
+  errBody,
+  throwError,
+ )
 
 -- | Cavefish API a
 data TransactionResp

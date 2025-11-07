@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Module      : Client.Mock
 -- Description : Mock client implementation for testing against the server.
@@ -8,20 +9,20 @@
 module Client.Mock where
 
 import Cardano.Api qualified as Api
-import Control.Monad
+import Control.Monad (when)
 import Control.Monad.Error.Class (throwError)
 import Core.Api.AppContext (AppM)
 import Core.Api.Messages (
-  ClientsResp (..),
-  CommitReq (..),
-  CommitResp (..),
-  FinaliseReq (..),
-  FinaliseResp (..),
-  PendingResp (..),
-  PrepareReq (..),
-  PrepareResp (..),
-  RegisterReq (..),
-  RegisterResp (..),
+  ClientsResp,
+  CommitReq (CommitReq, bigR, txId),
+  CommitResp (CommitResp, pi),
+  FinaliseReq (FinaliseReq, lcSig, txId),
+  FinaliseResp,
+  PendingResp,
+  PrepareReq (PrepareReq, clientId, intent, observer),
+  PrepareResp (PrepareResp, changeDelta, txAbs, txId, witnessBundleHex),
+  RegisterReq (RegisterReq, publicKey),
+  RegisterResp (RegisterResp, id, spPk),
   clientSignatureMessage,
   clientsH,
   commitH,
@@ -30,8 +31,11 @@ import Core.Api.Messages (
   prepareH,
   registerH,
  )
-import Core.Api.State (ClientId (..))
-import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
+import Core.Api.State (ClientId (ClientId))
+import Core.Cbor (
+  ClientWitnessBundle (ClientWitnessBundle, cwbAuxNonce, cwbCiphertext, cwbTxId),
+  deserialiseClientWitnessBundle,
+ )
 import Core.Intent (IntentW, satisfies, toInternalIntent)
 import Core.Observers.Observer (intentStakeValidatorBytes)
 import Core.PaymentProof (hashTxAbs, verifyPaymentProof)

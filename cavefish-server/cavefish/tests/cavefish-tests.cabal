@@ -55,7 +55,8 @@ common project-config
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
-    -Wredundant-constraints -Wcompat
+    -Wredundant-constraints -Wcompat -Wunused-packages
+    -Wmissing-import-lists
 
 library
   import:          base, project-config
@@ -71,13 +72,7 @@ executable cavefish-test-exe
   import:         base, project-config
   hs-source-dirs: app
   main-is:        Main.hs
-  build-depends:
-    , bytestring
-    , cavefish-tests
-    , cooked-validators
-    , crypton
-    , stm
-    , warp
+  build-depends:  cavefish-tests
 
   if flag(ide-stub)
     cpp-options: -DIDE_STUB
@@ -93,34 +88,23 @@ test-suite test
     Test.Common
 
   build-depends:
-    , aeson
-    , base16-bytestring
     , bytestring
     , cardano-api
-    , cardano-crypto-class
-    , cardano-ledger-alonzo
-    , cardano-ledger-core
     , cavefish-client
     , cavefish-core
     , cavefish-server
-    , cborg
     , containers
     , cooked-validators
     , crypton
-    , data-default
     , hspec
     , http-client
     , memory
-    , mtl
     , plutus-ledger
-    , plutus-ledger-api
     , plutus-script-utils
-    , servant
     , servant-client
     , servant-server
     , stm
     , text
     , transformers
     , uuid
-    , wai
     , warp

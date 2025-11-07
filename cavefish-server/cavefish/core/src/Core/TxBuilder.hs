@@ -10,8 +10,8 @@ import Cooked (
   BalanceOutputPolicy (..),
   BalancingPolicy (BalanceWith),
   FeePolicy (..),
-  MonadBlockChain (..),
-  TxOpts (..),
+  MonadBlockChain (validateTxSkel),
+  TxOpts (txOptBalanceOutputPolicy, txOptBalancingPolicy),
   TxSkel (
     txSkelOpts,
     txSkelOuts,
@@ -28,13 +28,14 @@ import Cooked (
   txSkelTemplate,
  )
 import Cooked.Skeleton.Payable qualified as Payable
-import Core.Api.AppContext (Env (..))
-import Core.Intent (Intent (..), source)
+import Core.Api.AppContext (Env (Env, resolveWallet, spFee, spWallet))
+import Core.Intent (Intent (irChangeTo, irMaxInterval, irMustMint, irPayTo, irSpendFrom), source)
 import Core.Observers.Observer (stakeValidatorFromBytes)
 import Data.ByteString (ByteString)
 import Data.List (nub)
 import Data.Text (Text)
 import Data.Text qualified as T
+import GHC.Exts (IsList (toList))
 import Ledger.Tx (CardanoTx)
 import Plutus.Script.Utils.Value qualified as PSV
 import PlutusLedgerApi.V1.Interval qualified as Interval
@@ -129,7 +130,7 @@ mkPayTo value addr Env {..} = do
 
 toLovelace :: Api.Value -> Either Text Integer
 toLovelace =
-  foldM step 0 . Api.valueToList
+  foldM step 0 . toList
   where
     step :: Integer -> (Api.AssetId, Api.Quantity) -> Either Text Integer
     step acc (aid, Api.Quantity q) =

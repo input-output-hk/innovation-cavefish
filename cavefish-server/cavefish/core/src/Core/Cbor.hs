@@ -20,10 +20,14 @@ import Cardano.Api.Shelley qualified as Api.Shelley
 import Cardano.Binary qualified as CBOR
 import Codec.CBOR.Encoding qualified as E
 import Codec.CBOR.Read (deserialiseFromBytes)
-import Codec.CBOR.Term (Term (..), decodeTerm, encodeTerm)
+import Codec.CBOR.Term (
+  Term (TBytes, TBytesI, TInt, TInteger, TList, TListI, TMap, TMapI, TTagged),
+  decodeTerm,
+  encodeTerm,
+ )
 import Codec.CBOR.Write qualified as Write
-import Core.Pke (PkeCiphertext (..), deserialiseCiphertext, serialiseCiphertext)
-import Core.TxAbs (TxAbs (..))
+import Core.Pke (PkeCiphertext, deserialiseCiphertext, serialiseCiphertext)
+import Core.TxAbs (TxAbs (TxAbs, absFee, absMint, outputs, sigKeys, validityInterval))
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
@@ -31,8 +35,8 @@ import Data.ByteString.Lazy qualified as BL
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
-import Ledger (Slot (..))
-import Ledger.Crypto (PubKey (..))
+import Ledger (Slot (Slot))
+import Ledger.Crypto (PubKey (PubKey))
 import PlutusLedgerApi.V1 (fromBuiltin)
 import PlutusLedgerApi.V1.Bytes (LedgerBytes (LedgerBytes))
 import PlutusLedgerApi.V1.Interval qualified as Interval
@@ -304,7 +308,7 @@ maskInput = \case
 maskTxId :: Term -> Term
 maskTxId = \case
   TBytes bs -> TBytes (BS.replicate (BS.length bs) 0)
-  TBytesI bs -> TBytesI (BL.replicate (fromIntegral (BL.length bs)) 0)
+  TBytesI bs -> TBytesI (BL.replicate (BL.length bs) 0)
   other -> other
 
 maskTxIndex :: Term -> Term
