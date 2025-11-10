@@ -1,0 +1,307 @@
+
+\documentclass[a4paper,USenglish,cleveref, autoref,anonymous, thm-restate]{lipics-v2021}
+%This is a template for producing LIPIcs articles. 
+%See lipics-v2021-authors-guidelines.pdf for further information.
+%for A4 paper format use option "a4paper", for US-letter use option "letterpaper"
+%for british hyphenation rules use option "UKenglish", for american hyphenation rules use option "USenglish"
+%for section-numbered lemmas etc., use "numberwithinsect"
+%for enabling cleveref support, use "cleveref"
+%for enabling autoref support, use "autoref"
+%for anonymousing the authors (e.g. for double-blind review), add "anonymous"
+%for enabling thm-restate support, use "thm-restate"
+%for enabling a two-column layout for the author/affilation part (only applicable for > 6 authors), use "authorcolumns"
+%for producing a PDF according the PDF/A standard, add "pdfa"
+
+%\pdfoutput=1 %uncomment to ensure pdflatex processing (mandatatory e.g. to submit to arXiv)
+%\hideLIPIcs  %uncomment to remove references to LIPIcs series (logo, DOI, ...), e.g. when preparing a pre-final version to be uploaded to arXiv or another public repository
+
+
+\usepackage{stmaryrd}
+\usepackage{bm}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{matrix,shapes,arrows,positioning,chains,calc,fit}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage[normalem]{ulem}
+\usepackage{amsthm}
+\usepackage[subtle]{savetrees} 
+
+\theoremstyle{definition} % For upright text
+\newtheorem{assumption}{Assumption}
+
+
+%\graphicspath{{./graphics/}}%helpful if your graphic files are in another directory
+
+\bibliographystyle{plainurl}% the mandatory bibstyle
+
+\title{Cavefish: Communication-Optimal Light Client Protocol for UTxO Ledgers}
+
+\titlerunning{Cavefish} %TODO optional, please use if title is longer than one line
+
+\author{Jane {Open Access}}{Dummy University Computing Laboratory, [optional: Address], Country \and My second affiliation, Country \and \url{http://www.myhomepage.edu} }{johnqpublic@dummyuni.org}{https://orcid.org/0000-0002-1825-0097}{(Optional) author-specific funding acknowledgements}%TODO mandatory, please use full name; only 1 author per \author macro; first two parameters are mandatory, other parameters can be empty. Please provide at least the name of the affiliation and the country. The full address is optional. Use additional curly braces to indicate the correct name splitting when the last name consists of multiple name parts.
+
+
+\authorrunning{J. Open Access and J.\,R. Public} %TODO mandatory. First: Use abbreviated first/middle names. Second (only in severe cases): Use first author plus 'et al.'
+
+\Copyright{Jane Open Access and Joan R. Public} %TODO mandatory, please use full first names. LIPIcs license is "CC-BY";  http://creativecommons.org/licenses/by/3.0/
+
+\begin{CCSXML}
+<ccs2012>
+   <concept>
+       <concept_id>10002978.10003014.10003015</concept_id>
+       <concept_desc>Security and privacy~Security protocols</concept_desc>
+       <concept_significance>500</concept_significance>
+       </concept>
+   <concept>
+       <concept_id>10003752.10010070.10010099.10010103</concept_id>
+       <concept_desc>Theory of computation~Exact and approximate computation of equilibria</concept_desc>
+       <concept_significance>500</concept_significance>
+       </concept>
+   <concept>
+       <concept_id>10002950.10003624.10003633.10003643</concept_id>
+       <concept_desc>Mathematics of computing~Graphs and surfaces</concept_desc>
+       <concept_significance>300</concept_significance>
+       </concept>
+ </ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Security and privacy~Security protocols}
+
+\keywords{light clients, protocols, wallets, blockchain} %TODO mandatory; please add comma-separated list of keywords
+
+%\category{} %optional, e.g. invited paper
+
+%\relatedversion{} %optional, e.g. full version hosted on arXiv, HAL, or other respository/website
+%\relatedversiondetails[linktext={opt. text shown instead of the URL}, cite=DBLP:books/mk/GrayR93]{Classification (e.g. Full Version, Extended Version, Previous Version}{URL to related version} %linktext and cite are optional
+
+%\supplement{}%optional, e.g. related research data, source code, ... hosted on a repository like zenodo, figshare, GitHub, ...
+%\supplementdetails[linktext={opt. text shown instead of the URL}, cite=DBLP:books/mk/GrayR93, subcategory={Description, Subcategory}, swhid={Software Heritage Identifier}]{General Classification (e.g. Software, Dataset, Model, ...)}{URL to related version} %linktext, cite, and subcategory are optional
+
+%\funding{(Optional) general funding statement \dots}%optional, to capture a funding statement, which applies to all authors. Please enter author specific funding statements as fifth argument of the \author macro.
+
+
+%\nolinenumbers %uncomment to disable line numbering
+
+
+
+%Editor-only macros:: begin (do not touch as author)%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\EventEditors{John Q. Open and Joan R. Access}
+\EventNoEds{2}
+\EventLongTitle{42nd Conference on Very Important Topics (CVIT 2016)}
+\EventShortTitle{CVIT 2016}
+\EventAcronym{CVIT}
+\EventYear{2016}
+\EventDate{December 24--27, 2016}
+\EventLocation{Little Whinging, United Kingdom}
+\EventLogo{}
+\SeriesVolume{42}
+\ArticleNo{23}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%formatting
+\newcommand{\var}[1]{\ensuremath{\mathit{#1}}}
+\newcommand{\fun}[1]{\ensuremath{\mathsf{#1}}}
+\newcommand{\type}[1]{\ensuremath{\mathsf{#1}}}
+\renewcommand\H{\mathbb{H}}
+\newcommand\A{\ensuremath{\mathcal{A}}}
+
+\newcommand\BLD{\ensuremath{\mathsf{BLD}}}
+\newcommand\WBPS{\ensuremath{\mathsf{WBPS}}}
+\newcommand\WBPSP{\ensuremath{\mathsf{WBPS}[P]}}
+
+
+\newcommand\hash{\ensuremath{\mathsf{H}}}
+\newcommand\HGen{\ensuremath{\mathsf{HGen}}}
+
+\newcommand\Setup{\ensuremath{\mathsf{Setup}}}
+\newcommand\Keygen{\ensuremath{\mathsf{KeyGen}}}
+\newcommand\Ver{\ensuremath{\mathsf{Ver}}}
+\newcommand\Sign{\ensuremath{\mathsf{Sign}}}
+\newcommand\Request{\ensuremath{\mathsf{Request}}}
+
+\newcommand\GGen{\ensuremath{\mathsf{GGen}}}
+\newcommand\NArg{\ensuremath{\mathsf{NArg}}}
+\newcommand\NArgr{\ensuremath{\mathsf{NArg}[R]}}
+
+\newcommand\Prove{\ensuremath{\mathsf{Prove}}}
+\newcommand\SimProve{\ensuremath{\mathsf{SimProve}}}
+
+\newcommand\PKE{\ensuremath{\mathsf{PKE}}}
+\newcommand\SDS{\ensuremath{\mathsf{SDS}}}
+\newcommand\DS{\ensuremath{\mathsf{DS}}}
+\newcommand\Enc{\ensuremath{\mathsf{Enc}}}
+\newcommand\Dec{\ensuremath{\mathsf{Dec}}}
+
+
+\newcommand{\Interval}[1]{\type{Interval}[#1]}
+\newcommand{\nextdef}{\ensuremath{\\[1em]}}
+\newcommand{\where}{\ensuremath{~ ~ \mathbf{where}~ ~ }}
+
+\newcommand{\todobox}[1]{ \fcolorbox{black}{gray!50} {\textbf{TODO:} \parbox{.7\textwidth}{#1}}}
+\newcommand{\cut}[1]{}
+%\newcommand{\cut}[1]{ \textcolor{orange}{#1}}
+
+
+% Macros for eutxo things.
+\newcommand{\tx}{\fun{tx}}
+\newcommand{\TxId}{\type{TxId}}
+\newcommand{\TxIn}{\type{TxIn}}
+\newcommand{\Header}{\type{Header}}
+\newcommand{\Block}{\type{Block}}
+\newcommand{\LState}{\type{LState}}
+\newcommand{\Tx}{\type{Tx}}
+\newcommand{\Slot}{\type{Slot}}
+\newcommand{\TxAbs}{\type{TxAbs}}
+\newcommand{\B}{\{0,1\}}
+\newcommand{\TxOut}{\type{TxOut}}
+\newcommand{\UTxO}{\type{UTxO}}
+\newcommand{\txId}{\msf{txId}}
+\newcommand{\txrefid}{\fun{id}}
+\newcommand{\Address}{\ensuremath{\s{Address}}}
+\newcommand{\DataHash}{\ensuremath{\s{DataHash}}}
+\newcommand{\hashData}{\fun{dataHash}}
+\newcommand{\idx}{\fun{index}}
+\newcommand{\inputs}{\fun{inputs}}
+\newcommand{\outputs}{\fun{outputs}}
+\newcommand{\Out}{\type{Output}}
+\newcommand{\validityInterval}{\fun{validityInterval}}
+\newcommand{\scripts}{\fun{scripts}}
+\newcommand{\mint}{\fun{mint}}
+\newcommand{\mintScripts}{\fun{mintScripts}}
+\newcommand{\mintScsRdmrs}{\fun{mintRdmrs}}
+\newcommand{\mintRdmrs}{\fun{mintRdmrs}}
+\newcommand{\sigs}{\fun{sigs}}
+\newcommand{\fee}{\fun{fee}}
+\newcommand{\addr}{\fun{addr}}
+\newcommand{\pubkey}{\fun{PubKey}}
+\newcommand{\privkey}{\fun{PrivKey}}
+\newcommand{\val}{\fun{value}}  %% \value is already defined
+\newcommand{\Value}{\type{Value}}
+\newcommand{\Redeemer}{\type{Redeemer}}
+\newcommand{\TxOutRef}{\type{TxIn}}
+\newcommand{\ScriptContext}{\type{ScriptContext}}
+\newcommand{\ScriptPurpose}{\type{ScriptPurpose}}
+\newcommand{\Datum}{\type{Datum}}
+\newcommand{\DCert}{\type{DCert}}
+\newcommand{\LCTx}{\type{LCTx}}
+\newcommand{\TxInInfo}{\type{TxInInfo}}
+
+
+\newcommand{\validator}{\fun{validator}}
+\newcommand{\redeemer}{\fun{redeemer}}
+\newcommand{\datum}{\fun{datum}}
+\newcommand{\datumHash}{\fun{datumHash}}
+\newcommand{\datumWits}{\fun{datumWitnesses}}
+\newcommand{\Data}{\ensuremath{\s{Data}}}
+\newcommand{\Input}{\ensuremath{\s{Input}}}
+\newcommand{\Output}{\type{Output}}
+\newcommand{\OutputRef}{\fun{OutputRef}}
+\newcommand{\Signature}{\type{Signature}}
+\newcommand{\Ledger}{\ensuremath{\s{Ledger}}}
+
+\newcommand{\outputref}{\fun{outputRef}}
+\newcommand{\outputrefs}{\fun{outputRefs}}
+\newcommand{\txin}{\fun{in}}
+\newcommand{\id}{\fun{id}}
+\newcommand{\lookupTx}{\msf{lookupTx}}
+\newcommand{\getSpent}{\msf{getSpentOutput}}
+
+% \newcommand{\Tick}{\ensuremath{\s{Tick}}}
+\newcommand{\Tick}{\type{Slot}}
+\newcommand{\Script}{\type{Script}}
+\newcommand{\spent}{\msf{spentOutputs}}
+\newcommand{\unspent}{\msf{unspentOutputs}}
+\newcommand{\txunspent}{\msf{unspentTxOutputs}}
+\newcommand{\eutxotx}{\msf{Tx}}
+
+\newcommand{\consumes}[1]{\msf{consumes(#1)}}
+\newcommand{\consumesOne}[1]{\msf{consumesOne(#1)}}
+\newcommand{\cid}{\fun{cid}}
+\newcommand{\inputValue}{\fun{inputValue}}
+\newcommand{\rMin}{r_{\fun{min}}}
+\newcommand{\rMax}{r_{\fun{max}}}
+
+\newcommand{\utxotx}{\msf{Tx}}
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\G}{\mathbb{G}}
+\newcommand{\Lang}{\mathcal{L}}
+\newcommand{\crs}{\text{crs}}
+
+\newcommand{\nt}{\ensuremath{\textsf{aux}_\textsf{nt}}}
+\newcommand{\notelength}{\kappa}
+
+
+\newcommand{\Quantity}{\type{Quantity}}
+\newcommand{\TokenName}{\type{TokenName}}
+\newcommand{\Asset}{\ensuremath{\s{Asset}}}
+\newcommand{\AssetID}{\type{AssetID}}
+\newcommand{\Policy}{\type{Policy}}
+\newcommand{\Quantities}{\ensuremath{\s{Quantities}}}
+\newcommand{\nativeCur}{\ensuremath{\mathrm{nativeC}}}
+\newcommand{\nativeTok}{\ensuremath{\mathrm{nativeT}}}
+\newcommand{\valC}{\mkValidator{\mathcal{C}}}
+\newcommand{\polC}{\mkPolicy{\mathcal{C}}}
+\newcommand\mkValidator[1]{\msf{validator}_#1}
+\newcommand\mkPolicy[1]{\msf{policy}_#1}
+
+\newcommand{\PublicKey}{\ensuremath{\s{PubKey}}}
+\newcommand{\PubKey}{\ensuremath{\s{PubKey}}}
+\newcommand{\PrivateKey}{\ensuremath{\s{PrivateKey}}}
+
+\newcommand{\mkContext}{\ensuremath{\s{mkContext}}}
+\newcommand{\mkTxInfo}{\ensuremath{\s{mkTxInfo}}}
+\newcommand{\mkVlContext}{\ensuremath{\s{mkValidatorContext}}}
+\newcommand{\mkMpsContext}{\ensuremath{\s{mkPolicyContext}}}
+\newcommand{\checkSig}{\type{checkSig}}
+
+\newcommand{\applyScript}[1]{\ensuremath{\llbracket#1\rrbracket}}
+\newcommand{\chkSpec}[1]{\ensuremath{\llbracket#1\rrbracket}_{\type{DSL}}}
+\newcommand{\applyMPScript}[1]{\ensuremath{\llbracket#1\rrbracket}}
+
+\newcommand{\true}{\type{1}}
+\newcommand{\false}{\type{0}}
+\newcommand{\True}{\type{1}}
+\newcommand{\False}{\type{0}}
+
+\newcommand{\leteq}{:=}
+
+\begin{document}
+
+
+\input{sections/intro}
+\input{sections/related}
+\input{sections/techbg}
+
+\input{sections/txmodel.tex}
+
+
+\input{sections/lcspec}
+\input{sections/proto}
+\input{sections/blindsig}
+\input{sections/analysis}
+\input{sections/implementation}
+\input{sections/conclusion}
+
+
+
+
+%%
+%% Bibliography
+%%
+
+%% Please use bibtex, 
+
+\bibliography{lcbib}
+
+
+\appendix
+\input{appendix.tex}
+
+
+\end{document}

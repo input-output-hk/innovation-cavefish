@@ -1,0 +1,318 @@
+% !TEX root = ../lc_main.tex
+
+
+\section{Light Client Protocols}
+\label{sec:protocols}
+We give an overview on our light client protocol and its components. Our protocol maximizes space and communication efficiency by essentially pushing all storage and lookup tasks to the SP, whilst guaranteeing the resulting transaction is safe for the light client to sign, and compensating their SP for their effort. This is non-trivial as the transaction must be signed sight-unseen (blinded) otherwise, the light client could simply remove the payment to the SP and submit the modified transaction.
+
+To satisfy both parties, we rely on cryptographic tools as well as some established features in implemented blockchains such as transaction validity periods and handling of invalid transactions. In the rest of this section, we make the following assumption: all communication between a light client and a service provider happens over a secure channel (e.g. a TLS connection).
+
+\subsection{Definitions and requirements}
+
+\begin{definition}[Correctness] A transaction building protocol is \textbf{correct} if for an honest light client, and service provider and any state $\LState_i \in \LState$ and intent $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$ such that: if $\fun{mkToSpec}(\LState_i, \var{int_{post}}) \neq \bot$, then the protocol completes and the transaction $\Tx'$ produced by the SP is such that $\fun{\fun{checkTxL}~}(\LState_i, \Tx')=1$. \end{definition}
+
+We use ${\fun{checkTxL}~}(l, \tx)$  as shorthand for  $\fun{checkTx}~((\var{slot}, \var{fee}), \var{utxo},~\tx)$, with ledger state $l$ 
+containing UTxO state $\fun{utxo}$ and current slot number $\fun{slot}$ and minimum fee $\fun{fee}$.
+
+\begin{definition}[Safety] A transaction building protocol is \textbf{safe} if for an honest light client and any service provider SP we have that: if transaction $\Tx'$ is produced by the SP is such that  $\fun{\fun{checkTxL}~}(LState, \Tx')=1$
+%against the client's key (XXX note: maybe we can ommit this)
+, then it must be that $\fun{chkSpec}(\var{int_{post}} , \Tx')=1$. \end{definition}
+
+The safety property is derived from two factors: first, the unforgeability property of $\WBPSP$ will ensure that only transactions that satisfy the given predicate will be signed. Second, our assumptions on ledger rules ensure that signed transactions involving spent UTXOs will have no effect (as opposed to something undesirable to the user).  
+
+\begin{definition}[Private until posted] A transaction building protocol has the  \textbf{private until posted} (PuP) property if a PPT adversarial client $C_\mathcal{A}$ cannot win the following experiment with probability significantly higher than $1\over 2$.
+
+For an honest service provider SP and any client $C_\mathcal{A}$ we have that: client provides 2 states $\LState_0, \LState_1$ and one intent $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$ such that for $i=0,1$ it is $ \fun{mkToSpec}(\LState_i, \var{int_{post}}) \neq \bot$.  The experiment flips a coin $d$ and runs the protocol between SP and C* using state $\LState_d$. $C_\mathcal{A}$ outputs $d^*$. The adversarial client wins iff $d=d^*$. \end{definition}
+
+The Private until posted property of our protocol is derived from Theorem \ref{thm:blind} and the protocol structure. Given an adversary against $\A$ PuP, we can build  an adversary against the weak blindness of the $\WBPSP$ scheme by running the SP once on $\LState_0$ and once on $\LState_1$ to produce two challenge messages for the blindness security game and simulate the role of the challenge towards $\A$ by passing on the rest of the protocol messages (the experiment enforces random padding internally). If $A$ can distinguish which ledger was used in producing the messages we can use the same index as our guess in the PuP game. 
+
+\subsection{Cavefish: a communication-optimal transaction building protocol}
+We given an overview on our light client protocol and its components.
+As the protocol is uniquely suited for UTxO-based blockchains, we develop our approach
+to support the general ledger model explained in Section~\ref{sec:model}
+and the intents set forth in Section~\ref{sec:dsl}.
+
+
+
+
+
+\subsubsection{Security model and requirements}
+\label{sec:secmodel}
+\textbf{Rational Actors.} For liveness, we assume that protocol participants are rational in the sense that they will opt to complete tasks that benefit them directly (i.e in the form of rewards, or in the form of a desired transaction being posted). For safety we assume parties can be fully malicious.
+
+\noindent\textbf{Transaction Expiry.} For safety, we require that transactions can be set to be valid only within a certain time window. This is to prevent trivial attacks where a malicious SP delays posting a transaction indefinitely. The user could contact a different SP to create a second transaction with similar parameters (e.g. by paying the same recipient with different coins) with the risk that the first SP would also post their transaction, making the user pay twice.
+
+\noindent\textbf{Idempotent Doublespends.} For safety we also require that attempted double spends are idempotent, i.e. they are simply not valid transactions and do not penalize (slash) the user for signing them. 
+
+\noindent\textbf{Trusted Setup.} We specify a proof system using a trapdoor, which is a common characteristic of efficient options such as Groth16 \cite{cryptoeprint:2016/260} or Plonk \cite{plonk}. It is possible to use alternatives featuring transparent setup with some impact to communication size. In the case of a transparent setup for $\NArg$, we still need to generate keys for $\PKE$. In the case of Elgamal in the random oracle model, this can be accomplished by hashing an unpredictable string into a group element.  
+
+\subsection{Protocol description}
+\label{sec:mainproto}
+The protocol operates as follows: the light client connects to the SP and sends a posting intent $\var{int_{post}}$, as well as a public key that has received payments (and, optionally a BIP-032 chaincode so that the SP can also derive child keys from the initial one --we explain the details in Section \ref{sec:xclient}). The SP will then search for UTXOs belonging to the client and form a transaction that satisfies the intent $\var{int_{post}}$, including in the transaction a tip for the SP's own work. Lastly, the SP adds a random note $\nt$ to the note field of the transaction. Then, the client and SP engage in a weakly blind predicate signature protocol so as to efficiently have the client sign the transaction whilst  ensuring that (1) the client needs to sign before learning the full transaction (typically the used UTXOs are hidden), and (2) that the signed transaction satisfies $\var{int_{post}}$ by means of satisfying the corresponding predicate.
+
+%\subsubsection{Outline}
+%The following computations are performed in the protocol
+%
+%\begin{itemize}
+%    \item[(i)] Intent specification is generated (see Section \ref{sec:dsl})
+%    \item[] \textcolor{orange}{mr: do we still need this extra signature? we can just say communication happens over secure channel.}
+%    \item[(ii)] Signature is generated as follows :
+%    \[\var{sig} = \fun{sign}~(\var{int_{post}}, sk_{\mathrm{client}})\]
+%    \item[(iii)] The signature is checked as follows :
+%    \[ \fun{checkSig} (\var{int_{post}}, vk_c, \var{sig}) = \true \]
+%    \item[(iv)] The transaction is generated as follows, including a randomly generated bytestring
+%    in the $\fun{auxData}$ field for extra entropy :
+%    \[ \tx = \fun{mkToSpec}~(\var{ls},~\var{int_{post}},~\tx_t)~\{~\fun{auxData}~=~\fun{random}~\} \]
+%    \item[(v)] Abstract transaction is generated as :
+%    \[ \TxAbs = \fun{mkAbs}~\tx  \]
+%    \item[(vi)] Blind Signature Commitment (see Section \ref{sec:blind} for details)
+%
+%    \item[(vii)] Intent specification Proof (see Section \ref{sec:dsl}) :
+%    \[ \chkSpec{(\var{int_{post}})}(\TxAbs )= \true \]
+%    \item[(viii)] Proof Check. Blind signatures are computed by (see Section \ref{sec:blind} for details), with $\var{sks} = \fun{getSKs}~\fun{dom}~(\tx . \fun{sigs})$ :
+%    \[ \var{sigs} = \{~(s,~\fun{blindSign}~(h,~\TxAbs,~ s)) \vert s \in sk_{\mathrm{client}} \cup ~\var{sks}~\} \]
+%    \item[(ix)] Signatures are computed from blind signatures (see Section \ref{sec:blind} for details) :
+%    \[ \var{sigs'} = \{~(s,~\fun{mkRealSig}~(s,~h,~\TxAbs,~k)) ~\vert~(s, k) \in \var{sigs}~\} \]
+%    \item[(ix)] Signatures are added to the transaction
+%    \[ \var{tx'} = \tx~\{~sig = \var{sigs'}~\} \]
+%\end{itemize}
+We can instantiate our protocol for two kinds of intents: ``light'' and ``extended''. In the light version,  we  support intents where the transaction abstract does not give the light client any information the SP does not wish to disclose---by design, the abstract hides the input transactions, but it could reveal, e.g. some state details of a smart contract. 
+
+A practical example of such intents is $int_{\text{light}}(\fun{tx}):=\{\textbf{return } (\fun{makeAbs}(\tx)=\fun{makeAbs}(\var{tx_0}))\}$ i.e. the light client  fully determines the requested transaction (including SP fee) to be $\fun{tx}_0$, apart from the input UTXOs (which it does not know) and the note field $\textsf{aux}$ which is free to the SP to set. This implies that $\TxAbs$ provides no new information to the light client. This reduces the computational effort by SP invested in running the $\NArg$ prover as $\fun{chkSpec}$ consists only of substring equality checks. We note here that no range check is necessary for values: $\fun{makeAbs}$  (Section \ref{sec:dsl}) retains the prescribed value assigned to all outputs except the first (which is used as a ``change'' address), i.e., the only option for the SP is to assign all excess value to the change address.
+
+Alternatively, in the extended variant, we set $\fun{makeAbs}(x):=\{\textbf{return } 1\}$, and change the predicate check from     $\fun{chkSpec}~(\mathcal{I}_\mathsf{post} \times \TxAbs) \to \B$ to $\fun{chkSpec}~(\mathcal{I}_\mathsf{post} \times \Tx) \to \B$. This too ensures that no information is leaked by $\TxAbs$. Our results hold for both variants.
+
+
+We show our complete light client protocol  in Figure~\ref{fig:protocol-short}, leveraging the  weakly blind signatures predicate of section \ref{sect:ourscheme}. For simplicity, the figure describes the process for a single UTXO signature, if more are needed, multiple \WBPS sessions can be run sharing the same $com_\tx$.
+
+
+
+
+\tikzset{
+  leftArrowBelow/.style={
+    append after command={
+      (\tikzlastnode.south east) ++(0,0) edge[->, thick] ([yshift=0pt]\tikzlastnode.south west)
+    }
+  },
+  rightArrowBelow/.style={
+    append after command={
+      (\tikzlastnode.south east) ++(0,0) edge[<-, thick] ([yshift=0pt]\tikzlastnode.south west)
+    }
+  }
+}
+\begin{figure}[ht]
+\footnotesize
+\begin{tikzpicture}[every node/.style={font=\small}]
+    \footnotesize
+	\matrix (m)[matrix of nodes, column  sep=0.1cm,row sep=0mm,
+			nodes={draw=none, anchor=center, 
+			minimum height=3mm},
+			column 1/.style={nodes={minimum width=4.5cm}}, 
+			column 3/.style={nodes={minimum width=6.2cm}}, 
+			column 2/.style={nodes={minimum width=2.6cm}} 
+			 ]{
+		\textbf{Signer (LC)} & & \textbf{Service Provider (SP)}\\
+    & & Obtain newest $\LState_t\ ls$\\
+		Generate intent $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$\\
+		& \node[rightArrowBelow] {$\var{int_{post}}, vk_c$};  \\
+    		& & Determine client UTXOs from $(\var{int_{post}}, vk_c)$\\
+		& & Generate $\tx = \fun{mkToSpec}(\var{ls},\var{int_{post}})$,\\
+    & & $\TxAbs = \fun{mkAbs}(\tx)$, $\nt \xleftarrow{\$} \{ 0,1 \}^\notelength$ \\
+    & &  Produce commitment  $com_\tx$ \\ % = $\var{Com}(\tx{\color{blue}||\var{nt}};\rho)$\\
+		& \node[leftArrowBelow] {$com_\tx,\TxAbs$}; & \\
+		%\ h=\fun{txid}~\tx
+		% %& ZK.proof $p$ of $P (h,\  \TxAbs) = \true$ & \\
+		Produce blind sig. com. $\var{R}=g^r$ &  \node[rightArrowBelow] {$\var{R}$};\\
+%    & & $c=H(R,X_c,\tx{\color{blue}||\var{nt}})$ and\\
+%		& & proof $\pi$ : $\fun{chkSpec}(\var{int_{post}},\tx) = 1\ \land$\\
+%	 	& & \quad\quad\quad $com_\tx = \var{Com}(\tx{\color{blue}||\var{nt}};\rho)\ \land$\\
+%		& & \quad\quad\quad $c=H(R,X_c,\tx{\color{blue}||\var{nt}})$ \\
+		&  \node[leftArrowBelow] {$c,\pi$}; & Produce challenge $c$ and proof $\pi$ \\
+		% %& ZK.proof $p$ of $P (h,\  \TxAbs) = \true$ & \\
+		 Check proof $\pi$ \\
+		Produce  $s=r+cx$ & \node[rightArrowBelow] {$\var{s}$}; & Produce signature $\sigma = (R,s)$\\
+		& & If valid, post $(\tx||\var{aux},\sigma)$ on chain.\\
+	};
+	\draw[thick] (m-1-1.south east)--(m-1-1.south west);
+	\draw[thick] (m-1-3.south east)--(m-1-3.south west);
+	\node[fit={(m-7-3.south west) (m-13-3.south east) (m-10-1.north west)},
+   ultra thick, dotted, inner xsep=11pt, inner ysep=0pt,
+    rounded corners=1mm, draw=gray, label={[gray,anchor=north west]north west:WBPS Execution for $m:=\tx||\nt $}]{};	
+\end{tikzpicture}
+\caption{Cavefish protocol featuring WBPS scheme. A detailed descripton of the WBPS scheme is in Fig.~\ref{fig:WBSP}.}
+\label{fig:protocol-short}
+\end{figure}
+
+%\begin{tikzpicture}
+%    \label{fig:protocol}
+%	\matrix (m)[matrix of nodes, column  sep=1.5cm,row  sep=7mm, nodes={draw=none, anchor=center,text depth=0pt} ]{
+%		\textbf{Light Client (LC)} & & \textbf{Service Provider (SP)}\\[-4mm]
+%		Generate intent & & \\[-7mm]
+%		(i) $\var{int_{post}} \in \mathcal{I}_\mathsf{post}$, & & \\[-7mm]
+%		(ii) generate signature $\var{sig}$  & & \\[-7mm]
+%		% and predicate $\fun{opt} : \TxAbs \to \B$\\
+%		&  $(\var{int_{post}}, vk_c, \var{sig})$ & \\[-7mm] %\fun{opt}(\ ),\
+%		& & (iii) Check signature \\[-7mm]
+%		& & (iv) Generate transaction  \\[-7mm]
+%		& & and (v) initiate WBPS signing \\[-7mm]
+%		&& with abstract $\TxAbs$  \\[-7mm]
+%		\phantom{x}& $\TxAbs$ & \\[-7mm]
+%		%\ h=\fun{txid}~\tx
+%		% %& ZK.proof $p$ of $P (h,\  \TxAbs) = \true$ & \\
+%		(vi) Produce Blind.  \\[-7mm]
+%			Sig. Commitment \\[-7mm]
+%		% sign abstract transaction\\[-7mm]
+%		& $\var{R}$\\[-7mm]
+%		& & (vii) Produce proof   \\[-7mm]
+%		& & $\fun{chkSpec}(\var{int_{post}},\TxAbs) = 1$ \\[-7mm]
+%		& $(c,\pi)$ & \\[-7mm]
+%		% %& ZK.proof $p$ of $P (h,\  \TxAbs) = \true$ & \\
+%		(viii) Check proof \\[-7mm]
+%		Produce pre signature \\[-7mm]
+%		% sign abstract transaction\\[-7mm]
+%		& $\var{bsig}$\\[-7mm]
+%		& & (ix) Produce signature $\sigma$\\[-7mm]
+%		& & from pre signature.\\[-7mm]
+%		& & Post $(\var{tx'},\sigma)$ on-chain.\\
+%	};
+%
+%	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-1.south east)--(m-1-1.south west);
+%	\draw[shorten <=-1.5cm,shorten >=-1.5cm] (m-1-3.south east)--(m-1-3.south west);
+%	%\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-6-2.south west)--(m-6-2.south east);
+%	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-10-2.south east)--(m-10-2.south west);
+%	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-13-2.south west)--(m-13-2.south east);
+%	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-16-2.south east)--(m-16-2.south west);
+%	\draw[shorten <=-1cm,shorten >=-1cm,-latex] (m-19-2.south west)--(m-19-2.south east);
+%	%\draw (m-10-2.north west) rectangle (m-19-2.south east);
+%	\node[fit={(m-10-1.north west) (m-18-1.north west) (m-21-3.south east) (m-15-3.south east)},
+%      ultra thick, inner sep=0pt, rounded corners=1mm,
+%      draw=cyan, label={[cyan,align=center]270:WBPS Execution}]{};
+%\end{tikzpicture}
+
+
+\subsubsection{Security}
+
+\begin{theorem}
+If the ledger rules include the \emph{Idempotent Doublespends} property and $\WBPSP$ is unforgeable, the protocol of Section \ref{sec:mainproto}
+ is safe.
+\end{theorem}
+
+\begin{proof}The safety property is derived from two factors: first, the unforgeability property of $\WBPSP$ (Theorem \ref{thm:unforge}) will ensure that only transactions that satisfy the given predicate will be signed. Second, our assumptions on ledger rules ensure that signed transactions involving spent UTXOs will have no effect (as opposed to something undesirable to the user).  
+\end{proof}
+
+\begin{theorem}
+If  $\WBPSP$ scheme is weakly blind, the protocol of Section \ref{sec:mainproto} is private until posted.
+\end{theorem}
+
+\begin{proof}The Private until posted property of our protocol is derived from Theorem \ref{thm:blind} and the protocol structure. Given an adversary against $\A$ PuP, we can build  an adversary against the weak blindness of the $\WBPSP$ scheme by running the SP once on $\LState_0$ and once on $\LState_1$ to produce two challenge messages for the blindness security game and simulate the role of the challenge towards $\A$ by passing on the rest of the protocol messages (the experiment enforces random padding internally). If $A$ can distinguish which ledger was used in producing the messages we can use the same index as our guess in the PuP game. \end{proof}
+
+
+\subsection{Discussion}
+
+\label{sec:threats}
+
+
+%\textbf{Erroneous User Balance.} A common threat vector is convincing the user of an erroneous balance on their account. This can lead a user to
+%complete a transaction outside the blockchain based on wrong information (e.g. accept an invalid transaction as payment for goods, or exchange his private key
+%in the understanding that is controls $x$ stake instead of $y$.)
+
+%\textbf{Invalid Transactions.}  In response to an LC query, it may be desirable for an SP to construct a transaction that does not meet the intent specified by the user. For example, the created transaction may pay the wrong recipient, or pay an amount over and above the one specified by the user.
+
+%\textbf{Protocol Failures.}  In a multi-node protocol, a malicious user may wish to force the protocol to abort even though there exist a number of honest nodes who would otherwise ensure the protocol completes successfully. In the single node, a malicious node can always cause a protocol to fail by not replying.
+
+\textbf{Suboptimal Transactions.}  In response to an LC query, it is possible for an SP to construct a
+\emph{sub-optimal} transaction (in terms of cost) which nevertheless matches the LC's specification. For example, the LC may
+include a larger-than-necessary system fee in the transaction, or not provide the LC with the best
+available exchange price for a specific token. We consider cost optimizations an orthogonal issue that can be addressed by e.g. 
+a market system.
+
+%Our model assumes that an LC is able to submit their transaction to multiple SPs, and will have pick one
+%transaction to sign from the resulting set $S$ of responses received within some pre-defined amount of
+%waiting time. Alternatively, the LC may simply choose the first valid transaction sent by an SP.
+%Assuming such a competitive SP environment, the suboptimal transaction threat is mitigated by
+%the incentive, in the form of a service fee for the SP, to provide both quickest and the most optimal
+%response. Note that the SP is not a-priori aware of how the LC will make
+%the choice of what transaction to sign, and how long their waiting period is.
+
+\noindent\textbf{Liveness against Malicious SPs.}
+\label{sec:stale-state}
+Malicious SPs are able to force delays for the user by completing the signing and never posting the transaction. This forces the user to wait until the signed transaction is no longer valid before retrying. Otherwise, as intents are not necessarily uniquely satisfied , it is possible that the first (malicious) node may be able to post the first transaction (which was purposefully delayed) after the posting of the second one. This can cause the user to e.g. double pay for a service as well as the full node fee. Even so, given enough retries the user will reach an honest SP and the transaction will be posted.
+
+
+%Arbitrary delay caused by SP: SP can offer to execute an intent and provide the crafted TX, but never publish it on the chain.
+%    For this reason, SP should provide the hashes of the UTxO references (or similar) to the light client, s.t. the LC can reuse those references in another transaction. This avoids the case where SP hangs on to the TX indefinitely or posts it at an arbitrary point in time causing two or more TXs being executed if the LC resubmits its intent/TX.
+
+%\textbf{Non-submission of Transactions.} A class of protocols deals with the joint creation of transactions by the light client and node, with the transaction submission being left to the full node. It is possible for the full node to not post such a transaction in a timely manner, potentially leading the user to retry at a different time. 
+%\textbf{Falsified or Unsafe Transaction Data}. SP lies to client about the UTxOs being spent by the tx, and tricks them into doing something they did not want to do (that is why 0-knowledge proof that outputs were correctly specified)
+
+%\textbf{Data Leakage.} The 2-PC protocol we propose is one that has leakage. In particular,
+%the co-construction of a transaction by the LC and the SP allows the LC to learn certain information
+%about the chain state, such as, e.g. the upper and lower bound of the interval containing the current blockchain
+%time. In fact, under certain circumstances, after several iterations of our SP-LC protocol, the LC
+%may gain the capacity to construct certain kinds of transactions themselves. As noted above, this
+%information can also be gained from blockchain explorer services. The
+%reason an LC may engage in our protocol that it allows all transaction-construction,
+%and state-tracking and querying logic to be off-loaded to the SP. If the LC can do all this themselves,
+%engaging in the protocol does not benefit them in any way.
+%
+%However, there is a specific kind of
+%data leakage threat we have have built the protocol to be resilient against : leakage of $\UTxO$ entry
+%identifiers, i.e. the inputs of a transaction. It is impossible to construct a valid transaction
+%without knowing the the inputs that need to be included in it for it to match the specification,
+%and this information cannot be guessed without knowledge of blockchain state. If this information
+%is somehow leaked to the LC along with the modified transaction, it makes it possible to for the
+%LC to not pay the SP for their work.
+%
+%Specifically, the full transaction (including the correct inputs) can be modified locally to
+%replace the output containing the SP's fee with one returning it as change to the LC, signed, and
+%submitted to the network by the LC. As part of our protocol, the SP replaces the inputs of a
+%transaction with outputs that correspond to those inputs in the UTxO set.
+%We have demonstrated that guessing inputs without access to either the inputs themselves, or
+%the transactions that have placed them into the UTxO set, is sufficiently difficult to not be considered a
+%vector of attack.
+%This data may also be leaked by getting recorded in a script, datum, or redeemer. E.g., a script
+%may require that its redeemer also list the inputs of the transaction. The responsibility of mitigating
+%this type of leakage rests on the SP, who can address this by limiting the kinds of specifications
+%they agree to fulfill.
+
+%\todobox{TODO : make sure we have shown that "We have demonstrated that guessing inputs
+%without access to either the inputs themselves, or
+%the transactions that have placed them into the UTxO set,
+ %is sufficiently difficult to not be considered a
+%vector of attack."} --see assumtion 2
+
+
+
+\subsubsection{Multi-SP protocols and optimality }
+
+ However, we can also formulate a version of this
+protocol where the LC instead sends the specification to multiple SPs, selecting the best
+response, and engaging in the rest of the protocol only with that SP.
+
+To do this, let $\fun{opt} : \TxAbs \to \Z$ be a function that rates abstract
+transactions to express LC's preferences. For example, the total amount of primary tokens
+spent by the transaction can be such a function :
+$\fun{opt}~\tx = \fun{coinValue}~(\sum_{o \in~\var{txd}.\fun{spentOuts}} \var{o}.\val)$.
+A transaction $\tx$ is \emph{optimal} in a set $S \in \type{Set}~\TxAbs$ when
+$\fun{opt}~\tx = \fun{min}~\{~\fun{opt}~\var{tx'}~\vert~\var{tx'}~\in~S~\}$.
+
+To get a multi-SP protocol, the first step of the single-SP protocol in Figure~\ref{fig:protocol-short}
+must be augmented, so that the pair $(\fun{opt}, \var{int_{post}}$ is sent to each SP instead of just
+sending $\var{int_{post}}$.
+Upon receiving transactions $\tx_{A,i}$, with $0\leq i < k$, from each of the $k$ SPs responding
+to LC's query, LC will engage in the rest of the protocol only with the sender of $\tx_{A,i}$.
+
+ Note that the $\fun{opt}$ function and the specification serve different purposes in the protocol.
+ The specification is checked, and any response transaction that does not satisfy it is discarded.
+ On the other hand, it is not required that a transaction be optimal across all possible
+ specification-satisfying transactions.  The kind of
+ sophisticated optimization (such as what is required, e.g., for optimized order-matching) would require
+ an entirely distinct set of tools for demonstrating the optimality result, such as ZK proofs about
+ the full blockchain state (rather than just the associated transaction), together with evidence that
+ the proof is about state that is \emph{sufficiently current} (see Section \ref{sec:stale-state}).
+ For example, a proof that
+ that there were no better offers for a specific token available on the ledger at the time the SP
+ produced a response to the LC. We do not assume that
+ either the SP or the LC are necessarily capable of performing or verifying (resp.) optimality according to the
+ function LC requested be optimized, but an LC is capable to comparing transactions using $\fun{opt}$.
+

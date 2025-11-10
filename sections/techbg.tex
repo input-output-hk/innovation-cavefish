@@ -1,0 +1,31 @@
+% !TEX root = ../lc_main.tex
+
+%\subsection{Technical Background}
+%UTxO model \textcolor{orange}{mr: do we still need this subsection?}
+
+\section{Technical Background}
+
+\textbf{Notation.} We use $y \gets x$ to denote that  variable $y$ is assigned the (possibly randomized) evaluation of $x$. When $x$ is a set, we denote uniformly random sampling from the set. We use $a=b$ to denote boolean comparison between $a$ and $b$ and $z:=w$ to denote equality by definition. We use $||$ to denote concatenation of bitstrings. When algorithms are randomized, we denote them as $A(x;r)$, where $x$ is the input and $r$ is the randomness, belonging to a randomness space $\mathcal{R}$. When we write $y\gets A(x)$ we imply $r\gets \mathcal{R};y\gets A(x;r)$. In algorithm descriptions we write $x,y,z \subseteq a$ to imply parsing $a$ to obtain $x,y,z$. 
+
+Our protocols operate in the discrete log setting, where we assume the discrete logarithm problem is hard. We also follow standard conventions with regards to public key encryption using $(\PKE.\Keygen,\PKE.\Enc,\PKE.\Dec)$ to describe schemes and require IND-CPA security. For signatures, we use Schnorr signatures $(\SDS.\Setup,\SDS.\Keygen,\SDS.\Sign,\SDS.\Ver)$. Finally, we use parametrized non interactive Arguments $(\NArg.\mathsf{Rel},\NArg.\Setup,\NArg.\Prove,\NArg.\Ver,$ $\NArg.\SimProve)$ to allow the relation being proven to depend on the group setting. For reasons of space we present the full description of these primitives in Appendix \ref{app:techbg} 
+
+
+
+
+The security of  Schnorr signatures, has been well studied in the random oracle model (ROM), where a hash replaced with an ideal random function the adversary can only call as an oracle. However in this work the need arises to instantiate the underlying hash function $\hash$ so that we may reason about it within a proof system \cite{9155085} e.g. prove that a known $y$ is $y=\hash(x)$ for some secret $x$. This renders ROM-based proofs inapplicable necessitating an assumption on the security of the scheme. This does not differ significantly from typical implementation practices (where the hash function is infact drawn from a small pool for standardized options), and also from the treatment of this issue in the literature \cite{blindsigs}.  
+
+
+\begin{definition} A hash function generator $\HGen(n) \to \hash$, on input $n\in \N$ generates a hash function $\hash : \{0,1\}^* \to \Z_n$.
+\end{definition}
+
+
+
+
+
+\begin{assumption} \label{ass:schnorr}\cite{blindsigs} There exists a group generator $\GGen$ and hash function generator $\HGen$ s.t. the Schnorr signature scheme $\SDS$ is strongly unforgeable under definition \ref{def:seufcma}. \end{assumption}
+
+Similarly, in the ROM we can trivially guarantee $\hash$ is pseudorandom, whereas for our setting we require an additional assumption:
+
+\begin{assumption} The hash function generator $\HGen$ is such that for all $n$\label{ass:hash}
+$$\left| \Pr[\hash \gets \HGen(n); (m_0,m_1)\gets \A(\hash);b\gets\{0,1\};r\gets\{0,1\}^\lambda:b=\A(\hash(m_b||r))]-1/2 \right| $$ is negligible in $\lambda$. \end{assumption}
+

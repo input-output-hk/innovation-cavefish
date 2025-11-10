@@ -1,0 +1,127 @@
+% !TEX root = ../lc_main.tex
+\section{Background and Related Work}
+
+\subsection{Light clients, off-chain payments, and chain explorer services}
+
+\textbf{Light clients.}
+Our approach facilitates transaction submission for a light client that is not aware of the history of a blockchain. Instead, it operates more like a single-chain intent-resolution protocol.
+Therefore, we compare our work with existing solutions for light clients as well as mechanisms that allow the interaction with a blockchain when in resource-constrained operation.
+Our approach is different from a more ``traditional'' (i.e., what commonly is referred to) light client that has the primary goal of syncing to the blockchain in order to acquire the information necessary to interact with a smart contract or to submit a transaction.
+We first describe the common idea of a light client and then outline concepts related to our work that complement light clients.
+
+There is existing work analyzing light client functionality \cite{committee} \cite{soklc}. The majority of light client designs include the following main functionalities it is expected to perform: (1) issue queries, such as for the balance of an account, or the state of a transaction, and (2) safeguard secret information and submit transactions to the blockchain. 
+In order to implement these functionalities, light clients use several generic techniques, most notably: header verification and consensus evolution verification. Unlike a \emph{full node}, a header verification light client \emph{only verifies the headers of blocks}, and skips the verification of transactions and account balances \cite{committee}. The light client is able to trust the resulting chain state if the data is signed by a sufficiently large set of full nodes (a multi-prover approach). The technique was made popular with SPV in Bitcoin~\cite{bitcoin} and nearly universally adopted by most practical approaches for light clients, e.g.,~\cite{ethereum}, along with its variations \cite{lazy}. 
+Because the validator set can change, consensus evolution verification is needed for blockchains running on proof-of-stake.
+Another common technique is to compress the blockchain and/or ledger state in order to reduce the information a light client need for functioning reliably (see, e.g.,~\cite{flyclient}). 
+
+Some light clients use game-theoretic approaches to eliminate the need for a trusted committee (a single-prover model), e.g. by implementing the slashing of previously deposited collateral in case of misbehavior~\cite{superlight}.
+Our model is both single-prover and does not require a deposit to be made, as neither the service provider nor the light client risk their assets during the protocol execution. Moreover, our design is independent of the underlying consensus, relying, instead, on the ledger model.
+
+The main cryptographic building blocks that are used to realize those techniques are succinct representation and proofs, such as data accumulators (often Merkle trees) and commitments and SNARKs (e.g. used to aggregate multi-signatures \cite{celo}).
+Suitable signatures and hash functions are needed for certain light client designs. Examples of these include aggregate signatures and threshold signatures \cite{mithril,committee}. 
+
+\textbf{Intents}.
+We also consider \emph{intents} and \emph{solver networks} to be related work. These designs attempt to establish a relationship between solvers and users via their (light) clients~\cite{ethresearch-solvers}. 
+A light client issues an intent via as an abstracted transaction object. Then, solvers process the intent, incentivized by transaction fee or intent execution reward. The users are then free to accept or reject a solver’s proposal. In case the solvers are required to provide a deposit, slashing incentivizes honest behavior of a rational actor.
+Since concepts around solver networks are relatively new, there is currently no universal standard governing the specification for intents and abstract transaction objects. To the best of our knowledge, this is the first work describing an intent-based light client protocol taking advantage of specific features of the UTxO ledger model that both minimizes communication and offers built-in incentive structure. 
+
+\textbf{Cross-chain intents.}
+A lot of work on intents applies is focused on building cross-chain intent resolution, which 
+requires more sophisticated protocols that are able to communicate with 
+multiple chains at once \cite{celer} .
+Some protocol designs choose to resolve intents on-chain directly \cite{khalani}, while 
+other offer both layer-1 and layer-2 options \cite{anoma}. Yet another designs is a consensus protocol
+relying on on minimal trust assumptions while conforming to the interledger standard \cite{ripple}. 
+Focusing on a single chain allows 
+us to construct a protocol which makes use of the unique features of the 
+underlying blockchain, and requires reduced communication (only 
+between two parties). In its simplicity and limited communication, our protocol also resembles payment channels. 
+
+\textbf{Payment channels}.
+The concept of \emph{payment channels}, and the related notion of \emph{state channels}, also bear similarities
+to our approach.
+Payment channels are a type of off-chain mechanism for blockchains. 
+A payment channel can be used to conduct a series of transactions without interacting
+with the main blockchain, e.g. \cite{lightning} \cite{raiden} \cite{ethereum}. The creation of a payment channel between parties requires locking funds in an on-chain transaction ~\cite{payment-channel}. 
+Some channels, such as Hydra \cite{hydra}, not only allow
+simple payments between users, but can simulate the majority of the on-chain transaction processing mechanism internally.
+This type of channel is usually called a \emph{state channel}. 
+
+Cavefish interacts well with payment channels: on the one hand cavefish can be used to setup a payment channel from a light client, and on the other setting up a payment channel allows the SP to be compensated offchain eliminating the on-chain overhead of Cavefish.
+%In addition to a limited set of possible actions, interactions in state and payment channels are also limited to a pre-determined set of participants, liquidity. \footnote{Payment networks attempt to address this issue
+%by using multi-path payments, where the original payment is split into smaller parts,
+%each routed through different channels, allowing for greater liquidity, adding complexity and risk}
+%The capacity of our proposed design to support 
+%different actions is dictated by the language used for request specification, which may be augmented in future work. 
+%At the same time, our design provides the same level of atomicity expected from payment channels, 
+%i.e., payments are either fully successful or completely fail.
+
+%After the initial on-chain setup has been completed, payment and state channels
+%are capable of greatly reducing both transaction processing times and fees.
+%The target user base for our light client design, however, are users
+%that either do not wish to (or are not capable of) engaging in establishing relationships with other chain users, participating
+%in an on-chain setup process, or intend to make repeat or scheduled interactions with the same
+%users. For this reason, the on-chain space- and cost-saving benefits of payment channels
+%are unlikely to be accessible to a user base which
+%we target with our low-commitment design.
+
+
+\textbf{API and Explorer Services}.
+Many realistic UTxO ledger implementations (e.g. Ergo \footnote{\url{https://ergoplatform.org/}},
+Cardano \footnote{\url{https://cardano.org/}}, and BitCoin \footnote{\url{https://bitcoin.org/}}) are set up
+in a way that an invalid transaction will, in most cases, not result in any update to the ledger
+state, but get rejected instead. This makes
+services such as blockchain explorers \footnote{\url{https://beta.explorer.cardano.org/}} or Blockfrost (API
+as a service for accessing the Cardano blockchain) \footnote{\url{https://blockfrost.dev/}} some of the
+strongest competitors with our proposal, as they provide the data needed
+for the LC to construct their transaction, often with a relatively high degree of reliability.
+Unlike our design, these services do not currently appear to support transaction construction
+for light clients.
+Revenue from explorer services is
+either ad-based, or they may charge users in fiat currency, or the service is free in order to
+promote use of the specific service/blockchain. We, on the other hand, propose a protocol
+in which service providers are compensated
+in assets on the same blockchain as the one to which their transaction gets applied, and the payment structure
+consists of a one-time, no-setup atomic exchange of assets for services. 
+
+\subsection{Hierarchical deterministic wallets and address discovery}
+UTXO based blockchains, including Bitcoin and Cardano use the concept of Hierarchical Deterministic (HD) wallets \cite{bip32} where child addresses can be created in a deterministic way using a public key of a keypair $sk,pk$, and some short auxiliary data (the chain code). Given a public key $pk$, chain code $c$ and requested index $i$ for a child key, a hash function is used to produce a scalar $s_i$ enabling the derivation of the child key as $sk_i=sk+s_i$. It is also possible to use $s_i$ without knowing $sk$ to directly derive the corresponding public key $pk_i=pk\cdot g^{s_i}$. The same method is used to produce a child chain code $c_i$, so that multiple generations of children are possible.
+
+In our application, we can assume that a wallet can give the service provider (SP) a single public key and chain code, letting the SP do address derivation and lookup on their side using some agreed-upon bounds or heuristics on the index depth. This keeps the communication cost between the light client and the SP constant.
+
+
+\subsection{Schnorr blind signatures}
+As soon as their patent expired in 2008, Schnorr signatures~\cite{10.1007/0-387-34805-0_22} have been gaining significant adoption,
+replacing RSA in many scenarios due to their smaller size and faster verification.
+Compared to (EC)DSA, Schnorr offers similar efficiency and guarantees,
+but (EC)DSA security proofs are most likely not possible without 
+strong idealization~\cite{cryptoeprint:2023/914}.
+As a consequence, EdDSA~\cite{cryptoeprint:2011/368}, a popular variant of the
+ Schnorr scheme, is currently under consideration by NIST for standardization.
+The security of Schnorr signaatures is based on the discrete 
+logarithm assumption~\cite{jofc-2000-14276},
+with proofs in the random oracle model (ROM) as well as in 
+the algebraic group model (AGM) and the ROM~\cite{10.1007/978-3-030-45724-2_3}.
+
+Standard Schnorr signatures are now widely used in blockchains such as Bitcoin, Bitcoin Cash, Litecoin, and Polkadot.
+Monero, Zcash, and Cardano use the EdDSA variant.
+The adption of Schnorr and EdDSA signatures is driven by privacy~\cite{cryptoeprint:2022/1636} and
+ scalability gains~\cite{10.1007/s10623-019-00608-x}
+but also the straightforward extension to \emph{blind Schnorr signatures}~\cite{10.1007/3-540-48071-4_7}.
+Most Schnorr-based blind signature schemes
+require multiple rounds~\cite{10.1007/3-540-48071-4_7}, which can make the protocol suceptible to denial-of-service attacks.
+Research has thus been focusing on making blind signatures \emph{concurrently} secure where more than one session can be intertwined, such as~\cite{bellare2003one,chairattana2022pi,tessaro2022short,hanzlik2023rai}. % as well as round-optimal schemes~\cite{}.
+
+Our construction hinges on the the concurrently secure blind and partially blind signing protocol
+for standard Schnorr signatures found in~\cite{blindsigs} by Fuchsbauer, et al.---the first work stating rigorous security guarantees for a practical blind signature scheme based on Schnorr signatures.
+Unlike schemes that had been presented before,~\cite{blindsigs} is not vulnerable to the attacks described in~\cite{10.1007/3-540-45708-9_19,cryptoeprint:2020/945} which showed that the hardness-assumption\footnote{The ROS (Random inhomogeneities in a Overdetermined
+Solvable system of linear equations) problem was initially studied by Schnorr in~\cite{10.1007/3-540-45600-7_1}} existing schemes relied on for concurrent security can be solved in polynomial-time.
+As our light client protocol is based on~\cite{blindsigs}, it also provides partial and predicate blindness, two properties that allow us to describe a transaction in an abstract way featuring ``redacted'' parts.
+We briefly outline the construction of Fuchsbauer et al.~\cite{blindsigs} in the following.
+The scheme is equivalent to the blind signature scheme~\cite{10.1007/3-540-48071-4_7} by Chaum and Pedersen but, in order to make the protocol concurrently secure, adds a commitment phase at the beginning where the user sends an encrypted version of the message $m$ and blinding values $(\alpha,\beta)$ to the signer.
+In addition to that, the second message by the user includes a zero-knowledge proof alongside the Schnorr challenge $c$.
+The zero-knowledge proof asserts to the signer that the initial (encrypted) commitment and $c$ have been derived from the same $m, \alpha, \beta$.
+
+In addition to obtaining concurrent security, one can leverage the zero-knowledge proof to assert additional facts, most notably, the user can prove to the signer that certain predicate(s) over message $m$ holds. This effectively turns the fully blind scheme into a predicate blind scheme.
+Furthermore, support for predicate blindness implies partial blindness~\cite{blindsigs} since constructing a predicate that checks equality for parts of $m$ can be used to assert to the user that parts of the message correspond to the expected value(s).
+

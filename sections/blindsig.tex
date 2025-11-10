@@ -1,0 +1,308 @@
+% !TEX root = ../lc_main.tex
+
+ \section{Blind Signatures for Abstract Transactions}
+ \label{sec:blind}
+ In order to allow the light to sign an abstract transaction we implement blind signatures on (partially) blinded transaction objects.
+ At the minimum the SP hides the inputs to the transaction, i.e., the references to UTxO objects which are present in the ledger and required to cover the transaction.
+ This ensures that the light client cannot simply obtain the transaction from the SP, then edit it to remove the SPs compensation.
+
+% In Bitcoin, for example, UTxOs are captured in the ledger as follows:
+ %For Cardano, the structure looks as follows:
+
+% \todobox{ Describe UTxO briefly for all chains we support?  }.
+
+
+ %The specific ledger implementation might require slight adaptations in terms of signature type and used hash functions---in this work, we give a very general construction that can be tailored to specific blockchains.
+
+ Our construction is inspired by the predicate blind signature mechanism in~\cite{blindsigs}.
+ It realizes a concurrently secure blind and partially blind signing protocol resulting in standard Schnorr signatures. This is a core property as it allows our protocol to be compatible with popular blockchains such as Bitcoin and Cardano without any modifications.
+%The signature scheme builds upon the original protocol proposed in~\cite{10.1007/3-540-48071-4_7} with the addition of a commitment phase that binds the signer to her secrets (blinding value and message), preventing a forgery attack (described in~\cite{bibid}) and making the scheme unforgeable under concurrent sessions.
+
+Given our application, the unlinkability property of blind signatures is not of much benefit: signed transactions are somewhat infrequent, often have different payees or payment sums (i.e different predicates) and re indirectly timestamped due to their time of posting on the blockchain. Further, there seems to be little benefit in preventing the light client from knowing which protocol section produced which payment. For this reason, we do away with the requirement of the signer being unable to distinguish between messages signed on different sessions. We only require that the singer is unable to distinguish the message \emph{before}  the signature-message pair is posted. 
+
+This weakening of the blindness property brings about the benefit that we can remove the blinding operations from the protocol (for a small efficiency increase) and also from the proof of correctness of the challenge generation (where the gain is more significant as it removes group exponentiations using foreign field arithmetic). The resulting scheme is similar in operation to the Signatures over Blocks of Committed Messages construction of Bobolz et. al. \cite{10.1007/978-3-031-78679-2_7} with the addition of predicate checking.
+ 
+%Once the SP publishes final (unblinded) transactions on the chain, the LC can in theory download recent blocks and observe the transaction that was posted by the SP on behalf of the light client. If downloading is too resource-intensive, the LC might also consult an online block explorer for said purpose. As a consequence, abstract transactions, published transactions and signatures are assumed to be ``linkable'' and unlinkability provided by the signature scheme is redundant in our scenario.
+
+
+
+%  \todobox{
+%     \begin{itemize}
+%  \item Do we consider TLS connection between LC and SP? A network adversary could otherwise link/localize abstract transactions and transactions posted on the ledger.
+%  \item specify the signing algorithm : $\fun{sign} : (\H, \privkey) \to \H$
+%  \item specify the function to make real sigs from blind sigs $\fun{mkRealSig} : (\pubkey \times \TxId \times \TxAbs \times \H) \to \H$
+% \item specify the blind signing algorithm $\fun{blindSign} : \H \times \TxAbs \times \privkey \to \H$
+% \end{itemize} }.
+
+
+
+\subsection{Weakly blind predicate signatures }
+
+We adapt the definitions of \cite{blindsigs} to account for the weak variant of blindness.
+
+A WBPS scheme is parameterized by a family of polynomial-time-computable predicates,
+which are implemented by a p.t. algorithm $P$, the predicate compiler: on input a predicate
+description $prd \in \{0, 1\}^*$ and a message $m \in \{0, 1\}^*$, $P$ returns 1 or 0 indicating whether $m$
+satisfies $prd$.
+
+ A WBPS scheme \WBPSP{} for predicate $P$ is defined by the following algorithms. We focus on
+schemes with 2-round (i.e., 4-message) signing protocols for concreteness.
+\begin{itemize}
+\item $Setup(1^\lambda) \to par$: the setup algorithm, on input the security parameter, outputs public
+parameters $par$, which define a message space $\mathcal{M}_{par}$.
+\item $KeyGen(par) \to (sk, vk)$: the key generation algorithm, on input the parameters $par$, outputs
+a signing/verification key pair $(sk, vk)$, which implicitly contain $par$, i.e., $vk = (par, vk')$.
+–\item $\langle Sign(sk, prd),User(vk, prd, m) \rangle \to (b, \sigma)$: an interactive protocol with shared input $par$
+(implicit in $sk$ and $vk$) and a predicate $prd$ is run between the signer and user. The signer
+takes a secret key $sk$ as private input, the user’s private input is a verification key $vk$ and
+a message $m$. The signer outputs $d = 1$ if the interaction succeeds and $d = 0$
+otherwise, while the user outputs a signature $\sigma$ if it succeeds, and $\bot$ otherwise.
+\item $Ver(vk, m, \sigma) \to 0/1$: the (deterministic) verification algorithm, on input a verification key
+$vk$, a message $m$ and a signature $\sigma$, outputs 1 if $\sigma$ is valid on $m$ under  $vk$ and 0 otherwise.
+\end{itemize}
+
+For a 2-round protocol the interaction $\langle Sign(sk, prd),User(vk, prd, m) \rangle \to (d, \sigma)$ can be realized by the following algorithms:
+\begin{align*}
+(txt_{U,0},st_{U,0}) \gets& User_0(vk, prd, m) & (txt_{S,1},st_{S}) \gets& Sign_1(sk, prd, txt_{U,0}) \\
+(txt_{U,1},st_{U,1}) \gets& User_1(st_{U,0}, txt_{S,1}) & (txt_{S,2}, d) \gets& Sign_2(st_S, txt_{U,1}) & \\
+\sigma \gets& User_2(st_{U,1}, txt_{S,2}) &&
+\end{align*}
+We write $(d, \sigma) \gets  \langle Sign(sk, prd),User(vk, prd, m) \rangle$  as shorthand for the above sequence.
+
+
+
+\begin{definition} A WBPS scheme $\WBPSP$ satisfies weak blindness if for all p.p.t.
+adversaries $\A$:
+
+$$Adv^{\mathsf{BLD}}_{\WBPSP,\mathcal{A}}(\lambda) := \Pr[
+\BLD^{\A,1}_{\WBPSP}(\lambda) - \BLD^{\A,0}_{\WBPSP}(\lambda)] \mbox{ is negligible in $\lambda$.}
+$$
+
+
+\end{definition}
+
+We note that the $\mathsf{BLD}$ experiment mauls the message by appending a random bitstring $r$ of length $\lambda$. This is appropriate to our setting, where the SP is explicitly allowed to use the  ``notes'' field of a transaction to add a randomizer. Without this mauling, any indistinguishability-based definition would fail.
+
+\begin{figure}[ht]
+%\footnotesize
+    \fbox{
+
+ \begin{minipage}[t]{0.40\linewidth}
+\textbf{\uline{$\BLD^{\A,b}_{\WBPSP}(\lambda)$}}
+%\hrule
+
+$par \gets Setup(1^\lambda) $\\
+$(m_0,m_1,prd,vk',st_\A) \gets \A_1(par)$\\
+\textbf{if} $P(prd,m_0) = 0$ \textbf{or} $P(prd,m_1) = 0$
+\textbf{then}  \quad \textbf{return} 0\\
+$\nt \gets \{0,1\}^\lambda $\\
+$m \gets m_b||\nt$\\
+$vk \gets (par,vk')$
+$sess\gets \mathsf{init}$\\
+$b^*\gets\A_2^{\mathsf{ChalUser}}(st_\A)$\\
+$ \textbf{return} \quad  b=b^* $
+\end{minipage}%
+\hspace{0.5cm}%
+\begin{minipage}[t]{0.45\linewidth}
+\textbf{\uline{$\mathsf{ChalUser}(msg=\emptyset)$}}
+%\hrule
+
+
+
+
+
+\textbf{if} $sess=\mathsf{await}$\\
+\null\quad $sess\gets\mathsf{closed}$\\
+\null\quad $\sigma \gets User_2(st_u, msg)$
+
+
+
+\textbf{if} $sess=\mathsf{closed}$\\
+\null\quad $msg' \gets Ver(vk, m, \sigma)$
+
+\textbf{if} $sess=\mathsf{open}$\\
+\null\quad $sess\gets\mathsf{await}$\\
+\null\quad $(msg',st_u) \gets User_1(st_u, msg)$
+
+
+\textbf{if} $sess=\mathsf{init}$\\
+$\null\quad sess\gets\mathsf{open}$\\
+$\null\quad (msg',st_u) \gets User_0(vk, prd, m)$
+
+
+
+
+
+\textbf{return} $msg'$
+
+\end{minipage}
+}
+    \caption{Weak Blindness experiment $\BLD^{\A,b}_{\WBPSP}(\lambda)$ for a $\WBPS{}$ scheme with predicate compiler $P$, adversary $\A$ and parameter $b$.}
+\end{figure}
+\begin{figure}[ht]
+\footnotesize
+    \fbox{
+ \begin{minipage}[t]{0.50\linewidth}
+\textbf{\uline{$\textsf{CMA}^{\A}_{\WBPSP}(\lambda)$}}
+%\hrule
+
+$par \gets Setup(1^\lambda) $\\
+$ (sk, vk) \gets KeyGen(par) $\\
+$Q \gets 0$\\
+$S \gets 0$\\
+$P \gets 0$\\
+$(\vec{m^*},{\vec\sigma^*}, \vec{prd^*}) \gets \A^{SigInit,SigComplete}(vk)$\\
+$n \gets \left |{\vec{m^*}}\right |$\\
+\mbox{$ \textbf{if} \quad \prod_i Ver(vk,m_i^*,\sigma_i^*) \neq 1 \textbf{ return 0} $}\\
+\mbox{$ \textbf{if} \quad \prod_i prd_i^*(m_i^*) \neq 1 \textbf{ return 0} $}\\
+\mbox{$ \textbf{if} \quad \exists i, j: (i\neq j) \land (m_i^*,\sigma_i^*)=(m_j^*,\sigma_j^*) \ \textbf{ return 0} $}\\
+\mbox{$ \textbf{if} \quad  n > Q \textbf{ return 1}$}\\
+\textbf{if} $\nexists \rho \in Perm(S):$\\
+\mbox{$\quad \forall i \leq n: (prd_{\rho(i)}(m_i)=1) \land (st_{\rho(i)}=\bot)$}\\
+\textbf{then} \quad \textbf{return 1} \\
+\quad \textbf{return 0}
+
+\end{minipage}%
+\hspace{0.5cm}%
+\begin{minipage}[t]{0.40\linewidth}
+\textbf{\uline{$\mathsf{SigInit}(prd, msg_{U,0})$}}
+%\hrule
+%$(msg_{U,0},st_{U,0}) \gets User_0(vk, prd, m)$\\
+\mbox{$S\gets S+1; P\gets P+1$}\\
+\mbox{$(msg,st_{S}) \gets Sign_1(sk, prd, msg_{U,0})$}\\
+\mbox{$prd_S \gets prd$}\\
+\textbf{return} $msg$\\
+
+\textbf{\uline{$\mathsf{SigComplete}(s,msg_{U,1})$}}
+%\hrule
+
+
+\textbf{if } $s>S$ \textbf{or} $st_s=\bot$ \\ \textbf{ then } \textbf { return } $\bot$\\
+%$(msg_{U,1},st_{U,1}) \gets User_1(st_{U,0}, msg_{S,1})$ \\
+$(msg, d) \gets Sign_2(st_s, msg_{U,1})$ \\
+\textbf{if } $d=1$ \textbf{ then } $Q\gets Q+1$\\
+$P \gets P-1$\\
+$st_S \gets \bot$\\
+\textbf{return} $msg$
+
+%Todo: change OSig1 / OSig2
+
+\end{minipage}
+}
+    \caption{Chosen Message Unforgeability Experiment  $\mathsf{CMA}^{\A}_{\WBPSP}(\lambda)$ for a $\WBPS{}$ scheme with predicate compiler $P$, adversary $\A$}
+\end{figure}
+
+\begin{definition}. A WBPS scheme $\WBPSP$ satisfies unforgeability  if for all p.p.t.
+adversaries $\A$
+$$Adv^{\mathsf{EUF-CMA}}_{\WBPSP,\mathcal{A}}(1^\lambda) := \Pr[
+\mathsf{CMA}^{\A}_{\WBPSP}(1^\lambda)=1] \mbox{\quad is negligible in $\lambda$.}
+$$
+\end{definition}
+
+
+\subsection{Cavefish scheme}
+\label{sect:ourscheme}
+Our Scheme operates as follows: given an intent (i.e. predicate predicate description) $prd:= \var{int_{post}}$ and predicate compiler $P$ s.t. $(P(prd))(\tx):=\fun{chkSpec}(\var{int_{post}},\fun{mkAbs}(\tx))$ the requestor (i.e. the SP) encrypts the message, in our case the full transaction $m:=\tx$ and sends the commitment $C$ to the signer, who returns a random group element $R$ used in the final Schnorr signature. The requestor replies with the Schnorr challenge $c$ as well as a proof $\pi$ of its correct construction, and of the fact that $\tx$ satisfies $\var{int_{post}}$. 
+
+We instantiate the scheme with a parametrisable $\NArg$ for the following relation, \begin{equation}
+\label{narg}
+\mathrm{R}_{\mathrm{Cavefish}}
+	(\underbrace{(q, \mathbb{G}, G, \mathsf{H})}_{\text{parameters}\ par},\
+	\overbrace{(X, R, com_\mathrm{tx}, \\TxAbs, c, \var{int_{post}} )}^{\text{known statement}\ \theta}\ ,\
+	 \underbrace{(\tx||\nt,\ \rho)}_{\text{witness}\ \omega}\ )
+\end{equation}
+checking that  $\fun{chkSpec}(\var{int_{post}},\TxAbs) = 1 \land m=\tx||\nt \land C = \PKE.\Enc(m;\rho) \land c= \hash(R,X,m) \land \TxAbs=\fun{mkAbs}(\tx)$. For the extended version, we alter the predicate compiler to $(P_{\text{ext}}$ such that $(P_{\text{ext}}(prd))(\tx):=\fun{chkSpec}(\var{int_{post}},\tx)$ (i.e. we check $\tx$ rather than $\fun{mkAbs}(\tx)$.
+
+The signer completes the signing only if the proof verifies correctly. We present the full protocol in Figure \ref{fig:WBSP}.
+\begin{figure}[ht]
+%\centering
+%\footnotesize
+\fbox{%
+  \begin{minipage}{0.95\textwidth}
+    % Top minipage
+    
+    \begin{minipage}[t]{0.09\textwidth}
+    \phantom{a}
+    \end{minipage}
+    \begin{minipage}[t]{0.48\textwidth}
+ \textbf{\uline{\bm{$\WBPS.\Setup$}}}\\[0.5ex]
+$(\G,g,q) \gets \GGen(1^\lambda)\\$
+$\hash\gets  \HGen(q)\\$
+$sp \gets (\G,g,q,\hash)\\$
+$(\crs,\tau)\gets \NArg.\Setup(sp)\\$
+$(ek,dk)\gets \PKE.\Keygen(1^\lambda)\\$
+$par \gets (\crs,ek)\\$
+$\textbf{return } par\\$
+    \end{minipage}
+    \begin{minipage}[t]{0.02\textwidth}
+    \phantom{a}
+    \end{minipage}
+    \begin{minipage}[t]{0.30\textwidth}
+      \textbf{\uline{\bm{$\WBPS.\Keygen (par)$}}}\\[0.5ex]
+$(\G,g,q) :\subseteq par\\$
+$x\gets \Z_q; X\gets g^x \\$
+$sk\gets(par,x)\\ vk\gets (par,X)\\$
+$\textbf{return } (sk,vk)\\$\\
+
+
+\textbf{\uline{\bm{$\WBPS.\Ver(vk,m,\sigma)$}}}\\[0.5ex]
+$(\G,g,q,\hash,X):\subseteq vk$\\
+$(R,s)\gets \sigma$\\
+$c\gets \hash(R,X,m)$\\
+$\textbf{return } (g^s=R\cdot X^c)$
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.1\textwidth}
+    \end{minipage}
+
+    \vspace{0.05em}
+
+    % Bottom minipage with invisible table
+    \begin{center}
+      \begin{tabular}{>{\raggedright\arraybackslash}p{0.3\textwidth} p{0.15\textwidth} >{\raggedright\arraybackslash}p{0.3\textwidth}}
+        \textbf{\uline{\bm{$\WBPS.\Sign(sk,prd)$}}} & & \textbf{\uline{\bm{$\WBPS.\Request(vk,prd,m)$}}} \\
+        $(\G,g,q,\crs,ek,x):\subseteq sk$ &  &  $(\G,g,q,\hash,\crs,ek,X):\subseteq vk$ \\
+         & $\xleftarrow{\quad C \quad}$  & $C\gets \PKE.\Enc(ek,m;\rho)$ \\
+         $r\gets \Z_q; R\gets g^r $& $\xrightarrow{\quad R \quad}$ &$c\gets \hash(R,X,m)$\\
+         && $ \theta \gets (X,R,c,C,prd,ek)$\\
+         && $w\gets (m,\rho)$\\
+         & $\xleftarrow{\quad c,\pi \quad}$ & $\pi \gets \NArg.\Prove(\crs,\theta,w)$\\
+         \textbf{if } $\NArg.\Ver(\crs,\theta,\pi) = 0:$ &&\\
+         \textbf{return } $0$ &&\\
+         $s\gets (r+c\cdot x) \mod q$ & $\xrightarrow{\quad s \quad}$ & $\textbf{if }g^s \neq R\cdot X^c : \textbf{return } \bot$ \\
+          \textbf{return } $1$ && $ \textbf{return } \sigma\gets(R,s)$
+      \end{tabular} 
+    \end{center}
+  \end{minipage}%
+}
+
+\caption{The weakly blind predicate Schnorr signature scheme \WBPSP}\label{fig:WBSP}
+\end{figure}
+
+
+
+\subsection{Security}
+
+%Blindness (initial sketch): If the commitments are perfectly hiding, then the first round does not reveal anything to the adversary. Likewise, the proof  can be simulated with no contradiction (there will always exist a correct witness to proceed with). However, the oracle query cannot be adversarially controlled: $(R,X,m_0)$ and $(R,X,m_1)$ are both known to the adversary. We thus need to replace $m\gets m_b$ with a weaker form.
+
+\begin{theorem} The $\WBPSP{}$  scheme of Figure \ref{fig:WBSP} achieves weak blindness when the encryption scheme $\PKE$ is IND-CPA secure, $\NArg$ has the zero knowledge property, assumption \ref{ass:hash} holds w.r.t. the hash generator $\HGen{}$.\label{thm:blind}
+\end{theorem}
+\begin{proof}
+We structure our proof as a sequence of games so that (1) two consecutive games are computationally indistinguishable to the adversary and (2) in the final game, the view of the adversary is independent of the challenge $b$. We define the initial game $G_0$ to be $G_0:=\BLD^{\A,b}_{\WBPSP}(\lambda)$. For $G_1$ we replace proofs with simulated ones. This is not detectable by the adversary due to the zero knowledge property of $\NArg$. Second, for game $G_2$ we replace $C$ with an encryption of a fixed message $\bar{m}$ rather than $m_b$, this too is undetectable\footnote{This will also change the input of the simulator, but this is not an obstacle: we simply consider the simulator to be part of the adversary we are constructing against the IND-CPA security of $\PKE$.} due to the IND-CPA security of $\PKE$. For game $G_3$ we replace the challenge $c$ to also use  $\bar{m}$ rather than $m_b$ in the hash. This is computationally indistinguishable due to assumption \ref{ass:hash}.
+ %  We replace $m\gets m_b$ with the weaker form $m\gets m_b||m_r$. The commitments are hiding, so  the first round does not reveal anything to the adversary. Likewise, the proof  can be simulated with no contradiction (there will always exist a correct witness to proceed with). Finally, the oracle result $c$ cannot be predicted. It is either  $c=(R,X,m_0||m_r)$ or $c=(R,X,m_1||m_r)$, but neither value can be obtained without correctly guessing the value of $m_r$ (Event $H$, which only happens with negligible probability). Conditioning on $\neg H$, $c$ is independent of the challenge bit $b$.
+\end{proof}
+
+\begin{theorem} The $\WBPSP{}$  scheme of Figure \ref{fig:WBSP} achieves unforgeability when the encryption scheme $\PKE$ is IND-CPA secure, $\NArg$ is sound, and assumption \ref{ass:schnorr} holds w.r.t. the hash generator $\HGen{}$\label{thm:unforge}.
+\end{theorem}
+
+\begin{proof}
+We follow the proof of \cite{blindsigs} with little changes. As before, we structure our proof as a sequence of games so that the probability of adversarial success changes negligibly from one game to the next. We define the initial game $G_0$ to be $G_0:=\mathsf{CMA}^{\A}_{\WBPSP}(\lambda)$.
+
+For game $G_1$, the experiment holds the decryption key for $\PKE$, so that we extract the message from $C$ ahead of time, and thus predict the $c$ value once the value of $R$ has been determined. If the value sent by the adversary is different from the predicted one, and the accompanying proof $\pi$ verifies we abort early, diverging from the original game. This only happens with negligible probability though, due to the adaptive soundness of $\NArg$ (if $\pi$ does not verify, $G_0$ would abort as well).
+
+For game $G_2$, we check to see if any of the adversarial signatures uses a message that belongs to a session that was not closed. If so, we abort early, diverging from $G_1$. However, this implies that the second part of the signature $s$ along with the secret key $x$ can be used to calculate the discrete log of $R$. Thus, if the early abort occurs (i.e. adversary manages to win using unfinished sessions)  with non negligible probability  we can build a discrete log calculator by embedding a discrete log challenge in one of the R values. Otherwise, we can assume that almost all of the adversarial wins use at least one ``new'' message, and thus the success probability for $G_1$ and $G_2$ differ only negligibly .
+
+For $G_3$ we build a reduction to the EUF-CMA security of Schnorr (Assumption \ref{ass:schnorr}). We remove key generation from the challenger, and instead obtain a $vk$ from the Schnorr EUF-CMA security game.  When we decrypt a message $m$, we query it on our signing oracle, obtaining $R,s$ as the signature. The reduction forwards $R$ to the adversary anticipating $c,\pi$. The checks introduced in $G_1$ ensure the $c$ value matches the predicted one, and thus $s$ correctly completes the signature. This ensures the simulation can complete the game. If the adversary wins the security game  $\WBPSP{}$ security game, there must be a signature on a new message that the reduction uses to also win the Schnorr EUF-CMA game with the same probability.
+\end{proof}
+

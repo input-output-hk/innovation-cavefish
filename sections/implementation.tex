@@ -1,0 +1,103 @@
+% !TEX root = ../lc_main.tex
+
+\section{Implementation}
+To assess the efficiency of our construction, we implement and benchmark the $\NArg$ component of the Cavefish protocol. Given today's implementations of zk-SNARKs, running the $\NArg$ is expected to be the most time and resource intensive part of our light client protocol.
+
+We base our tests on the trusted-setup zk-SNARK system \emph{Groth16}~\cite{cryptoeprint:2016/260} implemented by \emph{Iden3}~\cite{circom}.
+The circuits we construct and benchmark are inspired by the implementation of~\cite{blindsigs} and written in the domain-specific language of Circom~2.1.
+
+The \NArg we implement captures the relation $\mathrm{R}_{\mathrm{Cavefish}}$ in the protocol in Section~\ref{sect:ourscheme}.
+We implement the ``light'' version of Cavefish, i.e., the intent is given by\\
+$int_{\text{light}}(\fun{tx}):=\{\textbf{return } (\fun{mkAbs}(\var{tx})=\fun{mkAbs}(\var{tx_0}))\}$. The light client effectively specifies the transaction, except for the input UTxOs and note field $\textsf{aux}$. 
+
+
+%We note that the abstract transaction $\var{tx}_A$ is part of the known statement $\theta$ in $\mathrm{R}_{\mathrm{Cavefish}}$ as it constitutes an input to the predicate $P$. If full blindness is desired, then $P:= \var{int_{post}}$ and otherwise $P$ is a composite predicate that evaluates to true if $\var{tx}$ has been partially blinded according to $\var{tx}_A$ and all the specifications stated in $\var{int_{post}}$ are met.
+
+% proving: $\fun{chkSpec}(\var{int_{post}},\var{tx}) = 1$ $\land \var{Com}(\var{tx};\rho)$ from %\begin{equation}
+%\label{narg}
+%\mathrm{R}_{\mathrm{LCP}}
+%	(\underbrace{(q, \mathbb{G}, G, \mathsf{H})}_{\text{parameters}\ par},\
+%	\overbrace{(X_{\mathrm{client}}, R, com_\mathrm{tx}, \var{tx}_A, c, \var{int_{post}} )}^{\text{known statement}\ \theta}\ ,\
+%	 \underbrace{(\var{tx}||\var{nt}, \rho)}_{\text{witness}\ \omega}\ )
+%\end{equation}
+
+\subsection{Implementation choices}
+To implement and measure the arithmetic complexity of the relation $\mathrm{R}_{\mathrm{Cavefish}}$,
+we use BN254 as the curve for \emph{Groth16} to operate on, i.e., the curve group has 254 bits and the relation is instantiated over an arithmetic circuit with modulus of 254 bits. %, i.e., the order of the group given by  BN254 has 254 bits.
+The BN254 curve is one of the standard choices in Circom and forces the inputs to the circuit to be elements of the field given by BN254. 
+We capture transaction $\var{tx}$ and abstract transaction $\var{tx_A}$ as bit strings of some length $n$ encoded as field elements, which allows us to instantiate a circuit that can handle transactions of length up to $n$.
+
+In order to implement the encryption scheme $\PKE$ that is needed to encrypt $tx$ as $C$, 
+ we use ElGamal~\cite{elgamal1985public} public key encryption over the Baby-JubJub curve~\cite{whitehat2020baby}.
+ The reason for choosing Baby-JubJub curve is that the field given by BN254 is the base field of the Baby-JubJub curve and thus, any element can be represented as two elements of the BN254 field. As a consequence, the group operation is efficiently arithmetizable in the circuit~\cite{blindsigs}.
+ Furthermore, we encapsulate key and encryption of ElGamal using DHIES~\cite{abdalla1999dhaes}, i.e., the shared secret in ElGamal serves as a seed to the PRF generating random group elements for an additive one-time-pad that encrypts $tx$. The PRF is instantiated as a Poseidon hash~\cite{263850} that is efficiently arithmetizable by design.
+
+Unfortunately, most common cryptographic hash functions are not ``circuit-friendly''~\cite{263850} and thus it would be beneficial to optimize the hash function used to create the Schnorr challenge in the blind signature protocol. However, to be compatible with existing blockchain platforms and create standard Schnorr signatures, we have to adopt the exact hash function specified by the respective ledger. We use the library of hash functions in~\cite{komuves2025hashcircuits} which provides Circom implementations for many popular hash functions. The authors put effort into the optimization, but 
+more efficient implementations might be possible.
+Despite potential further improvements, the complexity of our resulting circuit is mainly governed by the number of rounds the hash function has to execute when producing the Schnorr challenge.
+
+
+\subsection{Benchmarks}
+We test and benchmark partially blind signatures for both Bitcoin and Cardano.
+Partial blindness can be interpreted as a predicate itself (see Sections~\ref{sec:mainproto} and~\ref{sect:ourscheme}).
+The ``light'' version of Cavefish uses $int_{\text{light}}$ which can be implemented with substring equality checks, provided the transaction to be signed can be unambiguously separated into blinded and nonblinded parts. 
+Cardano transactions are CBOR-encoded and contain the transaction-id and index for every UTxO serving as input~\cite{cardano-ledger}.
+Similarly, Bitcoin transactions (after Taproot update~\cite{bip340}) feature an input count followed by a list of inputs in binary format, each consisting of a transaction hash and output index.
+We assume for our benchmarks that one UTxO serves as input to the transaction and needs to be blinded.
+
+%For partial blindness, Cavefish constructs the following predicate for the \WBPSP \ scheme:
+%$$P(m_\mathrm{known},m):= \mathsf{return}\ (m_\mathrm{pub} = m_\mathrm{known})\ \mathrm{where}\ (m_\mathrm{pub},m_\mathrm{blind}) := m$$
+%asserts that transaction $\var{tx}$ corresponds to the abstract transaction $\var{tx_A}$.
+%We implement $P(m_\mathrm{known},m)$ as part of the arithmetic circuit describing $\mathrm{R}_{\mathrm{Cavefish}}$.
+
+We measure the number of contraints, the proving key size, and the proof size that $\mathrm{R}_{\mathrm{Cavefish}}$ requires in Circom.
+The number of constraints are obtained from the arithmetization when given as a R1CS relation.
+We also keep track of the time it takes to create the resulting circuit, the proving time and the proof verification time.
+ 
+ The results are summarized in Table~\ref{table_results} for Bitcoin and Cardano as the target platform. The experiments were executed on commodity hardware based on an Intel(R) Core(TM) i7-8750H CPU operating at 2.20~GHz with 12 cores and 16~GB of RAM.
+
+
+\begin{table}[h!]
+\centering
+\caption{Benchmark of $\mathrm{R}_{\mathrm{Cavefish}}$ for Bitcoin and Cardano implementing the ``light'' version of Cavefish.}
+\label{table_results}
+{\footnotesize
+\begin{tabular}{@{} lccc @{}}
+\toprule
+  & \multicolumn{1}{c}{\textbf{Bitcoin}} & \multicolumn{1}{c}{\textbf{Cardano}} \\
+\midrule
+Signature scheme & \multicolumn{1}{c}{Schnorr} & \multicolumn{1}{c}{EdDSA} \\
+Curve        & \multicolumn{1}{c}{Secp256k1} & \multicolumn{1}{c}{Ed25519}           \\
+Hash          & \multicolumn{1}{c}{SHA-256} & \multicolumn{1}{c}{SHA-512}          \\
+\midrule
+%\multirow{2}{*}{Blindness type}     & & partial & & & & partial \\
+Transaction size & 254 B & 285 B\\
+ & 288 b blinded & 333 b blinded\\
+\midrule
+Proving key size & 115 MB & 116 MB\\
+Proving key verification time & 18.6 s & 20.5 s \\
+Verification key size & 67 kB & 93 kB\\
+Proving time & 5.1 s & 5.8 s\\
+Proof size & 806 B & 805 B\\
+Proof verification time & 0.57 s & 0.59 s\\
+Number of constraints & 226509 & 245181 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+%Transaction input fields in Cardano and Bitcoin take up space proportional to the number of UTxO inputs.
+
+
+Bitcoin has one major conceptual difference from Cardano as the message being signed by the Schnorr signature scheme is the hash of the transaction $\mathsf{H}(tx)$ instead of the transaction itself.
+Therefore, \WBPSP\ is executed with $m := \mathsf{H}(\var{tx}||\nt )$.
+A straightforward adaption to \WBPSP\ that supports hashed transactions is to allow the predicate $P$ to accept an additional input which is a witness attesting to the signed message $m$ satisfying $P$.
+This additional witness must be included in the witness $\omega$ for $\mathrm{R}_{\mathrm{Cavefish}}$~\cite{blindsigs}. Therefore, compared to Cardano, the circuit for Bitcoin has to perform an additional invocation of the hash function (SHA-256). On the other hand, the hash function used by Cardano (SHA-512) has a larger codomain and higher complexity, which requires more constraints.
+
+We remark that the projects our implementation builds upon are in development, such as the hash function library, and lack certain optimizations.
+Nevertheless, the introduction of a weak variant of blindness in our light client protocol
+allowed us to obtain results within practical bounds and shows that the Cavefish protocol is deployable in the real world.
+
+
+%The most obvious choice is to blind/redact the UTxO references serving as the inputs to the transaction preventing a light client from constructing the transaction on its own, without the inclusion of the output that represents the tip/reimbursement to the service provider. If the light client posts the modified transaction on chain and thereby circumvents the service provider, no tip is due and the light client is able to obtain information that constitutes a valid transaction for free.
+

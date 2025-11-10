@@ -1,0 +1,405 @@
+\section{Expanded Technical Backgroud}
+\label{app:techbg}
+
+\subsection{Discrete Log Groups}
+\begin{definition} A group generator \GGen{} is a probabilistic polynomial time (p.p.t.) algorithm with input a security parameter $\lambda$ and outputs a group description $\G,g,q$ such that $\G$ is a group of prime order $q\approx 2^\lambda$ with generator $g$. We say that the discrete logarithm problem is hard w.r.t. \GGen{} if for all p.p.t $\A$ we have that
+
+$$\Pr[(\G,g,q) \gets \GGen(1^\lambda); t\gets \Z_q; h\gets g^t: t=A(\G,g,q,h) ] \mbox{ is negligible in }\lambda.$$
+\end{definition}
+
+\subsection{ Public Key encryption and Schnorr Signatures}
+
+A public key encryption scheme $\PKE$ comprises a set of polynomial time algorithms $\Keygen,\Enc,\Dec$ with the following syntax:
+\begin{itemize}
+\item $\Keygen(1^\lambda) \to (ek,dk)$. Creates a public/private keypair $ek,dk$. The encryption key $ek$ also defines the message space $\mathcal{M}$
+\item $\Enc(ek,m;\rho) \to C$. Encrypts a message $m\in \mathcal{M}$ under the public encryption key $ek$. \item $\Dec(dk,C) \to m$. Decrypts a ciphertext $C$ using the private decryption key $dk$.
+\end{itemize}
+
+\begin{definition} A public key encryption scheme $\PKE$ is \emph{correct} if 
+$$\Pr[ (ek,dk) \gets \PKE.\Keygen(1^\lambda); m\gets \mathcal{M}:\PKE.\Dec(sk,\PKE.\Enc(pk,m))=m ] =1.$$
+\end{definition}
+
+\begin{definition} A public key encryption scheme $\PKE$ is \emph{IND-CPA secure} if for all stateful p.p.t. adversaries \A, the difference
+$$\left| \Pr[ (ek,dk) \gets \PKE.\Keygen(1^\lambda); (m_0,m_1)\gets A(ek);d\gets\{0,1\}; c^*\gets \PKE.\Enc(ek,m_d):A(c^*)=d ] - {1\over2} \right|$$
+is negligible in $\lambda$.
+\end{definition}
+
+\begin{definition} The Schnorr digital signature scheme $\SDS$ is defined for a group generator $\GGen$ and a hash function generator $\HGen$ and operates as shown on Figure \ref{fig:schnorr}.\end{definition}
+
+
+\begin{figure}[ht]
+\fbox{%
+  \begin{minipage}{0.95\textwidth}
+    % Top minipage
+    
+    \begin{minipage}[t]{0.05\textwidth}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.4\textwidth}
+    
+ \textbf{\uline{\bm{$\SDS.\Setup(1^\lambda)$}}}\\[0.5ex]
+\mbox{$(\G,g,q) \gets \GGen(1^\lambda)$}\\
+\mbox{$\hash\gets  \HGen(q)$}\\
+\mbox{$sp \gets (\G,g,q,\hash)$}\\
+$\textbf{return } sp\\$
+
+
+      \textbf{\uline{\bm{$\SDS.\Sign (sk,m)$}}}\\[0.5ex]
+\mbox{$(\G,g,q,\hash,x):\subseteq sk$}\\
+\mbox{$r\gets \Z_q;\ R\gets g^x ;\ c\gets \hash(R,X,m)$}\\
+\mbox{$s\gets (r+c\cdot x) \mod q$}\\
+\mbox{$\textbf{return } \sigma \gets(R,s)$}\\
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.40\textwidth}
+      \textbf{\uline{\bm{$\SDS.\Keygen (sp)$}}}\\[0.5ex]
+\mbox{$(\G,g,q) :\subseteq sp$}\\
+\mbox{$x\gets \Z_q;\ X\gets g^x$}\\
+\mbox{$sk,vk \gets (par,x),(par,X)$}\\
+$\textbf{return } (sk,vk)\\$\\
+
+
+%\vspace{.5cm}
+       \textbf{\uline{\bm{$\SDS.\Ver(vk,m,\sigma)$}}}\\[0.5ex]
+$(\G,g,q,\hash,X):\subseteq vk$\\
+$(R,s)\gets \sigma; c\gets \hash(R,X,m)$\\
+$\textbf{return } (g^s=R\cdot X^c)$
+
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.1\textwidth}
+    \end{minipage}
+
+  \end{minipage}%
+}
+
+\caption{The  Schnorr signature scheme \SDS, with group and hash generators \GGen,   \HGen.}\label{fig:schnorr}
+
+\end{figure}
+
+
+\begin{definition} A digital signature scheme $\DS$ is \emph{correct} if 
+$$\Pr[sp\gets \DS.\Setup(1^\lambda); (sk,vk) \gets \DS.\Keygen(sp); m\gets \mathcal{M_{S}}:\DS.\Ver(vk,m,Sign(sk,m))=1 ] =1.$$
+\end{definition}
+
+\begin{definition} A digital signature scheme $\DS$ is \emph{strongly existentially unforgeable against chosen message attacks}  (sEUF-CMA)  if for all p.p.t.  adversaries \A, we have  
+$$\Pr[\textsf{sEUF-CMA}^{\A}_{\DS}(1^\lambda)] $$
+is negligible in $\lambda$ where the game $\textsf{GsEUF-CMA}^{\A}_{\DS}$ is defined in Figure \ref{fig:seufcma}. \label{def:seufcma}
+\end{definition}
+
+
+\begin{figure}[ht]
+\fbox{%
+  \begin{minipage}{0.95\textwidth}
+    % Top minipage
+    
+    \begin{minipage}[t]{0.05\textwidth}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.5\textwidth}
+
+      \textbf{\uline{\bm{$\textsf{GsEUF-CMA}^{\A}_{\DS}(1^\lambda)$}}}\\[0.5ex]
+$sp \gets \DS.\Setup(1^\lambda); Q\gets \emptyset$\\
+$(sk,vk)\gets \DS.\Keygen(sp)\\ (m^*,\sigma^*)\gets \A^{\textsf{OSig}}(vk)$\\
+$\textbf{return } (m^*,\sigma^*)\neq Q \land \DS.\Ver(vk,m^*,\sigma^*)$
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.35\textwidth}
+      \textbf{\uline{\bm{$\textsf{OSig}(m)$}}}\\[0.5ex]
+$\sigma \gets \DS.\Sign(skk,m)$\\
+$Q \gets Q\cup \{(m,s)\}$\\
+$\textbf{return } \sigma$
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.1\textwidth}
+    \end{minipage}
+
+  \end{minipage}%
+}
+
+\caption{The security experiment $\textsf{sEUF-CMA}^{\A}_{\DS}$ and supporting oracle $\textsf{OSig}$.}\label{fig:seufcma}
+
+\end{figure}
+
+\subsection{Parametrized Non-Interactive Zero Knowledge Arguments}
+
+Following \cite{blindsigs}, we define non-interactive zero knowledge arguments with regards to \emph parametrized polynomial relations $\mathcal{P}: \{0,1\}^* \times \{0,1\}^* \times \{0,1\}^*  \to \{0,1\}$, where the first argument represents a parameter set $par$ (e.g. a group description). Given a value of $par$, we say that $w$ is a witness for statement $\theta$ if $\mathcal{P}(par,\theta,w)=1$, i.e. $R=R_{par}(\theta,w):=\mathcal{P}(par,\theta,w)$ is an NP-relation, and $\Lang=\Lang_{par}$ is an NP-language. A NIZK for a relation  $\mathcal{P}$ operates as follows:
+\begin{itemize}
+
+\item $\mathsf{Rel}(1^\lambda) \to par$. Generates a parameter set $par$ that defines $R$ and $\Lang$.
+\item $\Setup(par)\to (\crs,\tau)$. Generates a common reference string (CRS) and trapdoor $\tau$ used by the simulator. We assume the CRS contains a description of $R$.
+\item $\Prove(\crs,\theta,w)\to \pi$. Given a CRS $\crs$, statement $\theta$ and witness $w$ for $\theta$, produces a proof $\pi$.  
+\item $\Ver(\crs,\theta,\pi)\to \{0,1\}$. Given a CRS $\crs$, a statement $\theta$ and a  proof $\pi$ outputs 1 or 0, accepting or rejecting the proof.
+\item $\SimProve(\crs,\theta,\tau)$. Given a CRS $\crs$, statement $\theta$ and traproor $\tau$ for $\crs$, produces a simulated proof $\pi$.
+\end{itemize}
+
+
+\begin{definition} A system $\NArgr$ is perfectly correct if for all unbounded adversaries $\A$ 
+\begin{align*}
+\Pr [par \gets \NArg.\mathsf{Rel}(1^\lambda);  (\crs,\tau)\gets \NArg.\Setup(par); (\theta,w) \gets A(crs):  \\
+\neg{}R(\theta,w) \lor \NArg.\Ver(\crs,\theta,\NArg.\Prove(\crs,\theta,w))]=1 \\
+\end{align*}
+\end{definition}
+
+\begin{definition} A system $\NArgr$ is adaptably computationally sound if for all p.p.t. adversaries $\A$ 
+\begin{align*}
+\Pr [par \gets \NArg.\mathsf{Rel}(1^\lambda);  (\crs,\tau)\gets \NArg.\Setup(par); (\theta,\pi) \gets A(crs):  \\
+\neg{}L(\theta) \land {}\NArg.\Ver(\crs,\theta,\pi)] \mbox{ is negligible in $\lambda$.}
+\end{align*}
+\end{definition}
+
+\begin{definition} A system $\NArgr$ is  computationally zero-knowledge if for all p.p.t. adversaries $\A$ 
+\begin{align*}
+|\Pr [par \gets \NArg.\mathsf{Rel}(1^\lambda);  (\crs,\tau)\gets \NArg.\Setup(par); d\gets\{0,1\}:  \\
+d = A^{\mathsf{OProve}_d}(crs)] - {1\over2}|\mbox{ is negligible in $\lambda$, where}\\
+\mathsf{OProve}_0(\theta,w):= \textbf{if } \neg R(\theta,w) \textbf{ return }\bot; \textbf{ return } \NArg.\Prove(\theta,w), \mbox{and} \\
+\mathsf{OProve}_1(\theta,w):= \textbf{if } \neg R(\theta,w) \textbf{ return }\bot; \textbf{ return } \NArg.\SimProve(\theta,\tau).
+  \end{align*}
+\end{definition}
+
+\newpage
+
+\section{Additional Ledger Syntax}
+\label{sec:appendix}
+
+In Figure~\ref{fig:notation:nonstandard} we introduce the standard ledger syntax that we use throughout.
+
+\begin{figure}[h!tb]
+  \begin{align*}
+    \H{}
+    & =~\bigcup_{n=0}^{\infty}\{0,1\}^{8n}
+    & \mbox{the type of bytestrings }
+    \\
+    (a, b)
+    & :~\Interval{A}
+    & \text{intervals over a totally-ordered set $A$}
+    \\
+    \var{Key} \mapsto \var{Value}
+    & \subseteq \{~ k \mapsto v ~\mid~ k \in \var{Key},~v \in \var{Value}~ \}
+    & \text{finite map with unique keys}
+    \\
+    [a1 ; ...; ak]
+    & :~[C]
+    & \text{finite list with terms of type $C$}
+    \\
+    h :: t
+    & :~[C]
+    & \text{list with head $h$ and tail $t$}
+    \\
+    x \cup \fun{nothing}
+    & :~A^?
+    & \text{maybe type over $A$}
+    \\
+    a ~\{ ~\fun{field} = ~x~\}
+    & :~A
+    & \text{record of type A with $\fun{field}$ changed to $x$}
+  \end{align*}
+  \caption{Notation}
+  \label{fig:notation:nonstandard}
+\end{figure}
+
+Figure~\ref{fig:eutxo-types} lists the primitives and derived types
+that comprise the foundations of the EUTxO model,
+along with some ancillary definitions.
+(Outputs normally refer to transaction IDs by hash,
+but we simplify here for clarity.)
+
+\begin{figure}[h!tb]
+
+\textsc{Ledger primitives}
+\begin{displaymath}
+\begin{array}{rlll}
+  \checkSig &:&
+  \Tx \to \pubkey \to \H \to \B \\
+  & &\mbox{\emph{checks that a given key signed a transaction}}
+\end{array}
+\end{displaymath}
+
+\textsc{Helper functions}
+    \begin{align*}
+        &\fun{txid} : \Tx \to \TxId \\
+        &\fun{txid}~\var{tx} = \fun{hash}~(\var{tx} ~\{ ~\fun{sigKeys} = ~\fun{dom}~(\var{tx} . \sigs) ,~\sigs = ~\emptyset~\})
+        \nextdef
+        &\fun{toMap} : \N \to [\TxOut] \to (\N \mapsto \TxOut) \\
+        &\fun{toMap}(\_,~[~]) ~~~~~~~~~~~~~= [~] \\
+        &\fun{toMap}(\var{ix},~u~::~\var{outs}) = \{~\var{ix}\mapsto u~\} \cup \fun{toMap}(\var{ix}+1,~\var{outs}) \\
+        & \mbox{\emph{constructs a map from a list of outputs}}
+        \nextdef
+        &\fun{mkOuts} : \Tx \to \UTxO \\
+        &\fun{mkOuts}(tx) = \{~(\var{tx},~\var{ix}) \mapsto o~ \mid~(\var{ix} \mapsto o)\in~\fun{toMap}(0,~\var{tx}.\outputs)~\} \\
+        &\mbox{\emph{constructs a UTxO set from a list of outputs of a given transaction}}
+        \nextdef
+        &\fun{MOf} : \N \to \N \to (A \to \B) \to [A] \to \B \\
+        &\fun{MOf}~k~m~f~[~] = m~\leq~k \\
+        &\fun{MOf}~k~m~f~( h~ ::~ t) = \fun{if}~ (m~\leq~k)~\fun{then}~\true~\fun{else}~(\fun{MOf}~(k~+~a)~m~f~t) \\
+        &~~\where~~a~=~\fun{if}~ (f~(h))~\fun{then}~1~\fun{else}~0 \\
+        &\mbox{\emph{returns $\true$ if enough elements of a list satisfy given function}}
+    \end{align*}
+\caption{Primitives and basic types for the $\UTxO_{ma}$ model}
+\label{fig:eutxo-types}
+\end{figure}
+\newpage 
+\subsection{Transaction Validation Rules}
+
+A transaction $\var{tx}$ is \emph{valid} if it follows the following rules. 
+
+\label{sec:check-tx}
+
+
+\begin{itemize}
+    \item[(i)] \textbf{The transaction has at least one input:}
+  \[
+  \var{tx}.\inputs~\neq~\{\}
+  \]
+    \item[(ii)] \textbf{The current slot is within transaction validity interval:}
+  \[
+  \var{slot} \in \var{tx}.\fun{validityInterval}
+  \]
+    \item[(iii)] \textbf{All outputs have positive values:}
+  \[
+  \forall o \in \var{tx}.\outputs,~\var{o}.\val > \emptyset
+  \]
+    \item[(iv)] \textbf{All output references of transaction inputs exist in the UTxO:}
+  \[
+  \var{tx}.\inputs~ \subseteq~ \fun{dom}~\var{utxo}
+  \]
+    \item[(v)] \textbf{Value is preserved:}
+  \[
+  \var{tx}.\mint +
+  \sum_{i \in~\var{tx}.\inputs,~(i~\mapsto~o) \in~\var{utxo}} \var{o}.\val =
+  \sum_{o \in~\var{tx}.\outputs} \var{o}.\val ~+~\fun{toValue}~(\var{tx}.\fun{fee})
+  \]
+    \item[(vii)] \textbf{All inputs validate:}
+  \[
+  \forall~ i \in \var{tx}.\inputs,~i \mapsto (s, v) \in \var{utxo},~
+     \applyScript{s}(\fun{dom}~(\var{tx}.\sigs),~\var{tx}.\validityInterval) = \true
+  \]
+    \item[(ix)] \textbf{All minting scripts validate:}
+  \[
+  \forall~ p\mapsto \_ \in \var{tx}.\mint,~ \applyScript{p} (\fun{dom}~(\var{tx}.\sigs),~\var{tx}.\validityInterval) = \true
+  \]
+    \item[(x)] \textbf{All signatures are correct:}
+  \[
+  \forall~ (pk \mapsto s) \in \var{tx}.\sigs,~ \checkSig (\var{tx}, pk, s) = \true
+  \]
+  \item[(i)] \textbf{The fee is sufficient:}
+  \[
+    \var{s}.\fun{minfee} \leq \var{tx}.\fun{fee} 
+  \]
+  \end{itemize}
+
+\subsection{Script construction and Evaluation}
+\label{sec:check-script}
+
+In Figure \ref{fig:script} we present the constructors and evaluation rules for scripts, and in Figure \ref{fig:mktospec} we explain the transaction building function \fun{mkToSpec}.
+
+\begin{figure}
+    \textsc{Constructors of $\Script$} 
+\begin{displaymath}
+\begin{array}{rlll}
+    \fun{RequireMOf}         &: \N \to [\Script] &\to~ \Script \\
+    \fun{RequireSig}         &: \pubkey      &\to~ \Script \\
+    \fun{RequireTimeStart}   &: \Slot        &\to~ \Script \\
+    \fun{RequireTimeExpire}  &: \Slot        &\to~ \Script \\
+\end{array}
+\end{displaymath}
+\nextdef
+\textsc{Evaluation of $\Script$} 
+\begin{displaymath}
+\begin{array}{rlll}
+  \applyScript{\_} &:& \Script \to ((\type{Set} \pubkey) \times (Slot \times Slot)) \to \B \\
+  \applyScript{\fun{RequireMOf}~n~ls} (\var{khs}, (t1, t2)) &=&  \fun{MOf}~0~ n ~(\applyScript{\_}~(\var{khs}, (t1, t2))) ~ls \\
+  \applyScript{\fun{RequireSig}~k} (\var{khs}, (t1, t2)) &=& k~\in~\var{khs} \\
+  \applyScript{\fun{RequireTimeStart}~t1'} (\var{khs}, (t1, t2)) &=& t1'~\leq~t1 \\
+  \applyScript{\fun{RequireTimeExpire}~t2'} (\var{khs}, (t1, t2)) &=& t2~\leq~t2' 
+\end{array}
+\end{displaymath}
+\caption{$\Script$ constructors and evaluation}
+\label{fig:script}
+\end{figure}
+
+\begin{figure}
+      \textsc{Trivial transaction $\fun{initTx}_{a,mf}$} 
+\begin{displaymath}
+\begin{array}{rlll}
+  \fun{initTx}_{a,mf}  &=& \{ ~\inputs = \emptyset,\\
+  & &\ \outputs = [ (a , \fun{tip})],\\
+  & &\ \fun{validityInterval} = [\fun{nothing} , \fun{nothing}],\\
+  & &\ \mint = 0,\\
+  & &\ \fun{fee} = mf \\
+  & &\ \fun{aux} = []~\\
+  & &\ \sigs = \emptyset~ \}
+\end{array}
+\end{displaymath}
+\nextdef
+\textsc{Input selection function} 
+\begin{displaymath}
+\begin{array}{rlll}
+  \fun{mkIns}  &:& (\LState \times (\type{Set} \TxIn) \times \Value \times \Script) \to (\type{Set} \TxIn) \\
+  \fun{mkIns} ~(l,~i,~v,~s) &=& \fun{if}~\neg~(v \leq 0) ~ \fun{then} \\
+  & & ~~~~ \fun{if}~(v > 0)~\fun{then}~\\
+  & & ~~~~ ~~~~\fun{mkIns}~(l~\setminus~(\{j \mapsto \_\}),~i \cup j,~v~-~(u(j) . \val) ,~s) \\
+  & & ~~~~ \fun{else}~i\\
+  & & \fun{else } \\
+  & & ~~~~\fun{nothing} \\
+  & & \fun{where}~\\
+  & & ~~~j = \fun{pickInput}~l~s \\
+  & & ~~~u = \fun{utxo}~l
+\end{array}
+\end{displaymath}
+\nextdef
+\textsc{Auxiliary $\fun{mkToSpec'}$ definition} 
+\begin{displaymath}
+\begin{array}{rlll}
+\fun{mkToSpec'} &:& \LState \to \mathcal{I}_\mathsf{post} \to \Tx \to \Tx^? \\
+\fun{mkToSpec'}~l~(\fun{MustMint}~v) (\var{tx}) &=&  \var{tx}~\{ \mint~=~v ~+~ \var{tx} . \mint , \fun{sigs} = tx.\fun{sigs} \cup \fun{getSigsVal}~v ,\\
+& & ~~~~\fun{validityInterval} = \fun{restrictIntervalVal}~tx.\fun{validityInterval}~v\} \\
+\fun{mkToSpec'}~l~(\fun{SpendFrom}~s) (\var{tx}) &=& \var{tx}~\{ \outputs~=~ \var{tx} . \inputs~\\
+& & ~~~~\cup~\fun{newIns} , \fun{sigs} = tx.\fun{sigs} \cup \fun{getSigsUTxO}~\fun{newIns}~l ,\\ 
+& & ~~~~ \fun{validityInterval} = \\ 
+& &~~~~~~~~\fun{restrictIntervalUTxO}~tx.\fun{validityInterval}~\fun{newIns}~l\} \\
+& & ~~~~\where \\
+& & ~~~~\fun{newIns} = \fun{mkIns}~l~(\var{tx} . \inputs)~(\fun{produced} - \fun{consumed})~ s \\
+\fun{mkToSpec'}~l~ (\fun{MaxInterval}~i) (\var{tx}) &=& \var{tx}~\{ \validityInterval~=~(l . \fun{slot}, \\
+& & ~~~~\fun{min}~\{l . \fun{slot}~+~i , \var{tx} . \fun{validityInterval}_2)\} \}  \\
+\fun{mkToSpec'}~l~ (\fun{PayTo}~(s, v)) (\var{tx}) &=& \var{tx}~\{ \outputs~=~ \var{tx} . \outputs~\cup~ (s, v) \}   \\
+\fun{mkToSpec'}~l~ (\fun{ChangeTo}~s) (\var{tx}) &=& \fun{if}~ \fun{consumed} - \fun{produced} ~>~0 ~\\ 
+& & ~~~~\fun{then}~ \var{tx}~\{ \outputs~=~ \var{tx} . \outputs~\\
+& & ~~~~\cup~ \{(s,~ \fun{consumed} - \fun{produced})\} \} ~\fun{else}~\fun{nothing}   \\
+\fun{mkToSpec'}~l~ (\fun{MaxFee}~f)~ (\var{tx}) &=&  \fun{if}~ \var{tx} . \fun{fee} \leq f~\\ 
+& & ~~~~\fun{then}~\var{tx}~\fun{else}~\fun{nothing} \\
+\fun{mkToSpec'}~l~ (\fun{AndExps}~[a1 ; a2 ; ... ; ak]) (\var{tx}) &=& \fun{mkToSpec'}~l~ak~(... ~(\fun{mkToSpec'}~l~a2~(\fun{mkToSpec'}~l~a1~\var{tx})))
+\end{array}
+\end{displaymath}
+\nextdef 
+\textsc{$\fun{mkToSpec}$ definition} 
+\begin{displaymath}
+\begin{array}{rlll}
+\fun{mkToSpec} &:& (\LState \times \mathcal{I}_\mathsf{post}) \to \Tx^? \\
+\fun{mkToSpec}~(l , i) &=& \fun{mkToSpec'}~l~i~\fun{initTx}_{a,mf}
+\end{array}
+\end{displaymath}
+\caption{Building transactions according to the specific intent}
+\label{fig:mktospec}
+\end{figure}
+
+
+
+
+\begin{figure}
+\begin{displaymath}
+\begin{array}{rlll}
+  \fun{txi}_1 &=&(\outputs = \{~(s, t)~\},\\
+  & &\ \fun{validityInterval} = [ \fun{slot}~l , (\fun{slot}~l) + j ],\\
+  & &\ \mint = t,\\
+  & &\ \fun{fee} = \fun{minfee}~l \\
+  & &\ \fun{sigKeys} = \fun{getSignersVal}~t) 
+  \nextdef 
+  \fun{txi}_2 &=& (\outputs = \{ (\fun{RequireSig}~k2,~x)~,~(\fun{RequireSig}~k1~,\\& & ~(\fun{balance}~(\fun{mkIns}~l~\{\}~x~ (\fun{RequireSig}~k1))) - x) \} ,\\
+  & &\ \fun{validityInterval}  = [~ \fun{nothing}~ , \fun{nothing}~],\\
+  & &\ \mint  = \{~\} ,\\
+  & &\ \fun{fee}  = \fun{minfee}~l \\
+  & &\ \fun{sigKeys}  = \{~k1~\} )
+\end{array}
+\end{displaymath}
+\caption{Abstract transaction examples}
+\label{fig:txs}
+\end{figure}

@@ -1,0 +1,33 @@
+% !TEX root = ../lc_main.tex
+
+\section{Analysis \& Applications}
+
+\textbf{Storage and Communications Requirements.} We point out that our protocol is optimal in terms of light client storage and light client \& SP communication. The light client (LC) only needs to store information about which wallet subkeys have been active. In terms of communication, our protocol transmits only a constant number of elements when using a succinct proof system. This compares favorably to solutions such as SPV which incur linear costs or even solutions based on succinct proof systems for the chain tip, but where the LC needs to verify transaction inclusion into blocks via Merkle proofs.
+
+\noindent \textbf{Transaction discovery via HD Wallets.}
+\label{sec:xclient}
+Assuming that the client only uses a single address can be unrealistic, as is requiring the LC to send the SP a list of addresses presumed active. Our protocol is compatible with BIP-32 \cite{bip32} hierarchical deterministic (HD) wallets.
+This enables child addresses to be deterministically created from a parent address by hashing the parent key $X$, a chaincode value $\text{cc}$ and an address index $i$. Concretely, $o_i:=\hash(X,\text{cc},i)$ is the private key offset of child key $i$, i.e. the $i$-th child keypair is $x_i=x+o_i$ and $X_i=X\cdot g^{o_i}$. Child chaincodes are determined in the same way. 
+
+Thus, an LC can simply transmit the chaincode corresponding to its public key $X$, and the SP will be able to derive a list of child addresses (bounding indexes can be done heuristically, or with hints from the client). The protocol then proceeds with minor changes:
+\begin{enumerate}
+\item The challenge $c$ is now derived as $c=\hash(R,X_c,m)$
+\item The witness $w$ now includes the index of the child key $i$ (or vector of indices $\bm{i}$ and chaincodes $\textbf{cc}$ if the child is further down the tree).
+\item The relation now checks that the hashed value is of the form $X_c=X\cdot g^{o_c}$ where $o_c=
+\textsf{HDDerive}(X,\bm{i},\textbf{cc})$.
+\item The SP modifies the  component $s:=xc+r$ to $s'=s+ o_c\cdot c$, adjusting for the child offset.
+\end{enumerate}
+Notably, the LC does not learn which child address was used, it can simply sign with regards to the sent public key $X$ and the SP can maul the signature as needed.
+
+\noindent \textbf{Asset and Non-Asset Compensation.} In our model, we have so far assumed that an SP performs its
+services in exchange for a fee. This fee may be either flat, or calculated on the basis of transaction size,
+or complexity of transaction specification, etc.---the details of this fee calculation are dependent on the
+specifics of the implementation of our protocol, the marketplace, and SPs preferences.
+The fee may also be specified in either an amount of primary asset tokens,
+or some other user-defined tokens. A fee requirement in user-defined tokens could be useful in the case
+of the SP service for LCs being associated with another type of service trading in such tokens, such as a
+videogame token marketplace. Yet another option for SPs is to request non-monetary compensation
+for their services, such as requiring engagement with a specific smart contract (i.e. SP does DApp fee
+sponsorship), voting for a specific update,
+delegating stake, etc. All these actions can be performed by the very transaction that SP constructed
+according to LC's specification.

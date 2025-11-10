@@ -1,0 +1,107 @@
+% !TEX root = ../lc_main.tex
+
+\maketitle
+
+\begin{abstract}
+Blockchain light clients (LCs) are agents with limited computational or storage resources who cannot maintain a fully validated local copy of the ledger state. Instead, they rely on service providers (SPs), typically full nodes, to access data required for tasks such as constructing transactions or interacting with off-chain applications.
+
+In this work, we introduce Cavefish, a novel protocol for UTxO-based platforms that enables LCs to interact with the ledger and submit transactions with minimal trust, storage, and computation. Cavefish defines a two-party computation protocol between an LC and an SP, in which the LC specifies a transaction and the SP constructs it. Consequently, the LC only receives a blinded version of the transaction, preventing it from modifying or reusing the transaction while still being able to verify that the transaction matches the original intent of the LC. The SP is compensated inside the constructed transaction, eliminating the need for another protocol or exchange.
+
+To support this, we propose a variant of the predicate blind signature (PBS) scheme of Fuchsbauer and Wolf (Eurocrypt 2024), allowing the SP to obtain a valid signature on the unblinded transaction, which it can then broadcast on the network and post on chain. Moreover, the resulting signatures verify as standard Schnorr signatures.
+Our construction achieves a trustless interaction in which the LC achieves their transaction goal, and the SP receives fair compensation for their effort.
+When Cavefish is combined with hierarchical deterministic (HD) wallets, the LC can provide a single public key and chain code to the SP, reducing communication footprint to a minimum.
+
+To further optimize communication and computational overhead, our PBS variant relaxes the unlinkability guarantees of traditional blind signatures in favor of efficiency. 
+We argue that this relaxation is adequate, since transactions only need to be kept private until posted on a public ledger.
+We implement and benchmark the Non-interactive Argument of Knowledge (NArg) component of our protocol on two major UTxO-based blockchains. Despite being the most computationally demanding part, our results show that proving and verification times, as well as circuit sizes, are practical for real-world deployment.
+
+%Blockchain light clients (LCs) are users with limited resources who cannot maintain a fully validated local copy of the ledger state. Consequently, they rely on service providers (SPs), typically full nodes, to access the data needed for tasks such as transaction construction or interacting with off-chain applications.
+%In this work, we propose a novel protocol and model for UTxO-based platforms that enables LCs to interact with the ledger and submit transactions with minimal local storage and computation. Our solution is called Cavefish and defines a two-party computation protocol between an LC and an SP. The LC instructs the SP to create a transaction according to its specifications, but only a blinded version of the result is shared. The blinded form prevents the LC from altering the transaction or constructing a new (valid) transaction, while still allowing the LC to verify that the transaction satisfies their original specification.
+%To achieve this, we introduce a secure predicate mechanism and a weakly blind signature scheme. This allows the SP to obtain a valid signature on the original (unblinded) transaction, which can then be submitted to the network. The result is a trustless interaction in which the LC achieves their transaction goal, and the SP receives compensation for their effort.
+%To optimize communication and computational overhead, we design an extension of Schnorr blind signatures called weakly blind predicate signatures, which relaxes the unlinkability requirement in standard blind signatures.
+%We implement and benchmark the Non-interactive Argument of Knowledge component of our protocol on two major UTxO-based blockchain platforms. Despite this component being the most computationally intensive part, our evaluation demonstrates that verification and proving times, as well as associated circuit sizes, are well within practical bounds for real-world deployment.
+
+%\textcolor{orange}{play up communication optimality: LC does not read blockchain. rationality }
+
+
+%Blockchain light clients (LCs) are platform users that do not have the capacity to locally maintain current,
+%fully-validated ledger state. For this reason, light clients rely on service providers (SPs, which are full nodes) for obtaining the blockchain data they require, e.g. for transaction construction or running off-chain apps.
+%In this paper, we propose protocol and model in which a light client of a UTxO-style platform has the goal of submitting a transaction with minimal local state and minimal local processing. We propose a 2-party computation protocol between the LC and the SP. First, the light client creates a specification for the transaction they would like the SP to construct, then the SP builds such a transaction, while including a small payment to cover the cost of computation.
+%The SP sends the LC a blinded version of the constructed transaction for signing and checking. It is modified such that it is impossible for the LC to use the provided data to construct a distinct new (valid) transaction without guessing pre-images of transaction hashes, but has enough information to allow the LC to
+%check that it meets their specification. Using a secure predicate and partially blind signature scheme, the SP is able to obtain a signature on the original (unmodified) transaction,
+%which is submitted to the network for inclusion in a block. This 2-PC protocol constitutes a trustless
+%interaction between the LC and the SP resulting in the LC's desired transaction being applied
+%to the ledger state, and the SP receiving compensation for their work.
+
+%In order to realize our light client protocol in a communication optimal way, we develop an adaptation of Secure Blind Schnorr Signatures that we call Weakly Blind Predicate Signatures, alleviating the unlinkability requirement of standard Blind Schnorr Signatures.
+
+%Finally, we implement and benchmark the Non-interactive Argument of Knowledge as part of our protocol and constitutes the most time and resource intensive component of our construction.
+\end{abstract}
+
+
+
+\section{Introduction}
+Blockchain technologies have emerged as a foundational component of decentralized systems, offering strong guarantees of data integrity, censorship resistance, and fault tolerance through cryptographic protocols and distributed consensus. Within this domain, the Unspent Transaction Output (UTxO) model represents a distinctive paradigm for managing asset ownership and validating transactions. 
+The UTxO model was initially introduced by Bitcoin and subsequently adopted by other platforms such as Cardano.
+In contrast to account-based models, UTxO-based blockchains accommodate parallelism and concurrent processing more effectively
+%and improve auditability, 
+but also introduce challenges in terms of complexity and
+client verification.
+
+Full nodes in a UTxO-based blockchain are required to download and validate the entire chain history to ensure correctness and security. This requirement presents a significant barrier to participation for resource-constrained devices, such as smartphones and embedded systems. Light client (LC) protocols aim to mitigate this issue by enabling nodes to interact with the blockchain in a secure and efficient manner without maintaining full historical data. These protocols must strike a careful balance between minimizing resource consumption and preserving critical security properties, such as transaction inclusion, double-spending resistance, and above all, chain validity.
+
+Blockchains are append-only data structures that grow continuously over time. As the chain length increases, it becomes prohibitively expensive for a light client (LC) to scan the entire history to verify past transactions or to locate a specific UTxO. \cut{In UTxO-based systems, where each transaction consumes and produces discrete outputs without a centralized account state, the ability to efficiently access historical transaction data becomes essential. Without mechanisms to support succinct historical queries or proofs of inclusion, LCs may be forced to rely on third-party services or sacrifice security.}
+
+The question answered by this paper is ``how can a user of a light client engage with a full node acting as a service provider to request and approve transactions (e.g. from their wallet) in a secure  way without knowing anything about the current chain and ledger state and minimal communication effort?'' 
+In this paper, we present a solution to this question in the form of \emph{Cavefish}, a novel intent-based light client protocol designed for UTxO-based blockchains.
+Cavefish enables LCs to avoid querying the current ledger state and submit transactions requiring only minimal local storage and computation. In order to submit a transaction on chain, the LC engages with a service provider (SP) in a two-party computation protocol that yields a signed transaction indistinguishable from one created by a full node. In addition to the low storage and computational requirements, our LC protocol is communication-optimal. After the LC has instructed the SP about the type of transaction it wishes to create, the protocol can be completed in as few as two rounds. The LC does not need to download  let alone parse the blockchain. The only information the SP must obtain from the LC are the addresses where the funds are located.
+Cavefish is compatible with hierarchical (HD) wallets \cite{bip32} allowing straightforward address discovery over a range of child addresses with the LC sending only a single public key together with its chain code.
+\cut{These are sufficient for the SP to scan the UTxO ledger and construct a transaction according to the specifications requested by the LC.}
+The only complexity is having the LC sign the requested signature after the SP constructs it. Sending the signature in the open would allow the LC to modify the transaction, potentially removing SPs fee. Instead, the SP transmits the result in a redacted form, which we call an \emph{abstract transaction}.
+
+The LC and SP then complete a blind signature protocol where the LC verifies if the transaction satisfies its defined specifications and only then creates valid signature(s) which are sent back to the SP. The abstract transaction is used to speed up this check.
+As a last step, the SP attaches the signatures to the transaction and posts them on the blockchain on behalf of the LC.
+
+To make our scheme viable in the real world, we adapt the blind predicate Schnorr signature scheme from~\cite{blindsigs}.
+More precisely, we do not require the unlinkability requirement once the transaction has been published on the blockchain.
+Accounting for timing, values and payees the potential anonymity set for a blinded transaction is trivially small, and in any case the transaction signed by the LC only needs to stay \emph{private until posted}.
+This insight allows us to introduce the notion of a \emph{weakly} blind predicate signature scheme, a simplification that reduces the space and time complexity of the zero-knowledge component which asserts that the abstract transaction meets the LC's specifications.
+
+In addition to the low communication overhead, our light client protocol gives the SP the ability to be reimbursed for its computation time required to construct the transaction without the need of an additional protocol or exchange. The requested transaction includes the SP's fee, i.e., an additional UTxO output, which makes up for the SP's costs and small reward. Additionally, if the client wishes to engage with the SP over a period of time, our mechanism can be used to initialize a payment channel that can be used subsequently for fast payments to the SP without impacting the size of transactions beyond the first. 
+%removed talk of how fee is set, let's assume it's set out of band, also meshes with mkAbs
+
+\noindent To summarize, our contributions are:
+\begin{itemize}
+\item We introduce the notion of intents, describing the desired end result of the light client's actions, as opposed to the method by which they are accomplished. We believe this to be an important abstraction as it assists in the conception, development and study of specialized efficient protocols as opposed to aiming for parity with full clients. To this end, we describe a domain-specific language (DSL) allowing the concise construction of intents for UTxO-based ledgers.
+\item We propose Cavefish, a light client protocol that avoids any enrollment or synchronizing with chain whilst maintaining safety, providing compensation to the SP, imposing minimal communication overhead and being compatible with any UTXO blockchains using Schnorr signatures.
+\item We introduce the notion of weakly blind predicate signatures, motivated by our ``private until posted'' goal. This brings together the notions of blind predicate signatures of~\cite{blindsigs} with the notion of signatures on committed messages (SBCM) from~\cite{10.1007/978-3-031-78679-2_7}.
+\item We implement and benchmark the zero-knowledge proof component of Cavefish for two major blockchain platforms, Bitcoin and Cardano, and show that an ``unoptimized'' implementation achieves proving and verification times that are viable in a real-world deployment.
+\end{itemize}
+
+
+%Since our protocol features atomicity of service and payment, no enrolment or set up phase is required,  letting the light client freely choose any suitable service provider.
+
+%Our work can be implemented for any UTxO or EUTxO blockchain, provided the intent specification is adapted to capture the ledger model and the blockchain supports standard Schnorr signatures. 
+
+
+
+
+%\textcolor{orange}{mr: needs 1-2 passes and some references.}
+
+%\todobox{
+%What sets us apart?
+%
+%\begin{itemize}
+%    \item Atomicity of payment+service
+%
+%    \item permission-less, decentralized
+%
+%    \item Model for (trustless) 2-party transaction construction rather than proving things about chain/ledger state
+%
+%    \item Do not require establishing a relationship with SP or any other set-up
+%
+%    \item inherent timeliness of transaction construction incentivized by SPs desired to earn
+%    their tip. This is in contrast with the possibility of stale info provided from old Mithril snapshots in other LC models
+%\end{itemize}}
+
+
