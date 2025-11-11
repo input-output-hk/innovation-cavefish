@@ -123,6 +123,7 @@ let
     pkgs.cacert
     pkgs.curl
     pkgs.bash
+    pkgs.git
     pkgs.git-lfs
     pkgs.which
     pkgs.watchexec

@@ -55,14 +55,11 @@
 
           # Configure ESLint and Prettier for the shell
           shellHook = ''
-            npm install snarkjs@latest --save-dev
-            npm install vite@latest --save-dev
-
+            if [ ! -d "node_modules/snarkjs" ]; then
+              npm install snarkjs@0.7.0 --save-dev
+            fi
             export PATH=$PWD/node_modules/.bin:$PATH
             echo "WBPS dev shell" | figlet -f cybermedium
-            #
-            # to set up project
-            # deno init --npm vite --template react-ts
           '';
         };
       }

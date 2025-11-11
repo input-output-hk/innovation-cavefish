@@ -21,3 +21,4 @@
 # nix / git-conig-hook link
 # ====================================================
 .pre-commit-config.yaml
+**/result
