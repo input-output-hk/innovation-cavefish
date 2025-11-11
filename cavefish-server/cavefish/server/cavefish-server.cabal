@@ -81,8 +81,6 @@ library
     , text
     , time
     , transformers
-    , transformers-either
-    , uuid
     , wai
     , wai-cors
 
@@ -100,8 +98,6 @@ executable cavefish-server
     , cooked-validators
     , crypton
     , stm
-    , wai
-    , wai-cors
     , warp
 
   if flag(ide-stub)

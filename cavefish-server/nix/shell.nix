@@ -123,15 +123,22 @@ let
     pkgs.cacert
     pkgs.curl
     pkgs.bash
-    pkgs.git
+    pkgs.git-lfs
     pkgs.which
     pkgs.watchexec
-
     pkgs.nix-prefetch-git
 
     # Additions for gen-tags.sh
     pkgs.haskellPackages.fast-tags
+    pkgs.haskellPackages.hie-bios
     pkgs.jq
+
+    # wbps and ZKsnark dependencies
+    pkgs.nodejs_22
+    pkgs.typescript
+    pkgs.circom
+
+    pkgs.figlet
   ];
 
   shell = project.shellFor {
@@ -151,6 +158,16 @@ let
       export PS1="\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] "
       alias ll="ls -l --color=auto"
       alias haskell-language-server-wrapper="haskell-language-server"
+
+      if [ ! -d "node_modules/snarkjs" ]; then
+        npm install snarkjs@0.7.0 --save-dev
+      fi
+      if [ ! -f .git/hooks/pre-push ] || ! grep -q "git-lfs" .git/hooks/pre-push 2>/dev/null; then
+        git lfs install
+      fi
+      echo "cavefish" | figlet -f cybermedium
+
+      export PATH=$(pwd)/node_modules/.bin:$PATH
     '';
   };
 
