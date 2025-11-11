@@ -4,5 +4,9 @@
   "ctags.onSave": true,
   "ctags.command": "./gen-tags.sh",
   "editor.gotoLocation.multipleDefinitions": "goto",
-  "editor.fontLigatures": true
+  "editor.fontLigatures": true,
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.eol": "\n"
+  
 }
