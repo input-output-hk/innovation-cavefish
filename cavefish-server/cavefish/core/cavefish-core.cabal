@@ -65,6 +65,7 @@ library
     Core.Api.AppContext
     Core.Api.Messages
     Core.Api.State
+    Core.Cardano.Class
     Core.Cbor
     Core.Intent
     Core.Observers.Observer
@@ -82,12 +83,17 @@ library
     , cardano-crypto-class
     , cardano-ledger-alonzo
     , cardano-ledger-core
+    , cardano-ledger-shelley
+    , cardano-slotting
     , cborg
     , containers
     , cooked-validators
     , crypton
+    , lens
     , memory
     , mtl
+    , ouroboros-consensus
+    , ouroboros-network-protocols
     , plutus-core
     , plutus-ledger
     , plutus-ledger-api
@@ -98,6 +104,7 @@ library
     , stm
     , text
     , time
+    , transformers
     , uuid
 
   if flag(ide-stub)
