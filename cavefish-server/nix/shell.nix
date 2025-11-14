@@ -1,10 +1,10 @@
-{
-  inputs,
-  pkgs,
-  lib,
-  project,
-  utils,
-  ghc,
+{ inputs
+, pkgs
+, lib
+, project
+, utils
+, ghc
+,
 }:
 
 let
@@ -61,11 +61,11 @@ let
 
     hooks = {
       nixpkgs-fmt = {
-        enable = false;
+        enable = true;
         package = pkgs.nixpkgs-fmt;
       };
       cabal-fmt = {
-        enable = false;
+        enable = true;
         package = tools.cabal-fmt;
       };
       stylish-haskell = {
@@ -77,10 +77,10 @@ let
         ];
       };
       fourmolu = {
-        enable = false;
+        enable = true;
         package = tools.fourmolu;
         args = [
-          "--mode"
+          "-m"
           "inplace"
         ];
       };
@@ -93,7 +93,7 @@ let
         ];
       };
       shellcheck = {
-        enable = false;
+        enable = true;
         package = pkgs.shellcheck;
       };
     };
@@ -127,6 +127,7 @@ let
     pkgs.git-lfs
     pkgs.which
     pkgs.watchexec
+    pkgs.ghciwatch
     pkgs.nix-prefetch-git
 
     # Additions for gen-tags.sh

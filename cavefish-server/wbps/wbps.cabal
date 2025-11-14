@@ -1,5 +1,5 @@
-cabal-version:      3.4
-name:               wbps
+cabal-version:   3.4
+name:            wbps
 
 -- The package version.
 -- See the Haskell package versioning policy (PVP) for standards
@@ -8,16 +8,15 @@ name:               wbps
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            0.1.0.0
-homepage:           https://github.com/input-output-hk/innovation-cavefish
-license:            Apache-2.0
-license-file:       LICENSE
-author:             Nicolas Henin
-maintainer:         mr.henin@gmail.com
-category:           Cryptography
-build-type:         Simple
-extra-doc-files:    CHANGELOG.md
-
+version:         0.1.0.0
+homepage:        https://github.com/input-output-hk/innovation-cavefish
+license:         Apache-2.0
+license-file:    LICENSE
+author:          Nicolas Henin
+maintainer:      mr.henin@gmail.com
+category:        Cryptography
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
 
 common base
   build-depends: base >=4.9 && <5
@@ -52,62 +51,60 @@ common project-config
     ViewPatterns
 
 library
-    import: base, project-config
-    hs-source-dirs: lib
-    exposed-modules:  
-        WBPS
-        WBPS.Core
-        WBPS.Core.Primitives.Snarkjs
-        WBPS.Core.Primitives.SnarkjsOverFileScheme
-        WBPS.Core.Primitives.Circom
-        WBPS.Core.FileScheme
-        WBPS.Adapter.CardanoCryptoClass.Crypto
-        WBPS.Adapter.Data  
-    build-depends:
-      ,  bytestring
-      , shh    >= 0.7.0  && < 0.8
-      , path   >= 0.9.0  && < 0.10
-      , path-io>= 1.8.0  && < 1.9
-      , transformers
-      , validation
-      , mtl
-      , cardano-crypto-class
-      , text
-      , hex-text
-      , aeson
+  import:          base, project-config
+  hs-source-dirs:  lib
+  exposed-modules:
+    WBPS
+    WBPS.Adapter.CardanoCryptoClass.Crypto
+    WBPS.Adapter.Data
+    WBPS.Core
+    WBPS.Core.FileScheme
+    WBPS.Core.Primitives.Circom
+    WBPS.Core.Primitives.Snarkjs
+    WBPS.Core.Primitives.SnarkjsOverFileScheme
 
-
+  build-depends:
+    , aeson
+    , bytestring
+    , cardano-crypto-class
+    , hex-text
+    , mtl
+    , path                  >=0.9.0 && <0.10
+    , path-io               >=1.8.0 && <1.9
+    , shh                   >=0.7.0 && <0.8
+    , text
+    , transformers
+    , validation
 
 test-suite wbps-unit-tests
-
-    import: base, project-config
-    type:             exitcode-stdio-1.0
-    hs-source-dirs:   tests/unit
-    main-is:          Main.hs
-    other-modules:  
-    build-depends:
-        , wbps
-        , tasty
-        , tasty-hunit
-        , tasty-quickcheck
+  import:         base, project-config
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: tests/unit
+  main-is:        Main.hs
+  other-modules:
+  build-depends:
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , wbps
 
 test-suite wbps-integration-tests
+  import:         base, project-config
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: tests/integration
+  main-is:        Main.hs
+  other-modules:
+    WBPS.Specs.Adapter.GenCardanoKeys
+    WBPS.Specs.Adapter.Test
+    WBPS.Specs.NominalCase
 
-    import: base, project-config
-    type:             exitcode-stdio-1.0
-    hs-source-dirs:   tests/integration
-    main-is:          Main.hs
-    other-modules:  
-      WBPS.Specs.NominalCase
-      WBPS.Specs.Adapter.GenCardanoKeys
-      WBPS.Specs.Adapter.Test
-    build-depends:
-        , path ^>=0.9.6
-        , path-io ^>=1.8.2
-        , wbps
-        , tasty
-        , tasty-hunit
-        , tasty-quickcheck
-        , bytestring
-        , QuickCheck
-        , cardano-crypto-class
+  build-depends:
+    , bytestring
+    , cardano-crypto-class
+    , path                  ^>=0.9.6
+    , path-io               ^>=1.8.2
+    , QuickCheck
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , wbps

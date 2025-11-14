@@ -1,10 +1,8 @@
 cabal-version:   3.4
 name:            cavefish-client-backend
 version:         0.1.0.0
-
 license:         MIT
 license-file:    LICENSE
-
 build-type:      Simple
 extra-doc-files: CHANGELOG.md
 
@@ -48,8 +46,7 @@ common project-config
 library
   import:          base, project-config
   hs-source-dirs:  src
-  exposed-modules:
-    ClientBackend.Server
+  exposed-modules: ClientBackend.Server
   other-modules:
     ClientBackend.Api
     ClientBackend.App
@@ -58,8 +55,6 @@ library
     ClientBackend.Types
 
   build-depends:
-    , cavefish-core
-    , cavefish-client
     , aeson
     , bytestring
     , cardano-api
@@ -67,6 +62,8 @@ library
     , cardano-crypto-class
     , cardano-ledger-alonzo
     , cardano-ledger-core
+    , cavefish-client
+    , cavefish-core
     , cborg
     , containers
     , cooked-validators
@@ -94,11 +91,11 @@ executable cavefish-client-backend
   hs-source-dirs: app
   main-is:        Main.hs
   build-depends:
-    , cavefish-client-backend
     , bytestring
+    , cavefish-client-backend
     , cooked-validators
     , crypton
     , stm
-    , warp
     , wai
     , wai-cors
+    , warp
