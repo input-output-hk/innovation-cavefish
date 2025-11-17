@@ -11,7 +11,6 @@ module Core.Api.Messages where
 
 import Cardano.Api qualified as Api
 import Cardano.Crypto.DSIGN (rawDeserialiseVerKeyDSIGN)
-import Cardano.Crypto.DSIGN.Ed25519 (Ed25519DSIGN)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, readTVarIO)
 import Control.Monad (unless, when)
 import Control.Monad.Except (liftEither)

@@ -10,7 +10,7 @@ import Core.Intent (ChangeDelta, IntentW)
 import Core.PaymentProof (ProofResult)
 import Core.Proof (renderHex)
 import Core.TxAbs (TxAbs)
-import Crypto.Error (CryptoFailable (..))
+import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Aeson (KeyValue (..), withObject)
 import Data.Aeson.Types (FromJSON (..), ToJSON (..), object, (.:))

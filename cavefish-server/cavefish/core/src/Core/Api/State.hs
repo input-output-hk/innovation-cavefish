@@ -4,7 +4,7 @@ import Cardano.Api (ConwayEra, Tx, TxId)
 import Cooked.MockChain.MockChainState (MockChainState)
 import Core.Pke (PkeCiphertext)
 import Core.Proof (parseHex, renderHex)
-import Crypto.Error (CryptoFailable (..))
+import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 (PublicKey)
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Aeson (FromJSON (parseJSON), ToJSON (toJSON), object, withObject, (.:), (.=))
