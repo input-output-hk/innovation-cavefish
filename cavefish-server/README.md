@@ -9,15 +9,28 @@ Ensure you have:
 - **Nix**: Installed to provide a reproducible environment (see [Nix installation guide](https://nixos.org/download.html)).
 - **VS Code**: For the recommended editor experience.
 - A Haskell project with a `cabal.project` file and dependencies.
+- Install [Git Large File Storage](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage), LFS.
 
 ### 2. Setting Up the Environment
-All required tools, including `fast-tags`, `cabal`, and `git`, are provided in the project’s Nix environment.
+The following commands will clone the project with LFS support, `cd` to cavefish-server project, and invoke the `nix develop` shell:
 
-To enter the environment:
-```bash
-nix-shell
+``` bash
+git lfs clone git@github.com:input-output-hk/innovation-cavefish.git
+cd cavefish-server
+nix develop
 ```
-This ensures all dependencies are available without global installation.
+All required tools, including `fast-tags`, `cabal`, and `git lfs`, are provided in the project’s Nix environment.
+
+The nix shell ensures all dependencies are available without global installation.
+
+> Note:
+If you have already `cloned` the project and need to pull the recent changes:
+
+``` bash
+git lfs fetch --all
+git lfs checkout
+```
+This sequence fetches all LFS files from all branches and tags and then replaces the LFS pointers in your working directory with the actual files.
 
 ### 3. Installing the VS Code Extension
 For VS Code, install the **ctagsx** extension:
@@ -87,6 +100,22 @@ With the `ctagsx` extension installed:
 - For Vim/Emacs users, the `tags` file supports native tag navigation (e.g., `:tag` in Vim or `M-.` in Emacs).
 - If you modify `cabal.project` or dependencies, re-run `./gen-tags.sh` to update tags.
 - For large projects, tag generation may take a few minutes due to dependency fetching.
+
+## Build and test the project
+- Build and test from `nix develop` shell
+
+``` bash
+nix develop
+cabal update
+cabal clean && cabal build all
+cabal test all
+```
+- Build executable(s) using nix build command:
+
+``` bash
+nix build .#cavefish-server
+nix build .#cavefish-client-backend
+```
 
 ## Runtime environment
 The nix shell adds the [cardano-nod](https://github.com/IntersectMBO/cardano-node/releases/tag/10.5.1) binary to the PATH. There is also the [node-runner.sh](./scripts/node-runner.sh) script that can be used to start a cardano node with the appropriate parameters for local testing. The [share](./share/) folder contains the correponding cardano-node 1.5.1 

@@ -7,9 +7,8 @@ module Core.TxBuilder where
 import Cardano.Api qualified as Api
 import Control.Monad (foldM, unless, when)
 import Cooked (
-  BalanceOutputPolicy (..),
+  BalanceOutputPolicy (DontAdjustExistingOutput),
   BalancingPolicy (BalanceWith),
-  FeePolicy (..),
   MonadBlockChain (validateTxSkel),
   TxOpts (txOptBalanceOutputPolicy, txOptBalancingPolicy),
   TxSkel (

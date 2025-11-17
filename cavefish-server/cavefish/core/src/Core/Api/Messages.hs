@@ -5,6 +5,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Core.Api.Messages where
 
@@ -232,7 +233,7 @@ data RegisterResp = RegisterResp
   deriving (Eq, Show, Generic)
 
 instance ToJSON RegisterResp where
-  toJSON RegisterResp {..} =
+  toJSON RegisterResp {id, spPk, verificationContext} =
     object
       [ "id" .= id
       , "spPk" .= renderHex (BA.convert spPk)
@@ -340,7 +341,7 @@ instance FromJSON FinaliseResp
 
 prepareH :: PrepareReq -> AppM PrepareResp
 prepareH PrepareReq {..} = do
-  Env {..} <- ask
+  Env {pending, clientRegistration, ttl, pkePublic, build} <- ask
   internalIntent <- liftIO $ either (ioError . userError . T.unpack) pure (toInternalIntent intent)
 
   clientKnown <- liftIO . atomically $ do

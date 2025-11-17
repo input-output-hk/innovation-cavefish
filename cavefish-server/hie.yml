@@ -1,0 +1,49 @@
+cradle:
+  cabal:
+    - path: "cavefish/client/src"
+      component: "lib:cavefish-client"
+
+    - path: "cavefish/client/app/Main.hs"
+      component: "cavefish-client:exe:cavefish-client"
+
+    - path: "cavefish/client/test"
+      component: "cavefish-client:test:test"
+
+    - path: "cavefish/client-backend/src"
+      component: "lib:cavefish-client-backend"
+
+    - path: "cavefish/client-backend/app/Main.hs"
+      component: "cavefish-client-backend:exe:cavefish-client-backend"
+
+    - path: "cavefish/core/src"
+      component: "lib:cavefish-core"
+
+    - path: "cavefish/core/test"
+      component: "cavefish-core:test:test"
+
+    - path: "cavefish/server/src"
+      component: "lib:cavefish-server"
+
+    - path: "cavefish/server/app/Main.hs"
+      component: "cavefish-server:exe:cavefish-server"
+
+    - path: "cavefish/server/test"
+      component: "cavefish-server:test:test"
+
+    - path: "cavefish/tests/src"
+      component: "lib:cavefish-tests"
+
+    - path: "cavefish/tests/app/Main.hs"
+      component: "cavefish-tests:exe:cavefish-test-exe"
+
+    - path: "cavefish/tests/test"
+      component: "cavefish-tests:test:test"
+
+    - path: "wbps/lib"
+      component: "lib:wbps"
+
+    - path: "wbps/tests/unit"
+      component: "wbps:test:wbps-unit-tests"
+
+    - path: "wbps/tests/integration"
+      component: "wbps:test:wbps-integration-tests"

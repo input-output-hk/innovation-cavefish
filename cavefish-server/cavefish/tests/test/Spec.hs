@@ -27,7 +27,7 @@ import Core.Api.Messages (
   PendingItem (PendingItem, clientId, expiresAt, txAbsHash, txId),
   PendingResp (PendingResp, pending),
   PendingSummary (PendingSummary, pendingClientId, pendingExpiresAt),
-  PrepareReq (PrepareReq, intent, observer),
+  PrepareReq (intent, observer),
   PrepareResp (PrepareResp, txAbs, txId, witnessBundleHex),
   RegisterReq (RegisterReq, signerPublicKey),
   RegisterResp (RegisterResp, id, verificationContext),
@@ -541,7 +541,7 @@ mkPrepareReqOrFail :: ClientId -> IntentW -> IO PrepareReq
 mkPrepareReqOrFail cid iw =
   case Mock.mkPrepareReq cid iw of
     Left err -> expectationFailure (Text.unpack err) >> fail "invalid prepare request"
-    Right req@PrepareReq {} -> pure req
+    Right req -> pure req
 
 corruptSignature :: ByteString -> ByteString
 corruptSignature bs =
