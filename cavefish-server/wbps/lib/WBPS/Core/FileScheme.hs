@@ -3,6 +3,7 @@
 module WBPS.Core.FileScheme (
   defaultFileScheme,
   getShellLogsFilepath,
+  mkFileSchemeFromRoot,
   FileScheme (..),
   RootFolders (..),
   Accounts,
@@ -23,6 +24,16 @@ type AccountName = Path Rel Dir
 
 data RootFolders = RootFolders {input :: Path Abs Dir, output :: Path Abs Dir}
 
+mkFileSchemeFromRoot :: FilePath -> IO FileScheme
+mkFileSchemeFromRoot rootPath = do
+  rootDir <- resolveDir' rootPath
+  pure $
+    defaultFileScheme
+      RootFolders
+        { input = rootDir </> [reldir|inputs|]
+        , output = rootDir </> [reldir|output|]
+        }
+
 defaultFileScheme :: RootFolders -> FileScheme
 defaultFileScheme RootFolders {..} =
   FileScheme
@@ -32,7 +43,7 @@ defaultFileScheme RootFolders {..} =
     , witnessWASM = [relfile|witness.wasm|]
     , shellLogs = [relfile|shellLogs.txt|]
     , provingKey = [relfile|proving_key.zkey|]
-    , verificationKey = [relfile|verification_key.json|]
+    , verificationContext = [relfile|verification_context.json|]
     }
 
 getShellLogsFilepath :: MonadReader FileScheme m => Account -> m BL8.ByteString
@@ -48,6 +59,6 @@ data FileScheme = FileScheme
   , witnessWASM :: Path Rel File
   , shellLogs :: Path Rel File
   , provingKey :: Path Rel File
-  , verificationKey :: Path Rel File
+  , verificationContext :: Path Rel File
   }
   deriving (Show, Eq)

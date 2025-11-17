@@ -21,8 +21,8 @@ import Core.Api.Messages (
   PendingResp,
   PrepareReq (PrepareReq, clientId, intent, observer),
   PrepareResp (PrepareResp, changeDelta, txAbs, txId, witnessBundleHex),
-  RegisterReq (RegisterReq, publicKey),
-  RegisterResp (RegisterResp, id, spPk),
+  RegisterReq (RegisterReq, signerPublicKey),
+  RegisterResp (RegisterResp, id, spPk, verificationContext),
   clientSignatureMessage,
   clientsH,
   commitH,
@@ -40,6 +40,7 @@ import Core.Intent (IntentW, satisfies, toInternalIntent)
 import Core.Observers.Observer (intentStakeValidatorBytes)
 import Core.PaymentProof (hashTxAbs, verifyPaymentProof)
 import Crypto.PubKey.Ed25519 qualified as Ed
+import Data.Aeson (Value)
 import Data.Bifunctor (first)
 import Data.ByteArray qualified as BA
 import Data.ByteArray.Encoding qualified as BAE
@@ -62,6 +63,7 @@ data MockClient = MockClient
   , mcLcSk :: Ed.SecretKey
   , mcSpPk :: Ed.PublicKey
   , mcClientId :: ClientId
+  , mcVerificationContext :: Value
   }
 
 initMockClient :: RunServer -> Ed.SecretKey -> UnregisteredMockClient
@@ -99,14 +101,22 @@ verifyCommitProof publicKey PrepareResp {txId = txIdText, txAbs, witnessBundleHe
   verifyPaymentProof publicKey piGiven txAbs txId ciphertext auxNonceBytes
 
 -- | Register the client with the server.
-registerClient :: RunServer -> Ed.PublicKey -> Handler RegisterResp
-registerClient run publicKey = run $ registerH RegisterReq {publicKey}
+registerClient :: RunServer -> RegisterReq -> Handler RegisterResp
+registerClient run req = run $ registerH req
 
 -- | Register the mock client with the server.
 register :: UnregisteredMockClient -> Handler MockClient
 register UnregisteredMockClient {..} = do
-  RegisterResp {id = uuid, spPk} <- registerClient umcRun (Ed.toPublic umcLcSk)
-  pure MockClient {mcRun = umcRun, mcLcSk = umcLcSk, mcSpPk = spPk, mcClientId = ClientId uuid}
+  registerResp@RegisterResp {id = uuid, spPk} <-
+    registerClient umcRun RegisterReq {signerPublicKey = Ed.toPublic umcLcSk}
+  pure
+    MockClient
+      { mcRun = umcRun
+      , mcLcSk = umcLcSk
+      , mcSpPk = spPk
+      , mcClientId = ClientId uuid
+      , mcVerificationContext = registerResp.verificationContext
+      }
 
 -- | List clients from the server.
 getClients :: RunServer -> Handler ClientsResp

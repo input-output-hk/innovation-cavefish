@@ -20,6 +20,7 @@ import Test.Common (
   testSpWallet,
  )
 import Test.Hspec (Spec, describe, expectationFailure, it)
+import WBPS.Core.FileScheme (mkFileSchemeFromRoot)
 
 spec :: Spec
 spec =
@@ -29,6 +30,7 @@ spec =
       pendingStore <- newTVarIO Map.empty
       completeStore <- newTVarIO Map.empty
       clientStore <- newTVarIO Map.empty
+      wbpsScheme <- mkFileSchemeFromRoot "../../wbps"
 
       let env =
             mkCookedEnv
@@ -41,6 +43,7 @@ spec =
               testSpWallet
               3600
               0
+              wbpsScheme
 
       prepareReq <-
         case Mock.mkPrepareReq (ClientId UUID.nil) testIntentW of

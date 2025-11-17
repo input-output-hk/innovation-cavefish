@@ -10,17 +10,17 @@ module Spec (spec) where
 
 import Cardano.Api qualified as Api
 import Client.Impl qualified as Client
-import Client.Mock (MockClient (mcRun), mkFinaliseReq)
+import Client.Mock (MockClient (mcRun, mcVerificationContext), mkFinaliseReq)
 import Client.Mock qualified as Mock
 import Control.Concurrent.STM (TVar, newTVarIO, readTVarIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Cooked.MockChain.MockChainState (MockChainState)
 import Core.Api.AppContext (Env (spSk), runApp)
 import Core.Api.Messages (
-  ClientInfo (ClientInfo, clientId, publicKey),
+  ClientInfo (ClientInfo, clientId, signerPublicKey),
   ClientsResp (ClientsResp, clients),
   CommitReq (CommitReq, bigR, txId),
-  CommitResp (CommitResp, pi),
+  CommitResp (pi),
   FinaliseReq (FinaliseReq, lcSig),
   FinaliseResp (FinaliseResp, result, submittedAt, txId),
   FinaliseResult (Finalised, Rejected),
@@ -29,11 +29,12 @@ import Core.Api.Messages (
   PendingSummary (PendingSummary, pendingClientId, pendingExpiresAt),
   PrepareReq (PrepareReq, intent, observer),
   PrepareResp (PrepareResp, txAbs, txId, witnessBundleHex),
-  RegisterReq (RegisterReq, publicKey),
-  RegisterResp (RegisterResp, id),
+  RegisterReq (RegisterReq, signerPublicKey),
+  RegisterResp (RegisterResp, id, verificationContext),
   SubmittedSummary (SubmittedSummary, submittedAt, submittedClientId, submittedTx),
   TransactionResp (TransactionMissing, TransactionPending, TransactionSubmitted),
   finaliseH,
+  mkSignerKey,
   transactionH,
  )
 import Core.Api.State (
@@ -59,12 +60,16 @@ import Core.Pke (ciphertextDigest)
 import Core.Proof (mkProof, renderHex)
 import Core.TxAbs (cardanoTxToTxAbs)
 import Crypto.PubKey.Ed25519 qualified as Ed
+import Data.Aeson qualified as Aeson
 import Data.Bits (xor)
 import Data.ByteArray qualified as BA
 import Data.ByteArray.Encoding qualified as BAE
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
+import Data.ByteString.Char8 qualified as BS8
+import Data.ByteString.Lazy qualified as BL
 import Data.Map.Strict qualified as Map
+import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
 import Ledger.Tx (
@@ -72,11 +77,17 @@ import Ledger.Tx (
  )
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.Wai.Handler.Warp qualified as Warp
+import Path ((</>))
+import Path qualified
 import Servant (Handler, Proxy (Proxy), runHandler', (:<|>) ((:<|>)))
 import Servant.Client (BaseUrl (BaseUrl))
 import Servant.Client qualified as SC
+import Servant.Server.Internal.ServerError (ServerError (ServerError, errBody, errHTTPCode))
 import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
 import Sp.Server (CavefishApi, mkApp)
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath qualified as FP
+import System.IO.Temp (withSystemTempDirectory)
 import Test.Common (
   testClientSecretKey,
   testCommitSecretKey,
@@ -85,7 +96,12 @@ import Test.Common (
   testSecretKey,
   testSpWallet,
  )
-import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
+import Test.Hspec (Spec, describe, expectationFailure, it, runIO, shouldBe)
+import WBPS.Core (SignerKey)
+import WBPS.Core.FileScheme (
+  FileScheme (FileScheme, accounts, verificationContext),
+  mkFileSchemeFromRoot,
+ )
 
 runHandlerOrFail :: Handler a -> IO a
 runHandlerOrFail handler = do
@@ -99,8 +115,9 @@ runClientOrFail clientEnv action = do
     Left err -> expectationFailure ("HTTP client call failed: " <> show err) >> fail "http client failure"
     Right value -> pure value
 
-mkEnv :: PendingStore -> CompleteStore -> ClientRegistrationStore -> TVar MockChainState -> Env
-mkEnv pendingStore completeStore clientRegVar mockStateVar =
+mkEnv ::
+  FileScheme -> PendingStore -> CompleteStore -> ClientRegistrationStore -> TVar MockChainState -> Env
+mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar =
   mkCookedEnv
     mockStateVar
     pendingStore
@@ -111,6 +128,11 @@ mkEnv pendingStore completeStore clientRegVar mockStateVar =
     testSpWallet
     3600
     0
+    wbpsScheme
+
+expectedSignerPublicKeyHex :: Text
+expectedSignerPublicKeyHex =
+  renderHex (BA.convert (Ed.toPublic testClientSecretKey))
 
 mkClientEnv :: Env -> Client.ClientEnv
 mkClientEnv env =
@@ -121,6 +143,7 @@ mkClientEnv env =
 
 spec :: Spec
 spec = do
+  wbpsScheme <- runIO (mkFileSchemeFromRoot "../../wbps")
   CborSpec.spec
   describe "buildTx integration" $ do
     it "prepare -> finalise roundtrip uses buildTx" $ do
@@ -128,9 +151,12 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
+      case Mock.mcVerificationContext mockClient of
+        Aeson.Object _ -> pure ()
+        _ -> expectationFailure "verification context is not a JSON object"
       let registeredClientId = Mock.mcClientId mockClient
       prepareReq <- mkPrepareReqOrFail registeredClientId testIntentW
       internalIntent <-
@@ -238,7 +264,7 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
       let registeredClientId = Mock.mcClientId mockClient
@@ -263,7 +289,8 @@ spec = do
       let commitBigR = Ed.toPublic testCommitSecretKey
       _ <- runHandlerOrFail (Mock.runCommit (mcRun mockClient) expectedTxId commitBigR)
 
-      let validFinaliseReq = Mock.mkFinaliseReq (Mock.mcLcSk mockClient) expectedTxId expectedTxAbsHash
+      let validFinaliseReq@FinaliseReq {} =
+            Mock.mkFinaliseReq (Mock.mcLcSk mockClient) expectedTxId expectedTxAbsHash
           invalidFinaliseReq =
             validFinaliseReq
               { lcSig = corruptSignature (lcSig validFinaliseReq)
@@ -275,28 +302,64 @@ spec = do
       pendingAfter <- readTVarIO pendingStore
       Map.member expectedTxIdValue pendingAfter `shouldBe` True
 
+  describe "registration" $ do
+    it "returns the verification context stored on disk" $ do
+      expectedValue <- expectedVerificationContext wbpsScheme
+      pendingStore <- newTVarIO Map.empty
+      completeStore <- newTVarIO Map.empty
+      clientRegVar <- newTVarIO Map.empty
+      mockStateVar <- newTVarIO initialMockState
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
+          mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
+      mockClient <- runHandlerOrFail (Mock.register mockClient0)
+      mcVerificationContext mockClient `shouldBe` expectedValue
+
+    it "rejects registrations if the verification context JSON is invalid" $ do
+      signerKey <- expectSignerKey
+      let invalidPayload = "{ not json }"
+      withSystemTempDirectory "cavefish-wbps-invalid" $ \tmpRoot -> do
+        setupMinimalWbpsTree tmpRoot
+        accountFolder <- accountDirectoryPath tmpRoot signerKey
+        createDirectoryIfMissing True accountFolder
+        let verificationFile = accountFolder FP.</> "verification_context.json"
+        writeFile verificationFile invalidPayload
+        wbpsSchemeTmp <- mkFileSchemeFromRoot tmpRoot
+        pendingStore <- newTVarIO Map.empty
+        completeStore <- newTVarIO Map.empty
+        clientRegVar <- newTVarIO Map.empty
+        mockStateVar <- newTVarIO initialMockState
+        let env = mkEnv wbpsSchemeTmp pendingStore completeStore clientRegVar mockStateVar
+            mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
+        result <- runExceptT (runHandler' (Mock.register mockClient0))
+        case result of
+          Left ServerError {errHTTPCode, errBody} -> do
+            errHTTPCode `shouldBe` 500
+            let bodyText = BL.toStrict errBody
+            (BS.isInfixOf (BS8.pack "verification context unavailable") bodyText)
+              `shouldBe` True
+          Right _ -> expectationFailure "registration unexpectedly succeeded"
+
   describe "API surfaces" $ do
     it "clients endpoint returns registered clients" $ do
       pendingStore <- newTVarIO Map.empty
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
-          expectedPublicKey = renderHex (BA.convert (Ed.toPublic testClientSecretKey))
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
       let ClientId clientUuid = Mock.mcClientId mockClient
       ClientsResp {clients = clientInfos} <-
         runHandlerOrFail (Mock.getClientsWithClient mockClient)
       clientInfos
-        `shouldBe` [ClientInfo {clientId = clientUuid, publicKey = expectedPublicKey}]
+        `shouldBe` [ClientInfo {clientId = clientUuid, signerPublicKey = expectedSignerPublicKeyHex}]
 
     it "pending endpoint returns stored pending transactions" $ do
       pendingStore <- newTVarIO Map.empty
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
       let ClientId clientUuid = Mock.mcClientId mockClient
@@ -338,7 +401,7 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
           clientEnv = mkClientEnv env
       FinaliseResp {result = finalResult} <-
         runHandlerOrFail $
@@ -348,11 +411,10 @@ spec = do
       PendingResp {pending = pendingAfter} <-
         runHandlerOrFail (Client.runClient clientEnv Client.listPending)
       pendingAfter `shouldBe` []
-      let expectedPublicKey = renderHex (BA.convert (Ed.toPublic testClientSecretKey))
       ClientsResp {clients = clientInfos} <-
         runHandlerOrFail (Client.runClient clientEnv Client.listClients)
       case clientInfos of
-        [ClientInfo {publicKey}] -> publicKey `shouldBe` expectedPublicKey
+        [ClientInfo {signerPublicKey}] -> signerPublicKey `shouldBe` expectedSignerPublicKeyHex
         _ -> expectationFailure "expected exactly one registered client"
 
   describe "Http server roundtrip" $ do
@@ -361,7 +423,7 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv pendingStore completeStore clientRegVar mockStateVar
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
       let application = pure (mkApp env)
       Warp.testWithApplication application $ \port -> do
         manager <- newManager defaultManagerSettings
@@ -377,14 +439,22 @@ spec = do
         registerResp <-
           runClientOrFail
             servantEnv
-            (registerClient RegisterReq {publicKey = Ed.toPublic testClientSecretKey})
-        let expectedPublicKey = renderHex (BA.convert (Ed.toPublic testClientSecretKey))
+            ( registerClient
+                RegisterReq
+                  { signerPublicKey = Ed.toPublic testClientSecretKey
+                  }
+            )
+
+        let RegisterResp {verificationContext = verificationPayload, id = registeredId} = registerResp
+
+        case verificationPayload of
+          Aeson.Object _ -> pure ()
+          _ -> expectationFailure "verification context is not a JSON object"
 
         -- Test that the client was registered
         ClientsResp {clients = clientInfos} <- runClientOrFail servantEnv clientsClient
-        let registeredId = registerResp.id
         clientInfos
-          `shouldBe` [ClientInfo {clientId = registeredId, publicKey = expectedPublicKey}]
+          `shouldBe` [ClientInfo {clientId = registeredId, signerPublicKey = expectedSignerPublicKeyHex}]
 
         -- Ask the SP about pending transactions...there should be none
         PendingResp ps <-
@@ -471,10 +541,55 @@ mkPrepareReqOrFail :: ClientId -> IntentW -> IO PrepareReq
 mkPrepareReqOrFail cid iw =
   case Mock.mkPrepareReq cid iw of
     Left err -> expectationFailure (Text.unpack err) >> fail "invalid prepare request"
-    Right req -> pure req
+    Right req@PrepareReq {} -> pure req
 
 corruptSignature :: ByteString -> ByteString
 corruptSignature bs =
   case BS.uncons bs of
     Nothing -> bs
     Just (b, rest) -> BS.cons (b `xor` 0x01) rest
+
+expectSignerKey :: IO SignerKey
+expectSignerKey =
+  case mkSignerKey (Ed.toPublic testClientSecretKey) of
+    Nothing -> expectationFailure "expected valid signer key for test client" >> fail "invalid signer key"
+    Just signerKey -> pure signerKey
+
+expectedVerificationContext :: FileScheme -> IO Aeson.Value
+expectedVerificationContext scheme = do
+  signerKey <- expectSignerKey
+  verificationPath <- verificationContextFilePath scheme signerKey
+  decodeJsonFile verificationPath
+
+verificationContextFilePath :: FileScheme -> SignerKey -> IO FilePath
+verificationContextFilePath FileScheme {accounts, verificationContext} signerKey = do
+  relDir <-
+    case Path.parseRelDir (show signerKey) of
+      Left err -> expectationFailure ("invalid account directory: " <> show err) >> fail "invalid account dir"
+      Right dir -> pure dir
+  pure $ Path.toFilePath (accounts </> relDir </> verificationContext)
+
+decodeJsonFile :: FilePath -> IO Aeson.Value
+decodeJsonFile filePath = do
+  bytes <- BL.readFile filePath
+  case Aeson.eitherDecode bytes of
+    Left err ->
+      expectationFailure ("failed to decode verification context JSON: " <> err)
+        >> fail "invalid verification context file"
+    Right value -> pure value
+
+setupMinimalWbpsTree :: FilePath -> IO ()
+setupMinimalWbpsTree root = do
+  let relationDir = root FP.</> "inputs" FP.</> "relation"
+      relationFile = relationDir FP.</> "relation.r1cs"
+      setupDir = root FP.</> "inputs" FP.</> "setup"
+      ptauFile = setupDir FP.</> "powersOfTauPrepared.ptau"
+  createDirectoryIfMissing True relationDir
+  writeFile relationFile ""
+  createDirectoryIfMissing True setupDir
+  writeFile ptauFile ""
+  createDirectoryIfMissing True (root FP.</> "output" FP.</> "accounts")
+
+accountDirectoryPath :: FilePath -> SignerKey -> IO FilePath
+accountDirectoryPath root signerKey =
+  pure (root FP.</> "output" FP.</> "accounts" FP.</> show signerKey)

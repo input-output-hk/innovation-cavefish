@@ -86,7 +86,14 @@ test-suite wbps-unit-tests
     main-is:          Main.hs
     other-modules:  
     build-depends:
+        , aeson
         , wbps
+        , bytestring
+        , directory
+        , filepath
+        , path
+        , path-io
+        , temporary
         , tasty
         , tasty-hunit
         , tasty-quickcheck

@@ -292,6 +292,39 @@
       const elements = collectElements();
       const steps = Array.from(document.querySelectorAll('.step'));
       const state = createInitialState();
+      const storage = initStorage();
+      const verificationContextStoreKey = (clientId) =>
+        clientId ? `cavefish:verificationContext:${clientId}` : null;
+      const persistVerificationContext = (clientId, payload) => {
+        const key = verificationContextStoreKey(clientId);
+        if (!storage || !key || !payload) {
+          return;
+        }
+        try {
+          storage.setItem(key, JSON.stringify(payload));
+        } catch (_) { }
+      };
+      const loadStoredVerificationContext = (clientId) => {
+        const key = verificationContextStoreKey(clientId);
+        if (!storage || !key) {
+          return null;
+        }
+        try {
+          const raw = storage.getItem(key);
+          return raw ? JSON.parse(raw) : null;
+        } catch (_) {
+          return null;
+        }
+      };
+
+      function initStorage() {
+        try {
+          return window.localStorage;
+        } catch (_) {
+          return null;
+        }
+      }
+
       const formatJson = (value) => JSON.stringify(value, null, 2);
       const { resetStatus, showError, showInfo } = createStatusHandlers(elements);
       const { currentBase, currentHelperBase } = createBaseResolvers(elements);
@@ -314,14 +347,67 @@
         elements.clientSecretDisplay.textContent = value ? value : 'No secret loaded.';
       };
 
+      const flowPhases = ['prepare', 'satisfies', 'commit', 'verify', 'finalise'];
+
+      const resetFlowProgress = ({ includeRegister = false, clearClientId = false } = {}) => {
+        if (includeRegister) {
+          state.registerResp = null;
+          state.spPublicKey = null;
+          state.verificationContext = null;
+        }
+        state.intentW = null;
+        state.prepareResp = null;
+        state.commitResp = null;
+        state.finaliseResp = null;
+        state.commitHelper = null;
+        state.satisfiesResult = null;
+        state.verifyResult = null;
+        intentBuilder.reset();
+        flowPhases.forEach(resetStatus);
+        elements.commitTxId.value = '';
+        elements.finaliseTxId.value = '';
+        elements.bigR.value = '';
+        elements.littleR.value = '';
+        if (clearClientId) {
+          elements.clientId.value = '';
+        }
+      };
+
+      const fetchRegisterPayload = async (secretKey) => {
+        const helperResponse = await requestHelper('register', '/helpers/register', {
+          secretKey,
+        });
+        const helperPayload = unwrapEither(helperResponse);
+        if (
+          !helperPayload
+          || typeof helperPayload !== 'object'
+          || !helperPayload.registerReq
+          || !helperPayload.clientSecret
+        ) {
+          throw new Error('Helper did not return register payload.');
+        }
+        return helperPayload;
+      };
+
+      const applyRegisterPayload = (registerReq, clientSecret) => {
+        state.clientSecretHex = clientSecret;
+        elements.clientSecret.value = clientSecret;
+        elements.finaliseSecret.value = clientSecret;
+        updateSecretDisplay(clientSecret);
+        elements.lcSig.value = '';
+        elements.pk.value = registerReq.signerPublicKey ?? '';
+      };
+
+      const setDisabled = (element, disabled) => {
+        if (element) {
+          element.disabled = disabled;
+        }
+      };
+
       updateSecretDisplay(elements.clientSecret.value.trim());
 
-      if (elements.fillSpendBtn) {
-        elements.fillSpendBtn.disabled = true;
-      }
-      if (elements.fillChangeBtn) {
-        elements.fillChangeBtn.disabled = true;
-      }
+      setDisabled(elements.fillSpendBtn, true);
+      setDisabled(elements.fillChangeBtn, true);
 
       const unwrapEither = (payload) => {
         if (payload && typeof payload === 'object') {
@@ -390,14 +476,12 @@
         }
 
         const button = elements.generateCommitBtn;
-        if (button) {
-          button.disabled = true;
-        }
+        setDisabled(button, true);
 
         try {
           resetStatus('commit');
           const helperResponse = await requestHelper('commit', '/helpers/commit', {
-            txId: txId,
+            txId,
           });
           const helperPayload = unwrapEither(helperResponse);
           if (
@@ -413,7 +497,6 @@
           state.commitResp = null;
           state.verifyResult = null;
           resetStatus('verify');
-          elements.outputs.verify.textContent = '';
           elements.littleR.value = helperPayload.littleR;
           elements.bigR.value = helperPayload.commitReq.bigR ?? '';
           elements.outputs.commit.textContent = formatJson({ helper: helperPayload });
@@ -423,9 +506,7 @@
           showError('commit', err.message);
           return null;
         } finally {
-          if (button) {
-            button.disabled = false;
-          }
+          setDisabled(button, false);
         }
       };
 
@@ -511,162 +592,116 @@
         elements.finaliseSecret.value = value;
       });
 
-      if (elements.spendFromAddress) {
-        elements.spendFromAddress.addEventListener('input', () => intentBuilder.refreshPreview());
-      }
-      if (elements.changeToAddress) {
-        elements.changeToAddress.addEventListener('input', () => intentBuilder.refreshPreview());
-      }
-      if (elements.maxFee) {
-        elements.maxFee.addEventListener('input', () => intentBuilder.refreshPreview());
-      }
-      if (elements.maxInterval) {
-        elements.maxInterval.addEventListener('input', () => intentBuilder.refreshPreview());
-      }
+      elements.spendFromAddress?.addEventListener('input', () => intentBuilder.refreshPreview());
+      elements.changeToAddress?.addEventListener('input', () => intentBuilder.refreshPreview());
+      elements.maxFee?.addEventListener('input', () => intentBuilder.refreshPreview());
+      elements.maxInterval?.addEventListener('input', () => intentBuilder.refreshPreview());
 
-      if (elements.addPayToBtn) {
-        elements.addPayToBtn.addEventListener('click', () => {
-          intentBuilder.addCard();
-        });
-      }
-      if (elements.addMaxFeeBtn) {
-        elements.addMaxFeeBtn.addEventListener('click', () => {
-          intentBuilder.showMaxFeeSection();
-        });
-      }
-      if (elements.removeMaxFeeBtn) {
-        elements.removeMaxFeeBtn.addEventListener('click', () => {
-          intentBuilder.hideMaxFeeSection();
-        });
-      }
-      if (elements.addMaxIntervalBtn) {
-        elements.addMaxIntervalBtn.addEventListener('click', () => {
-          intentBuilder.showMaxIntervalSection();
-        });
-      }
-      if (elements.removeMaxIntervalBtn) {
-        elements.removeMaxIntervalBtn.addEventListener('click', () => {
-          intentBuilder.hideMaxIntervalSection();
-        });
-      }
+      elements.addPayToBtn?.addEventListener('click', intentBuilder.addCard);
+      elements.addMaxFeeBtn?.addEventListener('click', intentBuilder.showMaxFeeSection);
+      elements.removeMaxFeeBtn?.addEventListener('click', intentBuilder.hideMaxFeeSection);
+      elements.addMaxIntervalBtn?.addEventListener('click', intentBuilder.showMaxIntervalSection);
+      elements.removeMaxIntervalBtn?.addEventListener('click', intentBuilder.hideMaxIntervalSection);
 
       intentBuilder.updateState();
       intentBuilder.refreshPreview();
       loadDemoAddresses();
 
-      if (elements.fillSpendBtn) {
-        elements.fillSpendBtn.addEventListener('click', () => {
-          if (!elements.demoSpendSelect || elements.demoSpendSelect.disabled) {
-            showError('address', 'No sample spend-from address available.');
-            return;
-          }
-          const selectedSpend = elements.demoSpendSelect.value;
-          if (!selectedSpend) {
-            showError('address', 'Select a spend-from address.');
-            return;
-          }
-          if (elements.spendFromAddress) {
-            elements.spendFromAddress.value = selectedSpend;
-            intentBuilder.refreshPreview();
-            showInfo('address', 'Spend-from address updated from samples.');
-          }
-        });
-      }
+      elements.fillSpendBtn?.addEventListener('click', () => {
+        if (!elements.demoSpendSelect || elements.demoSpendSelect.disabled) {
+          showError('address', 'No sample spend-from address available.');
+          return;
+        }
+        const selectedSpend = elements.demoSpendSelect.value;
+        if (!selectedSpend) {
+          showError('address', 'Select a spend-from address.');
+          return;
+        }
+        if (elements.spendFromAddress) {
+          elements.spendFromAddress.value = selectedSpend;
+          intentBuilder.refreshPreview();
+          showInfo('address', 'Spend-from address updated from samples.');
+        }
+      });
 
-      if (elements.fillChangeBtn) {
-        elements.fillChangeBtn.addEventListener('click', () => {
-          if (!elements.demoChangeSelect || elements.demoChangeSelect.disabled) {
-            showError('address', 'No sample change-to address available.');
-            return;
-          }
-          const selectedChange = elements.demoChangeSelect.value;
-          if (!selectedChange) {
-            showError('address', 'Select a change-to address.');
-            return;
-          }
-          if (elements.changeToAddress) {
-            elements.changeToAddress.value = selectedChange;
-            intentBuilder.refreshPreview();
-            showInfo('address', 'Change-to address updated from samples.');
-          }
-        });
-      }
+      elements.fillChangeBtn?.addEventListener('click', () => {
+        if (!elements.demoChangeSelect || elements.demoChangeSelect.disabled) {
+          showError('address', 'No sample change-to address available.');
+          return;
+        }
+        const selectedChange = elements.demoChangeSelect.value;
+        if (!selectedChange) {
+          showError('address', 'Select a change-to address.');
+          return;
+        }
+        if (elements.changeToAddress) {
+          elements.changeToAddress.value = selectedChange;
+          intentBuilder.refreshPreview();
+          showInfo('address', 'Change-to address updated from samples.');
+        }
+      });
 
-      if (elements.buttons.build) {
-        elements.buttons.build.addEventListener('click', () =>
-          withBusy('build', async () => {
-            try {
-              resetStatus('build');
-              const payload = intentBuilder.buildPayload();
-              const resp = await requestHelperSilent('/helpers/intent/payto', payload);
-              const intent = unwrapEither(resp);
-              state.intentW = intent;
-              elements.intentPreview.textContent = formatJson(intent);
-              showInfo('build', 'Intent built.');
-            } catch (err) {
-              showError('build', err.message);
-            }
-          }),
-        );
-      }
-
-      if (elements.runSatisfiesBtn) {
-        elements.runSatisfiesBtn.addEventListener('click', () => {
-          runSatisfiesCheck(false);
-        });
-      }
-
-      if (elements.toCommitBtn) {
-        elements.toCommitBtn.addEventListener('click', () => {
-          if (state.satisfiesResult !== true) {
-            showError('satisfies', 'Run the satisfies check first.');
-            return;
-          }
-          showStep(3);
-        });
-      }
-
-      if (elements.generateCommitBtn) {
-        elements.generateCommitBtn.addEventListener('click', () => {
-          generateCommitment();
-        });
-      }
-
-      if (elements.runVerifyBtn) {
-        elements.runVerifyBtn.addEventListener('click', () => {
-          runVerifyCheck(false);
-        });
-      }
-
-      if (elements.toFinaliseBtn) {
-        elements.toFinaliseBtn.addEventListener('click', () => {
-          if (state.verifyResult !== true) {
-            showError('verify', 'Run verification first.');
-            return;
-          }
-          showStep(5);
-        });
-      }
-
-      if (elements.buttons.fetchTx) {
-        elements.buttons.fetchTx.addEventListener('click', async () => {
-          const txId = elements.finaliseTxId.value.trim();
-          if (!txId) {
-            showError('transaction', 'Missing transaction ID. Finalise first or copy it from Prepare.');
-            return;
-          }
-
+      elements.buttons.build?.addEventListener('click', () =>
+        withBusy('build', async () => {
           try {
-            const resp = await requestServiceGet('transaction', `/transaction/${txId}`);
-            elements.outputs.transaction.textContent = formatJson(resp ?? {});
-            const status = resp && resp.status ? String(resp.status) : 'unknown';
-            showInfo('transaction', `Transaction status: ${status}.`);
+            resetStatus('build');
+            const payload = intentBuilder.buildPayload();
+            const resp = await requestHelperSilent('/helpers/intent/payto', payload);
+            const intent = unwrapEither(resp);
+            state.intentW = intent;
+            elements.intentPreview.textContent = formatJson(intent);
+            showInfo('build', 'Intent built.');
           } catch (err) {
-            elements.outputs.transaction.textContent = '';
-            showError('transaction', err.message);
+            showError('build', err.message);
           }
-        });
-      }
+        }),
+      );
+
+      elements.runSatisfiesBtn?.addEventListener('click', () => {
+        runSatisfiesCheck(false);
+      });
+
+      elements.toCommitBtn?.addEventListener('click', () => {
+        if (state.satisfiesResult !== true) {
+          showError('satisfies', 'Run the satisfies check first.');
+          return;
+        }
+        showStep(3);
+      });
+
+      elements.generateCommitBtn?.addEventListener('click', () => {
+        generateCommitment();
+      });
+
+      elements.runVerifyBtn?.addEventListener('click', () => {
+        runVerifyCheck(false);
+      });
+
+      elements.toFinaliseBtn?.addEventListener('click', () => {
+        if (state.verifyResult !== true) {
+          showError('verify', 'Run verification first.');
+          return;
+        }
+        showStep(5);
+      });
+
+      elements.buttons.fetchTx?.addEventListener('click', async () => {
+        const txId = elements.finaliseTxId.value.trim();
+        if (!txId) {
+          showError('transaction', 'Missing transaction ID. Finalise first or copy it from Prepare.');
+          return;
+        }
+
+        try {
+          const resp = await requestServiceGet('transaction', `/transaction/${txId}`);
+          elements.outputs.transaction.textContent = formatJson(resp ?? {});
+          const status = resp && resp.status ? String(resp.status) : 'unknown';
+          showInfo('transaction', `Transaction status: ${status}.`);
+        } catch (err) {
+          elements.outputs.transaction.textContent = '';
+          showError('transaction', err.message);
+        }
+      });
 
       elements.buttons.generate.addEventListener('click', async () => {
         const generatorButton = elements.buttons.generate;
@@ -676,38 +711,10 @@
         registerButton.disabled = true;
 
         try {
-          const helperResponse = await requestHelper('register', '/helpers/register', {
-            secretKey: null,
-          });
-          const helperPayload = unwrapEither(helperResponse);
-          if (
-            !helperPayload
-            || typeof helperPayload !== 'object'
-            || !helperPayload.registerReq
-            || !helperPayload.clientSecret
-          ) {
-            throw new Error('Helper did not return register payload.');
-          }
-
+          const helperPayload = await fetchRegisterPayload(null);
           const { registerReq, clientSecret } = helperPayload;
-          state.clientSecretHex = clientSecret;
-          elements.clientSecret.value = clientSecret;
-          elements.finaliseSecret.value = clientSecret;
-          updateSecretDisplay(clientSecret);
-          elements.lcSig.value = '';
-          elements.pk.value = registerReq.publicKey ?? '';
-          elements.clientId.value = '';
-          state.registerResp = null;
-          state.spPublicKey = null;
-          state.intentW = null;
-          state.prepareResp = null;
-          state.satisfiesResult = null;
-          state.commitResp = null;
-          state.commitHelper = null;
-          state.verifyResult = null;
-          state.finaliseResp = null;
-          intentBuilder.reset();
-          ['prepare', 'satisfies', 'commit', 'verify', 'finalise'].forEach(resetStatus);
+          applyRegisterPayload(registerReq, clientSecret);
+          resetFlowProgress({ includeRegister: true, clearClientId: true });
           elements.outputs.register.textContent = formatJson({ helper: helperPayload });
           showInfo('register', 'Key pair generated. Ready to register.');
         } catch (err) {
@@ -732,46 +739,20 @@
           generatorButton.disabled = true;
 
           try {
-            const helperResponse = await requestHelper('register', '/helpers/register', {
-              secretKey: secretRaw,
-            });
-            const helperPayload = unwrapEither(helperResponse);
-            if (
-              !helperPayload
-              || typeof helperPayload !== 'object'
-              || !helperPayload.registerReq
-              || !helperPayload.clientSecret
-            ) {
-              throw new Error('Helper did not return register payload.');
-            }
-
+            const helperPayload = await fetchRegisterPayload(secretRaw);
             const { registerReq, clientSecret } = helperPayload;
-            state.clientSecretHex = clientSecret;
-            elements.clientSecret.value = clientSecret;
-            elements.finaliseSecret.value = clientSecret;
-            updateSecretDisplay(clientSecret);
-            elements.lcSig.value = '';
-            elements.pk.value = registerReq.publicKey ?? '';
+            applyRegisterPayload(registerReq, clientSecret);
 
             showInfo('register', 'Submitting registration to service…');
             const registerResp = await requestService('register', '/register', registerReq);
             state.registerResp = registerResp;
-            state.spPublicKey = registerResp ? registerResp.spPk : null;
-            if (registerResp && registerResp.id) {
+            state.spPublicKey = registerResp?.spPk ?? null;
+            state.verificationContext = registerResp?.verificationContext ?? null;
+            if (registerResp && registerResp.id && state.verificationContext) {
               elements.clientId.value = registerResp.id;
+              persistVerificationContext(registerResp.id, state.verificationContext);
             }
-            state.prepareResp = null;
-            state.commitResp = null;
-            state.finaliseResp = null;
-            state.commitHelper = null;
-            state.satisfiesResult = null;
-            state.verifyResult = null;
-            intentBuilder.reset();
-            ['prepare', 'satisfies', 'commit', 'verify', 'finalise'].forEach(resetStatus);
-            elements.commitTxId.value = '';
-            elements.finaliseTxId.value = '';
-            elements.bigR.value = '';
-            elements.littleR.value = '';
+            resetFlowProgress();
             elements.outputs.register.textContent = formatJson({
               helper: helperPayload,
               response: registerResp ?? {},
@@ -1003,6 +984,7 @@
           clientSecretHex: null,
           commitHelper: null,
           spPublicKey: null,
+          verificationContext: null,
           intentW: null,
           satisfiesResult: null,
           verifyResult: null,
@@ -1625,12 +1607,8 @@
           populateSelect(elements.demoSpendSelect, 1);
           populateSelect(elements.demoChangeSelect, 2);
 
-          if (elements.fillSpendBtn) {
-            elements.fillSpendBtn.disabled = demoAddresses.length === 0;
-          }
-          if (elements.fillChangeBtn) {
-            elements.fillChangeBtn.disabled = demoAddresses.length === 0;
-          }
+          setDisabled(elements.fillSpendBtn, demoAddresses.length === 0);
+          setDisabled(elements.fillChangeBtn, demoAddresses.length === 0);
 
           cards().forEach((card) => updateSampleSelectOptions(card));
           ensureAddressDefaults();

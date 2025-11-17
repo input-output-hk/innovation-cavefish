@@ -18,6 +18,7 @@ import Ledger.Address qualified as Ledger
 import Ledger.CardanoWallet qualified as CW
 import Servant.Server (Handler)
 import Servant.Server.Internal.ServerError (ServerError)
+import WBPS.Core.FileScheme (FileScheme)
 
 data Env = Env
   { spSk :: SecretKey
@@ -30,6 +31,7 @@ data Env = Env
   , spFee :: Integer
   , pkeSecret :: PkeSecretKey
   , pkePublic :: PkePublicKey
+  , wbpsScheme :: FileScheme
   , build ::
       Intent ->
       Maybe ByteString ->

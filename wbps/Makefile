@@ -8,7 +8,7 @@
 #     build/<circuit>/
 #       relation/{relation.r1cs,relation_symbols.sym}
 #       witness_generator/{witness_gen.wasm,generate_witness.js,witness_calculator.js}
-#       setup/{powersoftau.ptau,pot_final.ptau,proving_key.zkey,verification_key.json}
+#       setup/{powersoftau.ptau,pot_final.ptau,proving_key.zkey,verification_context.json}
 #       runs/<UTC-ISO>/
 #         input/generation_input.json
 #         witness/{witness.wtns,statement_theta.json}
@@ -68,7 +68,7 @@ WITCALC_JS  := $(WITGEN_DIR)/witness_calculator.js
 
 # setup/
 ZKEY   := $(SETUP_DIR)/proving_key.zkey
-VK     := $(SETUP_DIR)/verification_key.json
+VK     := $(SETUP_DIR)/verification_context.json
 PTAU1  := $(SETUP_DIR)/powersoftau.ptau
 PTAU2  := $(SETUP_DIR)/pot_final.ptau
 

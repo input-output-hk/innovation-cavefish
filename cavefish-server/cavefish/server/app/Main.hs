@@ -14,6 +14,7 @@ import Network.Wai.Handler.Warp qualified as Warp
 import Sp.Emulator (initialMockState, mkCookedEnv)
 import Sp.Server (mkApp)
 import System.IO (hPutStrLn, stderr)
+import WBPS.Core.FileScheme (mkFileSchemeFromRoot)
 
 main :: IO ()
 main = do
@@ -27,6 +28,9 @@ main = do
   pendingStore <- newTVarIO mempty
   completeStore <- newTVarIO mempty
   clientStore <- newTVarIO mempty
+  let wbpsRoot = "wbps" -- TODO WG: Probably get this from some sort of config
+  wbpsScheme <- mkFileSchemeFromRoot wbpsRoot
+  hPutStrLn stderr ("Using WBPS root: " <> wbpsRoot)
 
   let spSk =
         case Ed.secretKey (BS.pack [1 .. 32]) of
@@ -47,5 +51,6 @@ main = do
           (wallet 1)
           (fromInteger ttlSeconds)
           spFee
+          wbpsScheme
 
   Warp.run port (mkApp env)

@@ -28,5 +28,5 @@ toVerificationKeyScheme :: Account -> FileScheme -> Snarkjs.VerificationKeySchem
 toVerificationKeyScheme account FileScheme {..} =
   Snarkjs.VerificationKeyScheme
     { provingKey = Path.toFilePath (account </> provingKey)
-    , verificationKeyOutput = Path.toFilePath (account </> verificationKey)
+    , verificationKeyOutput = Path.toFilePath (account </> verificationContext)
     }

@@ -27,7 +27,12 @@ import Core.Api.Messages (
  )
 import Data.Text (Text)
 import Network.Wai (Application)
-import Network.Wai.Middleware.Cors (CorsResourcePolicy (..), cors, simpleCorsResourcePolicy)
+import Network.Wai.Middleware.Cors (
+  cors,
+  corsMethods,
+  corsRequestHeaders,
+  simpleCorsResourcePolicy,
+ )
 import Servant (
   Capture,
   Get,

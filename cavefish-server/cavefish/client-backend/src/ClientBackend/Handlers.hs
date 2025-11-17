@@ -69,7 +69,7 @@ registerHelperH RegisterHelperReq {secretKey} = do
   pure . RegisterHelperResp $
     do
       (secret, secretHex) <- secretResult
-      let registerReq = RegisterReq {publicKey = Ed.toPublic secret}
+      let registerReq = RegisterReq {signerPublicKey = Ed.toPublic secret}
       pure
         RegisterHelperPayload
           { registerReq = registerReq

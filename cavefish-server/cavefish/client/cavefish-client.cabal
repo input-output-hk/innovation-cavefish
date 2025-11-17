@@ -66,6 +66,7 @@ library
     Client.Mock
 
   build-depends:
+    , aeson
     , bytestring
     , cardano-api
     , cavefish-core
@@ -96,6 +97,6 @@ test-suite test
   main-is:        Main.hs
   hs-source-dirs: test
   other-modules:
+    Spec
   build-depends:
-    , cavefish-client
     , hspec

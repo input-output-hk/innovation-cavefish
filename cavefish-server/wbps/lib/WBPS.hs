@@ -1,7 +1,13 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE RankNTypes #-}
 
-module WBPS (register, withFileSchemeIO, SignerKey) where
+module WBPS (
+  register,
+  withFileSchemeIO,
+  SignerKey,
+  getVerificationContext,
+  RegistrationFailure (..),
+) where
 
 import Cardano.Crypto.DSIGN.Class (
   SignKeyDSIGN,
@@ -12,15 +18,17 @@ import Cardano.Crypto.DSIGN.Class (
  )
 import Cardano.Crypto.DSIGN.Ed25519 (Ed25519DSIGN)
 import Control.Exception (SomeException)
-import Control.Monad ()
+import Control.Monad (unless, when)
 import Control.Monad.Error.Class
 import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class
 import Control.Monad.RWS (MonadReader, asks)
 import Control.Monad.Reader (ask, runReaderT)
 import Control.Monad.Trans.Maybe
+import Data.Aeson (Value, eitherDecode)
 import Data.Bool (bool)
 import Data.ByteString (ByteString)
+import Data.ByteString.Lazy qualified as BL
 import Data.Functor
 import Data.Validation (Validation (..))
 import GHC.Base (when)
@@ -37,19 +45,23 @@ import WBPS.Core.Primitives.SnarkjsOverFileScheme as SnarkJs
 
 register ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) =>
-  SignerKey -> m ()
+  SignerKey ->
+  m ()
 register signerKey = do
   scheme@FileScheme {..} <- ask
-  ensureDir accounts
   accountName <- getAccountFileName . accountId $ signerKey
-  account <- createAccountDirectory $ accounts </> accountName
-  generateProvingKeyProcess <- getGenerateProvingKeyProcess account
-  generateVerificationKeyProcess <- getGenerateVerificationKeyProcess account
-  shellLogsFilepath <- getShellLogsFilepath account
-  liftIO $
-    (generateProvingKeyProcess >> generateVerificationKeyProcess)
-      &!> StdOut
-      &> Append shellLogsFilepath
+  let account = accounts </> accountName
+  ensureDir account
+  let verificationContextPath = account </> verificationContext
+  verificationExists <- liftIO (doesFileExist verificationContextPath)
+  unless verificationExists $ do
+    generateProvingKeyProcess <- getGenerateProvingKeyProcess account
+    generateVerificationKeyProcess <- getGenerateVerificationKeyProcess account
+    shellLogsFilepath <- getShellLogsFilepath account
+    liftIO $
+      (generateProvingKeyProcess >> generateVerificationKeyProcess)
+        &!> StdOut
+        &> Append shellLogsFilepath
 
 getAccountFileName :: MonadError [RegistrationFailure] m => AccountId -> m AccountName
 getAccountFileName account@(AccountId x) =
@@ -68,21 +80,47 @@ withFileSchemeIO scheme action =
 newtype AccountId = AccountId String deriving (Show, Eq)
 
 data RegistrationFailure
-  = AccountExistAlready Account
-  | AccountIdInvalidToCreateAFolder AccountId
+  = AccountIdInvalidToCreateAFolder AccountId
+  | VerificationContextMissing Account
+  | VerificationContextInvalidJSON Account String
   deriving (Show, Eq)
 
 accountId :: SignerKey -> AccountId
 accountId = AccountId . show
 
-createAccountDirectory ::
+getVerificationContext ::
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) =>
+  SignerKey ->
+  m Value
+getVerificationContext signerKey = do
+  FileScheme {accounts, verificationContext = verificationContextRel} <- ask
+  accountDir <- accountDirectory accounts signerKey
+  register signerKey
+  loadVerificationContext accountDir verificationContextRel
+
+accountDirectory ::
+  MonadError [RegistrationFailure] m =>
+  Accounts ->
+  SignerKey ->
+  m Account
+accountDirectory accountsDir signer = do
+  name <- getAccountFileName (accountId signer)
+  pure (accountsDir </> name)
+
+loadVerificationContext ::
   (MonadIO m, MonadError [RegistrationFailure] m) =>
   Account ->
-  m Account
-createAccountDirectory account = do
-  whenM (liftIO . doesDirExist $ account) $ throwError [AccountExistAlready account]
-  liftIO . ensureDir $ account
-  pure account
+  Path Rel File ->
+  m Value
+loadVerificationContext accountDir verificationContextRel = do
+  let verificationContextPath = accountDir </> verificationContextRel
+  exists <- liftIO (doesFileExist verificationContextPath)
+  unless exists $
+    throwError [VerificationContextMissing accountDir]
+  bytes <- liftIO (BL.readFile (Path.toFilePath verificationContextPath))
+  case eitherDecode bytes of
+    Left err -> throwError [VerificationContextInvalidJSON accountDir err]
+    Right value -> pure value
 
 -- Below is Experimental (under progress)
 
@@ -90,7 +128,7 @@ data Message = Message {private :: ByteString, public :: ByteString}
 
 data AccountKeys = AccountKeys
   { provingKey :: Path Abs File
-  , verificationKey :: Path Abs File
+  , verificationContext :: Path Abs File
   }
 
 type InstanceId = String

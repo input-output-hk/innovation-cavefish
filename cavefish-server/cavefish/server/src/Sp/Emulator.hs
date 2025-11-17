@@ -34,7 +34,8 @@ import Core.Api.AppContext (
     spSk,
     spWallet,
     submit,
-    ttl
+    ttl,
+    wbpsScheme
   ),
   defaultWalletResolver,
  )
@@ -64,6 +65,7 @@ import Ledger.Tx (
 import Ledger.Tx qualified as LedgerTx
 import Plutus.Script.Utils.Address qualified as ScriptAddr
 import Plutus.Script.Utils.Scripts (Language (PlutusV2), Versioned (Versioned))
+import WBPS.Core.FileScheme (FileScheme)
 
 -- | Create a Cooked environment for the Cavefish server using the provided
 -- parameters.
@@ -77,8 +79,9 @@ mkCookedEnv ::
   Wallet ->
   NominalDiffTime ->
   Integer ->
+  FileScheme ->
   Env
-mkCookedEnv mockState pendingStore completeStore clientRegStore spSk pkeSk spWallet ttl spFee = env
+mkCookedEnv mockState pendingStore completeStore clientRegStore spSk pkeSk spWallet ttl spFee wbpsSchemeValue = env
   where
     pkePk = toPublicKey pkeSk
     env =
@@ -93,6 +96,7 @@ mkCookedEnv mockState pendingStore completeStore clientRegStore spSk pkeSk spWal
         , spFee
         , pkeSecret = pkeSk
         , pkePublic = pkePk
+        , wbpsScheme = wbpsSchemeValue
         , build = buildWithCooked mockState env
         , submit = submitWithCooked mockState env
         }
