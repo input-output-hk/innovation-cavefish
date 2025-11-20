@@ -78,24 +78,23 @@ library
     , validation
 
 test-suite wbps-unit-tests
-
-    import: base, project-config
-    type:             exitcode-stdio-1.0
-    hs-source-dirs:   tests/unit
-    main-is:          Main.hs
-    other-modules:  
-    build-depends:
-        , aeson
-        , wbps
-        , bytestring
-        , directory
-        , filepath
-        , path
-        , path-io
-        , temporary
-        , tasty
-        , tasty-hunit
-        , tasty-quickcheck
+  import:         base, project-config
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: tests/unit
+  main-is:        Main.hs
+  other-modules:
+  build-depends:
+    , aeson
+    , bytestring
+    , directory
+    , filepath
+    , path
+    , path-io
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , temporary
+    , wbps
 
 test-suite wbps-integration-tests
   import:         base, project-config

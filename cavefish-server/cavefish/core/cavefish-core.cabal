@@ -89,8 +89,8 @@ library
     , memory
     , mtl
     , path
-    , plutus-core
     , path-io
+    , plutus-core
     , plutus-ledger
     , plutus-ledger-api
     , plutus-script-utils
