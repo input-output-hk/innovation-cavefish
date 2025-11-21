@@ -26,8 +26,8 @@ import Client.Mock (
   MockClient (mcRun),
   RunServer,
   as422,
+  askSubmissionWithClient,
   demonstrateCommitmentWithClient,
-  finaliseWithClient,
   getClients,
   getPending,
   initMockClient,
@@ -41,7 +41,7 @@ import Control.Monad.Reader (MonadIO (liftIO), MonadReader, ReaderT, ask, runRea
 import Control.Monad.State (MonadState, StateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (evalStateT)
-import Core.Api.Messages (ClientsResp, CommitResp, PendingResp)
+import Core.Api.Messages (Accounts, CommitResp, PendingResp)
 import Core.Intent (IntentW)
 import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
@@ -128,7 +128,7 @@ commit run txId = do
   liftHandler (runCommit run txId bigR)
 
 askSubmission :: ClientSession -> DemonstrateCommitment.Outputs -> ClientM AskSubmission.Outputs
-askSubmission ClientSession {client} resp = liftHandler (finaliseWithClient client resp)
+askSubmission ClientSession {client} resp = liftHandler (askSubmissionWithClient client resp)
 
 runIntent :: ClientSession -> IntentW -> ClientM AskSubmission.Outputs
 runIntent session intent = do
@@ -140,7 +140,7 @@ listPending = do
   ClientEnv {run} <- ask
   liftHandler (getPending run)
 
-listClients :: ClientM ClientsResp
+listClients :: ClientM Accounts
 listClients = do
   ClientEnv {run} <- ask
   liftHandler (getClients run)

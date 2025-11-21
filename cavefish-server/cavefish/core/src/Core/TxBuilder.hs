@@ -2,7 +2,9 @@
 --     This module provides functionality to construct transactions using the Cooked
 --     library, interpreting intents that specify spending sources, payment outputs,
 --     validity intervals, and change addresses.
-module Core.TxBuilder where
+module Core.TxBuilder (
+  buildTx,
+) where
 
 import Cardano.Api qualified as Api
 import Control.Monad (foldM, unless, when)

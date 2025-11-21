@@ -12,6 +12,7 @@ module WBPS.Adapter.CardanoCryptoClass.Crypto (
   Hexadecimal,
   Codec (..),
   sign,
+  generateKeyPair,
   Ed25519DSIGN,
   DSIGNAlgorithm (..),
   ToByteString (..),
@@ -21,19 +22,48 @@ module WBPS.Adapter.CardanoCryptoClass.Crypto (
 
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.Hash (ByteString)
+import Cardano.Crypto.Seed (mkSeedFromBytes)
+import Crypto.Random
 import Data.Aeson as A hiding (decode, decode', encode)
+import Data.ByteString qualified as BS
 import Data.Coerce (coerce)
+import Data.Data (Proxy (..))
 import Data.List qualified as T
 import Data.String
 import Data.Text as Text hiding (drop)
+import GHC.Generics
 import GHC.Stack (HasCallStack)
 import Text.Hex (decodeHex, encodeHex)
+
+-- | Generate a fresh DSIGN keypair (e.g. Ed25519DSIGN).
+generateKeyPair ::
+  forall a m.
+  (DSIGNAlgorithm a, MonadRandom m) =>
+  m (KeyPair a)
+generateKeyPair = do
+  -- Determine how many bytes of entropy are needed for this DSIGN algorithm
+  let nBytes :: Int
+      nBytes = fromIntegral (seedSizeDSIGN (Proxy @a))
+
+  -- Draw random bytes inside MonadRandom
+  seedBytes <- getRandomBytes nBytes
+
+  -- Turn them into a Seed and derive signing/verifying keys
+  let seed = mkSeedFromBytes seedBytes
+      sk = genKeyDSIGN @a seed
+      vk = deriveVerKeyDSIGN sk
+
+  pure
+    KeyPair
+      { signatureKey = PrivateKey sk
+      , verificationKey = PublicKey vk
+      }
 
 data KeyPair a = KeyPair
   { signatureKey :: PrivateKey a
   , verificationKey :: PublicKey a
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 newtype PrivateKey a = PrivateKey (SignKeyDSIGN a)
 
@@ -132,6 +162,15 @@ instance DSIGNAlgorithm a => Show (PublicKey a) where
       . encode @Hexadecimal
       . fromByteString @Hexadecimal
       . toByteString @(PublicKey a)
+
+instance DSIGNAlgorithm a => Eq (PrivateKey a) where
+  (==) a b = show a == show b
+
+instance DSIGNAlgorithm a => Eq (PublicKey a) where
+  (==) a b = show a == show b
+
+instance DSIGNAlgorithm a => Ord (PublicKey a) where
+  (<=) a b = show a <= show b
 
 instance DSIGNAlgorithm a => IsString (PublicKey a) where
   fromString =

@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# OPTIONS_GHC -Wno-missing-import-lists #-}
 
 -- | Module providing an implementation of the transaction building and submission
 --    functions using the Cooked mock chain.
@@ -6,7 +7,11 @@
 --    This module defines functions to create a Cooked environment, build transactions,
 --    and submit them to the mock chain. It also includes utilities to manage the
 --    mock chain state.
-module Sp.Emulator where
+module Sp.Emulator (
+  mkCookedEnv,
+  buildWithCooked,
+  initialMockState,
+) where
 
 import Cardano.Api qualified as Api
 import Control.Concurrent.STM (TVar, atomically, readTVarIO, writeTVar)
@@ -73,7 +78,6 @@ mkCookedEnv ::
   TVar MockChainState ->
   PendingStore ->
   CompleteStore ->
-  ClientRegistrationStore ->
   SecretKey ->
   PkeSecretKey ->
   Wallet ->

@@ -6,7 +6,7 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Cooked (MockChainState)
 import Cooked.Wallet (Wallet, knownWallets)
-import Core.Api.State (ClientRegistrationStore, CompleteStore, PendingStore)
+import Core.Api.State (CompleteStore, PendingStore)
 import Core.Intent (BuildTxResult, Intent)
 import Core.Pke (PkePublicKey, PkeSecretKey)
 import Crypto.PubKey.Ed25519 (SecretKey)
@@ -24,7 +24,6 @@ data Env = Env
   { spSk :: SecretKey
   , pending :: PendingStore
   , complete :: CompleteStore
-  , clientRegistration :: ClientRegistrationStore
   , ttl :: NominalDiffTime
   , spWallet :: Wallet
   , resolveWallet :: Api.AddressInEra Api.ConwayEra -> Maybe Wallet

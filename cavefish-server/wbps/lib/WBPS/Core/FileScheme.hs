@@ -53,7 +53,7 @@ defaultFileScheme RootFolders {..} =
     , provingKey = [relfile|proving_key.zkey|]
     , verificationContext = [relfile|verification_context.json|]
     , accountPublicKey = [relfile|user_public_key.hex|]
-    , wbpsPublicKeyFile = [relfile|wbps_public_key.json|]
+    , encryptionKeys = [relfile|encryption_keys.json|]
     }
 
 getShellLogsFilepath :: MonadReader FileScheme m => Account -> m BL8.ByteString
@@ -78,6 +78,6 @@ data FileScheme = FileScheme
   , provingKey :: Path Rel File
   , verificationContext :: Path Rel File
   , accountPublicKey :: Path Rel File
-  , wbpsPublicKeyFile :: Path Rel File
+  , encryptionKeys :: Path Rel File
   }
   deriving (Show, Eq)

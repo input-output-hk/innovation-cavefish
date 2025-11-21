@@ -62,7 +62,6 @@ main = (withTracer $ Verbose "SP.Server") $ \tr -> do
           mockState
           pendingStore
           completeStore
-          clientStore
           spSk
           pkeSk
           (wallet 1)

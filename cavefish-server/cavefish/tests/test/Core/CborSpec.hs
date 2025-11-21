@@ -31,7 +31,7 @@ spec =
       mockState <- newTVarIO initialMockState
       pendingStore <- newTVarIO Map.empty
       completeStore <- newTVarIO Map.empty
-      clientStore <- newTVarIO Map.empty
+      -- clientStore <- newTVarIO Map.empty
       wbpsScheme <- mkFileSchemeFromRoot "../../wbps"
       let config :: Config = def
 
@@ -40,7 +40,6 @@ spec =
               mockState
               pendingStore
               completeStore
-              clientStore
               testSecretKey
               testPkeSecretKey
               testSpWallet

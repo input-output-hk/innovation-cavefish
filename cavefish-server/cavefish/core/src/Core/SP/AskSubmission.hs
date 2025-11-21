@@ -7,50 +7,9 @@
 
 module Core.SP.AskSubmission (handle, Inputs (..), Outputs (..), FinaliseResult (..)) where
 
-import Control.Concurrent.STM (atomically, modifyTVar')
-import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (MonadReader (ask))
 import Core.Api.AppContext (
   AppM,
-  Env (
-    Env,
-    build,
-    clientRegistration,
-    complete,
-    pending,
-    pkePublic,
-    pkeSecret,
-    spSk,
-    submit,
-    ttl,
-    wbpsScheme
-  ),
- )
-import Core.Api.Messages (
-  decryptPendingPayload,
-  lookupClientRegistration,
-  lookupPendingEntry,
-  parseTxIdHex,
-  removePendingEntry,
-  verifyClientSignature,
- )
-import Core.Api.State (
-  ClientRegistration (ClientRegistration, userPublicKey),
-  Completed (Completed, creator, submittedAt, tx),
-  Pending (
-    Pending,
-    auxNonce,
-    challenge,
-    ciphertext,
-    commitment,
-    creator,
-    expiry,
-    mockState,
-    rho,
-    tx,
-    txAbsHash
-  ),
  )
 import Core.Proof (parseHex, renderHex)
 import Data.Aeson (
@@ -62,20 +21,12 @@ import Data.Aeson (
   (.=),
  )
 import Data.ByteString (ByteString)
-import Data.Map.Strict qualified as Map
-import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import GHC.Generics (Generic)
-import Servant (
-  err410,
-  errBody,
-  throwError,
- )
 
 handle :: Inputs -> AppM Outputs
-handle Inputs {..} = do
-  env@Env {..} <- ask
+handle Inputs {} = do
   now <- liftIO getCurrentTime
   case parseTxIdHex txId of
     Nothing ->

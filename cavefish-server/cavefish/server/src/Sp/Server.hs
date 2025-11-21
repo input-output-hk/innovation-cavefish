@@ -2,11 +2,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Sp.Server where
+module Sp.Server (
+  CavefishApi,
+  mkApp,
+) where
 
 import Core.Api.AppContext (AppM, Env, runApp)
 import Core.Api.Messages (
-  ClientsResp,
+  Accounts,
   CommitReq,
   CommitResp,
   PendingResp,
@@ -47,7 +50,7 @@ type CavefishApi =
       :> Post '[JSON] DemonstrateCommitment.Outputs
     :<|> "askSubmission" :> ReqBody '[JSON] AskSubmission.Inputs :> Post '[JSON] AskSubmission.Outputs
     :<|> "commit" :> ReqBody '[JSON] CommitReq :> Post '[JSON] CommitResp
-    :<|> "clients" :> Get '[JSON] ClientsResp
+    :<|> "clients" :> Get '[JSON] Accounts
     :<|> "pending" :> Get '[JSON] PendingResp
     :<|> "transaction" :> Capture "id" Text :> Get '[JSON] TransactionResp
 

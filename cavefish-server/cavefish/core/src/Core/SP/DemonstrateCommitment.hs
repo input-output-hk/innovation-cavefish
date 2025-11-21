@@ -159,11 +159,11 @@ handle Inputs {..} = do
   Env {pending, clientRegistration, ttl, pkePublic, build, wbpsScheme} <- ask
   internalIntent <- liftIO $ either (ioError . userError . T.unpack) pure (toInternalIntent intent)
 
-  clientKnown <- liftIO . atomically $ do
-    registry <- readTVar clientRegistration
-    pure (Map.member clientId registry)
-  unless clientKnown $
-    throwError err403 {errBody = "unknown client"}
+  -- clientKnown <- liftIO . atomically $ do
+  --   -- registry <- readTVar clientRegistration
+  --   -- pure (Map.member clientId registry)
+  -- unless clientKnown $
+  --   throwError err403 {errBody = "unknown client"}
 
   -- TODO WG: We can't do this exactly, but it'd be nice to say at this point whether or not the observer is coherent with the intent
   -- expectedObserverBytes <-

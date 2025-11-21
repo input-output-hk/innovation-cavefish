@@ -18,7 +18,6 @@ import Core.Api.AppContext (
   Env (
     Env,
     build,
-    clientRegistration,
     complete,
     pending,
     pkePublic,
@@ -31,7 +30,6 @@ import Core.Api.AppContext (
  )
 import Core.Api.State (
   ClientId (ClientId),
-  ClientRegistration (ClientRegistration, userPublicKey),
   Completed (Completed, creator, submittedAt, tx),
   Pending (
     Pending,
@@ -43,7 +41,6 @@ import Core.Api.State (
     tx,
     txAbsHash
   ),
-  renderPublicKey,
  )
 import Core.Cbor (serialiseTx)
 import Core.PaymentProof (ProofResult (ProofEd25519))
@@ -141,14 +138,14 @@ instance FromJSON TransactionResp where
         pure $ TransactionSubmitted (SubmittedSummary tx submittedAt clientId)
       _ -> fail "unknown transaction status"
 
-newtype ClientsResp = ClientsResp
+newtype Accounts = Accounts
   { clients :: [ClientInfo]
   }
   deriving (Eq, Show, Generic)
 
-instance ToJSON ClientsResp
+instance ToJSON Accounts
 
-instance FromJSON ClientsResp
+instance FromJSON Accounts
 
 data ClientInfo = ClientInfo
   { clientId :: UUID
@@ -212,7 +209,8 @@ commitH CommitReq {..} = do
             removePendingEntry pending wantedTxId
             throwError err410 {errBody = "pending expired"}
           _ <- either throwError pure (decryptPendingPayload env pendingEntry)
-          mClient <- lookupClientRegistration clientRegistration creator
+          -- mClient <- lookupClientRegistration clientRegistration creator
+          let mClient = Nothing
           case mClient of
             Nothing ->
               throwError err403 {errBody = "unknown client"}
@@ -228,18 +226,8 @@ commitH CommitReq {..} = do
                       proof = ProofEd25519 (mkProof spSk txIdVal txAbsHash commitmentBytes)
                   pure CommitResp {pi = proof, c = 0}
 
-clientsH :: AppM ClientsResp
-clientsH = do
-  Env {clientRegistration} <- ask
-  regs <- liftIO . atomically $ Map.toAscList <$> readTVar clientRegistration
-  pure . ClientsResp $ fmap mkClientInfo regs
-  where
-    mkClientInfo :: (ClientId, ClientRegistration) -> ClientInfo
-    mkClientInfo (ClientId uuid, ClientRegistration {userPublicKey}) =
-      ClientInfo
-        { clientId = uuid
-        , userPublicKey = renderHex (renderPublicKey userPublicKey)
-        }
+clientsH :: AppM Accounts -- TODO : re-implement usimg WPBS primitive
+clientsH = return Accounts {clients = mempty}
 
 pendingH :: AppM PendingResp
 pendingH = do
@@ -323,13 +311,6 @@ lookupPendingEntry store txId =
   liftIO . atomically $ do
     entries <- readTVar store
     pure (Map.lookup txId entries)
-
-lookupClientRegistration ::
-  TVar (Map ClientId ClientRegistration) -> ClientId -> AppM (Maybe ClientRegistration)
-lookupClientRegistration store clientId =
-  liftIO . atomically $ do
-    registry <- readTVar store
-    pure (Map.lookup clientId registry)
 
 removePendingEntry :: TVar (Map Api.TxId Pending) -> Api.TxId -> AppM ()
 removePendingEntry store txId =

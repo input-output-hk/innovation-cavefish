@@ -60,6 +60,8 @@ library
     WBPS.Core
     WBPS.Core.BuildCommitment
     WBPS.Core.FileScheme
+    WBPS.Core.Keys.Ed25519
+    WBPS.Core.Keys.ElGamal
     WBPS.Core.Primitives.Circom
     WBPS.Core.Primitives.Snarkjs
     WBPS.Core.Primitives.SnarkjsOverFileScheme
@@ -74,9 +76,9 @@ library
     , hex-text
     , memory
     , mtl
-    , path                  >=0.9.0 && <0.10
-    , path-io               >=1.8.0 && <1.9
-    , shh                   >=0.7.0 && <0.8
+    , path                  >=0.9.0   && <0.10
+    , path-io               >=1.8.0   && <1.9
+    , shh                   >=0.7.0   && <0.8
     , text
     , transformers
     , validation
@@ -115,6 +117,7 @@ test-suite wbps-integration-tests
   build-depends:
     , bytestring
     , cardano-crypto-class
+    , containers            ^>=0.6.7
     , path                  ^>=0.9.6
     , path-io               ^>=1.8.2
     , QuickCheck

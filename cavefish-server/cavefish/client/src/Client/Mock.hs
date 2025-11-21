@@ -26,13 +26,12 @@ module Client.Mock (
   demonstrateCommitmentWithClient,
   demonstrateCommitmentWithClientAndVerifyWithClient,
   runCommit,
-  finalise,
-  finaliseWithClient,
+  askSubmission,
+  askSubmissionWithClient,
   verifyCommitProofWithClient,
   verifySatisfies,
   as422,
   decodeHex,
-  mockWbpsPublicKey,
 ) where
 
 import Cardano.Api qualified as Api
@@ -40,7 +39,7 @@ import Control.Monad (when)
 import Control.Monad.Error.Class (throwError)
 import Core.Api.AppContext (AppM)
 import Core.Api.Messages (
-  ClientsResp,
+  Accounts,
   CommitReq (CommitReq, bigR, txId),
   CommitResp (CommitResp, pi),
   PendingResp,
@@ -49,7 +48,7 @@ import Core.Api.Messages (
   commitH,
   pendingH,
  )
-import Core.Api.State (ClientId (ClientId))
+import Core.Api.State (ClientId)
 import Core.Cbor (
   ClientWitnessBundle (ClientWitnessBundle, cwbAuxNonce, cwbCiphertext, cwbTxId),
   deserialiseClientWitnessBundle,
@@ -66,13 +65,11 @@ import Data.Bifunctor (first)
 import Data.ByteArray qualified as BA
 import Data.ByteArray.Encoding qualified as BAE
 import Data.ByteString (ByteString)
-import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
 import Servant (Handler, ServerError, err422, errBody)
-import WBPS.Core (WbpsPublicKey (WbpsPublicKey))
 
 type RunServer = forall a. AppM a -> Handler a
 
@@ -136,28 +133,28 @@ registerClient runServer inputs = runServer $ Register.handle inputs
 -- | Register the mock client with the server.
 register :: UnregisteredMockClient -> Handler MockClient
 register UnregisteredMockClient {..} = do
-  registerResp@Register.Outputs {id = uuid, spPk} <-
+  registerResp@Register.Outputs {ek, publicVerificationContext} <-
     registerClient
       umcRun
       Register.Inputs
-        { userPublicKey = Ed.toPublic umcLcSk
-        , xPublicKey = mockWbpsPublicKey (Ed.toPublic umcLcSk)
+      -- userWalletPublicKey = UserWalletPublicKey . PublicKey $ Ed.toPublic umcLcSk
+        {
         }
   pure
     MockClient
       { mcRun = umcRun
       , mcLcSk = umcLcSk
-      , mcSpPk = spPk
-      , mcClientId = ClientId uuid
-      , mcVerificationContext = registerResp.verificationContext
+      -- , mcSpPk = ek
+      -- , mcClientId = ClientId uuid
+      -- , mcVerificationContext = registerResp.verificationContext
       }
 
 -- | List clients from the server.
-getClients :: RunServer -> Handler ClientsResp
+getClients :: RunServer -> Handler Accounts
 getClients run = run clientsH
 
 -- | List clients using the given mock client.
-getClientsWithClient :: MockClient -> Handler ClientsResp
+getClientsWithClient :: MockClient -> Handler Accounts
 getClientsWithClient mockClient = getClients (mcRun mockClient)
 
 -- | List pending transactions from the server.
@@ -191,16 +188,17 @@ demonstrateCommitmentWithClientAndVerifyWithClient mockClient intentW = do
   demonstrateCommitmentWithClient mockClient intentW
 
 -- | Finalise a prepared transaction with the server.
-finalise ::
+askSubmission ::
   RunServer -> Ed.SecretKey -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
-finalise run secretKey DemonstrateCommitment.Outputs {txId, txAbs} =
+askSubmission run secretKey DemonstrateCommitment.Outputs {txId, txAbs} =
   let txAbsHash = hashTxAbs txAbs
       req = mkAskSubmissionInputs secretKey txId txAbsHash
    in run (AskSubmission.handle req)
 
 -- | Finalise a prepared transaction using the given mock client.
-finaliseWithClient :: MockClient -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
-finaliseWithClient mockClient = finalise (mcRun mockClient) (mcLcSk mockClient)
+askSubmissionWithClient ::
+  MockClient -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
+askSubmissionWithClient mockClient = askSubmission (mcRun mockClient) (mcLcSk mockClient)
 
 -- | Verify that the prepared transaction proof is valid with the given client.
 verifyCommitProofWithClient ::
@@ -221,10 +219,3 @@ decodeHex label hexText =
   case BAE.convertFromBase BAE.Base16 (TE.encodeUtf8 hexText) of
     Left err -> Left (Text.concat ["failed to decode ", label, ": ", Text.pack err])
     Right bs -> Right bs
-
--- TODO WG: This is done correctly for the frontend, but this is still just a placeholder (uses JS on the frontend, not done the Haskell implementation of g^x yet)
-mockWbpsPublicKey :: Ed.PublicKey -> WbpsPublicKey
-mockWbpsPublicKey pk =
-  let raw = BA.convert pk
-      mirrored = BS.reverse raw
-   in WbpsPublicKey raw mirrored

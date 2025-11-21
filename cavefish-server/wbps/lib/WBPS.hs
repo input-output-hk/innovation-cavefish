@@ -1,14 +1,15 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module WBPS (
   register,
   withFileSchemeIO,
-  SignerKey,
-  WbpsPublicKey (..),
-  getVerificationContext,
-  storeAccountArtifacts,
-  RegistrationFailure (..),
+  loadAccount,
+  loadAccounts,
+  AccountCreated (..),
+  RegistrationFailed (..),
+  PublicVerificationContext (..),
 ) where
 
 import Cardano.Crypto.DSIGN.Class (
@@ -20,66 +21,132 @@ import Cardano.Crypto.DSIGN.Class (
  )
 import Cardano.Crypto.DSIGN.Ed25519 (Ed25519DSIGN)
 import Control.Exception (SomeException, displayException, try)
-import Control.Monad (unless, when)
+import Control.Monad (filterM, unless, when)
 import Control.Monad.Error.Class
 import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class
 import Control.Monad.RWS (MonadReader, asks)
 import Control.Monad.Reader (ask, runReaderT)
 import Control.Monad.Trans.Maybe
+import Crypto.Random (MonadRandom)
 import Data.Aeson (Value, eitherDecode)
 import Data.Aeson qualified as Aeson
+import Data.Aeson.Key (toString)
 import Data.Bool (bool)
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy qualified as BL
+import Data.ByteString.Lazy.Char8 qualified as BL8
 import Data.Functor
+import Data.Maybe (mapMaybe)
+import Data.String (IsString (..))
 import Data.Text (Text)
 import Data.Text.IO qualified as TIO
 import Data.Validation (Validation (..))
 import GHC.Base (when)
+import GHC.Generics
 import Path
 import Path.IO
-import Shh hiding (Failure)
-import WBPS.Adapter.CardanoCryptoClass.Crypto
+import Shh hiding (Failure, toFilePath)
+import WBPS.Adapter.CardanoCryptoClass.Crypto hiding (PublicKey)
 import WBPS.Adapter.Data
-import WBPS.Core (SignerKey, WbpsPublicKey)
+import WBPS.Adapter.Monad.Control
+import WBPS.Adapter.Path
 import WBPS.Core.FileScheme
+import WBPS.Core.Keys.Ed25519 (PublicKey (..), UserWalletPublicKey (..))
+import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Primitives.Snarkjs
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
 import WBPS.Core.Primitives.SnarkjsOverFileScheme as SnarkJs
 
+data PublicVerificationContext = PublicVerificationContext {filePath :: Path Abs File, asJson :: Value}
+  deriving (Eq, Show, Ord, Generic)
+
+data AccountCreated
+  = AccountCreated
+  { userWalletPublicKey :: UserWalletPublicKey
+  , provingKey :: Path Abs File
+  , encryptionKeys :: ElGamal.KeyPair
+  , publicVerificationContext :: PublicVerificationContext
+  }
+  deriving (Ord, Eq, Show)
+
+getRecordedUserWalletPublicKeys :: MonadIO m => Path b Dir -> m [UserWalletPublicKey]
+getRecordedUserWalletPublicKeys p = do
+  a <- fst <$> (liftIO . listDirRel $ p)
+  return $ fromString . takeWhile (/= '/') . toFilePath <$> a
+
+loadAccounts ::
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
+  m [AccountCreated]
+loadAccounts = do
+  FileScheme {..} <- ask
+  recordedKeys <- getRecordedUserWalletPublicKeys accounts
+  traverse loadAccount' recordedKeys
+
+loadAccount ::
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
+  UserWalletPublicKey -> m (Maybe AccountCreated)
+loadAccount userWalletPublicKey = do
+  account <- deriveAccountFrom userWalletPublicKey
+  ifM
+    (not <$> doesDirExist account)
+    (return Nothing)
+    (Just <$> loadAccount' userWalletPublicKey)
+
+loadAccount' ::
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
+  UserWalletPublicKey -> m AccountCreated
+loadAccount' userWalletPublicKey = do
+  account <- deriveAccountFrom userWalletPublicKey
+  FileScheme {..} <- ask
+  AccountCreated
+    userWalletPublicKey
+    (account </> provingKey)
+    <$> ( readFrom (account </> encryptionKeys)
+            >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey]
+        )
+    <*> ( PublicVerificationContext (account </> verificationContext)
+            <$> ( readFrom (account </> verificationContext)
+                    >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey]
+                )
+        )
+
 register ::
-  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) =>
-  SignerKey ->
-  m ()
-register signerKey =
-  register' =<< deriveAccountFrom signerKey
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
+  UserWalletPublicKey ->
+  m AccountCreated
+register userWalletPublicKey =
+  loadAccount userWalletPublicKey
+    >>= \case
+      Just AccountCreated {..} -> throwError [AccountAlreadyRegistered userWalletPublicKey]
+      Nothing -> do
+        register' =<< deriveAccountFrom userWalletPublicKey
+        loadAccount' userWalletPublicKey
 
 deriveAccountFrom ::
-  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) => SignerKey -> m Account
-deriveAccountFrom signerKey = do
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
+  UserWalletPublicKey -> m Account
+deriveAccountFrom userWalletPublicKey = do
   FileScheme {..} <- ask
-  (accounts </>) <$> (getAccountFileName . accountId $ signerKey)
+  (accounts </>) <$> (getAccountFileName . accountId $ userWalletPublicKey)
 
 register' ::
-  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) =>
+  (MonadIO m, MonadReader FileScheme m) =>
   Account ->
   m ()
 register' account = do
   FileScheme {..} <- ask
   ensureDir account
-  let verificationContextPath = account </> verificationContext
-  verificationExists <- liftIO (doesFileExist verificationContextPath)
-  unless verificationExists $ do
-    generateProvingKeyProcess <- getGenerateProvingKeyProcess account
-    generateVerificationKeyProcess <- getGenerateVerificationKeyProcess account
-    shellLogsFilepath <- getShellLogsFilepath account
-    liftIO $
-      (generateProvingKeyProcess >> generateVerificationKeyProcess)
-        &!> StdOut
-        &> Append shellLogsFilepath
+  ElGamal.generateKeypair >>= writeTo (account </> encryptionKeys)
+  generateProvingKeyProcess <- getGenerateProvingKeyProcess account
+  generateVerificationKeyProcess <- getGenerateVerificationKeyProcess account
+  shellLogsFilepath <- getShellLogsFilepath account
+  liftIO $
+    (generateProvingKeyProcess >> generateVerificationKeyProcess)
+      &!> StdOut
+      &> Append shellLogsFilepath
 
-getAccountFileName :: MonadError [RegistrationFailure] m => AccountId -> m AccountName
+getAccountFileName :: MonadError [RegistrationFailed] m => AccountId -> m AccountName
 getAccountFileName account@(AccountId x) =
   either
     (const . throwError $ [AccountIdInvalidToCreateAFolder account])
@@ -88,129 +155,19 @@ getAccountFileName account@(AccountId x) =
 
 withFileSchemeIO ::
   FileScheme ->
-  (forall m. (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) => m a) ->
-  IO (Either [RegistrationFailure] a)
+  (forall m. (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) => m a) ->
+  IO (Either [RegistrationFailed] a)
 withFileSchemeIO scheme action =
   runExceptT $ runReaderT action scheme
 
 newtype AccountId = AccountId String deriving (Show, Eq)
 
-data RegistrationFailure
+data RegistrationFailed
   = AccountIdInvalidToCreateAFolder AccountId
-  | VerificationContextMissing Account
-  | VerificationContextInvalidJSON Account String
-  | AccountMetadataWriteFailed Account (Path Rel File) String
+  | VerificationNotFound UserWalletPublicKey
+  | EncryptionKeysNotFound UserWalletPublicKey
+  | AccountAlreadyRegistered UserWalletPublicKey
   deriving (Show, Eq)
 
-accountId :: SignerKey -> AccountId
-accountId = AccountId . show
-
-getVerificationContext ::
-  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) =>
-  SignerKey ->
-  m Value
-getVerificationContext signerKey = do
-  FileScheme {accounts, verificationContext = verificationContextRel} <- ask
-  accountDir <- accountDirectory accounts signerKey
-  register signerKey
-  loadVerificationContext accountDir verificationContextRel
-
-accountDirectory ::
-  MonadError [RegistrationFailure] m =>
-  Accounts ->
-  SignerKey ->
-  m Account
-accountDirectory accountsDir signer = do
-  name <- getAccountFileName (accountId signer)
-  pure (accountsDir </> name)
-
-loadVerificationContext ::
-  (MonadIO m, MonadError [RegistrationFailure] m) =>
-  Account ->
-  Path Rel File ->
-  m Value
-loadVerificationContext accountDir verificationContextRel = do
-  let verificationContextPath = accountDir </> verificationContextRel
-  exists <- liftIO (doesFileExist verificationContextPath)
-  unless exists $
-    throwError [VerificationContextMissing accountDir]
-  bytes <- liftIO (BL.readFile (Path.toFilePath verificationContextPath))
-  case eitherDecode bytes of
-    Left err -> throwError [VerificationContextInvalidJSON accountDir err]
-    Right value -> pure value
-
-storeAccountArtifacts ::
-  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) =>
-  SignerKey ->
-  Text ->
-  WbpsPublicKey ->
-  m ()
-storeAccountArtifacts signerKey userPublicKeyHex wbpsPublicKey = do
-  FileScheme
-    { accounts
-    , accountPublicKey = accountPublicKeyRel
-    , wbpsPublicKeyFile = wbpsPublicKeyRel
-    } <-
-    ask
-  accountDir <- accountDirectory accounts signerKey
-  writeTextFile accountDir accountPublicKeyRel userPublicKeyHex
-  writeJsonFile accountDir wbpsPublicKeyRel wbpsPublicKey
-  where
-    writeTextFile accountDir rel contents = do
-      let fp = accountDir </> rel
-      result <- liftIO . try $ TIO.writeFile (Path.toFilePath fp) contents
-      case result of
-        Left (err :: SomeException) ->
-          throwError [AccountMetadataWriteFailed accountDir rel (displayException err)]
-        Right () -> pure ()
-    writeJsonFile accountDir rel value = do
-      let fp = accountDir </> rel
-      result <- liftIO . try $ BL.writeFile (Path.toFilePath fp) (Aeson.encode value)
-      case result of
-        Left (err :: SomeException) ->
-          throwError [AccountMetadataWriteFailed accountDir rel (displayException err)]
-        Right () -> pure ()
-
--- Below is Experimental (under progress)
-
-data Message = Message {private :: ByteString, public :: ByteString}
-
-data AccountKeys = AccountKeys
-  { provingKey :: Path Abs File
-  , verificationContext :: Path Abs File
-  }
-
-type InstanceId = String
-
-addInstance :: (MonadIO m, MonadReader FileScheme m) => AccountId -> Message -> m InstanceId
-addInstance accountId message =
-  -- generate el Gamal ephemeral key
-  -- build commitment
-  -- build challenge
-  -- create input.json file
-  -- call generateWitness
-  -- call generateProof
-  pure ""
-
-verifyInstance :: (MonadIO m, MonadReader FileScheme m) => AccountId -> InstanceId -> m ()
-verifyInstance accountId instanceId =
-  -- SnarkJS.verifyProof
-  pure ()
-
-data Point = Point {x :: Int, y :: Int}
-
-data Commitment
-  = Commitment
-  { point :: Point
-  , rho :: Int
-  , payload :: ByteString
-  }
-
-type Challenge = ByteString
-
-data WitnessInput
-  = WitnessInput
-  { signer_key :: ByteString
-  , elGamal_ephemeral_encryption_key :: (ByteString, ByteString)
-  , commitment :: Commitment
-  }
+accountId :: UserWalletPublicKey -> AccountId
+accountId (UserWalletPublicKey (PublicKey x)) = AccountId . show $ x
