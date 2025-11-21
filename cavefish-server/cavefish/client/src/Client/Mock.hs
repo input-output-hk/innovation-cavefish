@@ -6,7 +6,34 @@
 --  This module provides a mock client that can register with the server,
 --  prepare intents, verify proofs, and finalize transactions. It is designed
 --  for testing purposes and simulates client-server interactions.
-module Client.Mock where
+module Client.Mock (
+  RunServer,
+  UnregisteredMockClient (..),
+  MockClient (..),
+  initMockClient,
+  mkDemonstrateCommitmentInputs,
+  mkPrepareReq,
+  mkAskSubmissionInputs,
+  mkFinaliseReq,
+  verifyCommitProof,
+  registerClient,
+  register,
+  getClients,
+  getClientsWithClient,
+  getPending,
+  getPendingWithClient,
+  demonstrateCommitment,
+  demonstrateCommitmentWithClient,
+  demonstrateCommitmentWithClientAndVerifyWithClient,
+  runCommit,
+  finalise,
+  finaliseWithClient,
+  verifyCommitProofWithClient,
+  verifySatisfies,
+  as422,
+  decodeHex,
+  mockWbpsPublicKey,
+) where
 
 import Cardano.Api qualified as Api
 import Control.Monad (when)
@@ -16,13 +43,10 @@ import Core.Api.Messages (
   ClientsResp,
   CommitReq (CommitReq, bigR, txId),
   CommitResp (CommitResp, pi),
-  FinaliseReq (FinaliseReq, lcSig, txId),
-  FinaliseResp,
   PendingResp,
   clientSignatureMessage,
   clientsH,
   commitH,
-  finaliseH,
   pendingH,
  )
 import Core.Api.State (ClientId (ClientId))
@@ -33,6 +57,7 @@ import Core.Cbor (
 import Core.Intent (IntentW, satisfies, toInternalIntent)
 import Core.Observers.Observer (intentStakeValidatorBytes)
 import Core.PaymentProof (hashTxAbs, verifyPaymentProof)
+import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.Register qualified as Register
 import Crypto.PubKey.Ed25519 qualified as Ed
@@ -72,18 +97,24 @@ initMockClient run lcSk =
     }
 
 -- | Create a PrepareReq from the given client ID and intent.
-mkPrepareReq :: ClientId -> IntentW -> Either Text DemonstrateCommitment.Inputs
-mkPrepareReq clientId intentW = do
+mkDemonstrateCommitmentInputs :: ClientId -> IntentW -> Either Text DemonstrateCommitment.Inputs
+mkDemonstrateCommitmentInputs clientId intentW = do
   internalIntent <- toInternalIntent intentW
   observerBytes <- intentStakeValidatorBytes internalIntent
   pure DemonstrateCommitment.Inputs {intent = intentW, observer = Just observerBytes, clientId}
 
+mkPrepareReq :: ClientId -> IntentW -> Either Text DemonstrateCommitment.Inputs
+mkPrepareReq = mkDemonstrateCommitmentInputs
+
 -- | Create a FinaliseReq from the given secret key, transaction ID, and transaction abstract hash.
-mkFinaliseReq :: Ed.SecretKey -> Text -> ByteString -> FinaliseReq
-mkFinaliseReq secretKey txId txAbsHash =
+mkAskSubmissionInputs :: Ed.SecretKey -> Text -> ByteString -> AskSubmission.Inputs
+mkAskSubmissionInputs secretKey txId txAbsHash =
   let message = clientSignatureMessage txAbsHash
       signature = Ed.sign secretKey (Ed.toPublic secretKey) message
-   in FinaliseReq {txId = txId, lcSig = BA.convert signature}
+   in AskSubmission.Inputs {txId = txId, lcSig = BA.convert signature}
+
+mkFinaliseReq :: Ed.SecretKey -> Text -> ByteString -> AskSubmission.Inputs
+mkFinaliseReq = mkAskSubmissionInputs
 
 verifyCommitProof :: Ed.PublicKey -> DemonstrateCommitment.Outputs -> CommitResp -> Either Text ()
 verifyCommitProof publicKey DemonstrateCommitment.Outputs {txId = txIdText, txAbs, witnessBundleHex} CommitResp {pi = piGiven} = do
@@ -140,7 +171,7 @@ getPendingWithClient mockClient = getPending (mcRun mockClient)
 -- | Prepare an intent with the server.
 demonstrateCommitment :: RunServer -> ClientId -> IntentW -> Handler DemonstrateCommitment.Outputs
 demonstrateCommitment run clientId intentW =
-  case mkPrepareReq clientId intentW of
+  case mkDemonstrateCommitmentInputs clientId intentW of
     Left err -> throwError (as422 err)
     Right req -> run (DemonstrateCommitment.handle req)
 
@@ -160,14 +191,15 @@ demonstrateCommitmentWithClientAndVerifyWithClient mockClient intentW = do
   demonstrateCommitmentWithClient mockClient intentW
 
 -- | Finalise a prepared transaction with the server.
-finalise :: RunServer -> Ed.SecretKey -> DemonstrateCommitment.Outputs -> Handler FinaliseResp
+finalise ::
+  RunServer -> Ed.SecretKey -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
 finalise run secretKey DemonstrateCommitment.Outputs {txId, txAbs} =
   let txAbsHash = hashTxAbs txAbs
-      req = mkFinaliseReq secretKey txId txAbsHash
-   in run (finaliseH req)
+      req = mkAskSubmissionInputs secretKey txId txAbsHash
+   in run (AskSubmission.handle req)
 
 -- | Finalise a prepared transaction using the given mock client.
-finaliseWithClient :: MockClient -> DemonstrateCommitment.Outputs -> Handler FinaliseResp
+finaliseWithClient :: MockClient -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
 finaliseWithClient mockClient = finalise (mcRun mockClient) (mcLcSk mockClient)
 
 -- | Verify that the prepared transaction proof is valid with the given client.

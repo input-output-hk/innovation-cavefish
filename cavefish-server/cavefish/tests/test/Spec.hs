@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-missing-import-lists #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -21,15 +22,11 @@ import Core.Api.Messages (
   ClientsResp (ClientsResp, clients),
   CommitReq (CommitReq, bigR, txId),
   CommitResp (pi),
-  FinaliseReq (FinaliseReq, lcSig),
-  FinaliseResp (FinaliseResp, result, submittedAt, txId),
-  FinaliseResult (Finalised, Rejected),
   PendingItem (PendingItem, clientId, expiresAt, txAbsHash, txId),
   PendingResp (PendingResp, pending),
   PendingSummary (PendingSummary, pendingClientId, pendingExpiresAt),
   SubmittedSummary (SubmittedSummary, submittedAt, submittedClientId, submittedTx),
   TransactionResp (TransactionMissing, TransactionPending, TransactionSubmitted),
-  finaliseH,
   transactionH,
  )
 import Core.Api.State (
@@ -53,6 +50,9 @@ import Core.Intent (
 import Core.PaymentProof (ProofResult (ProofEd25519), hashTxAbs)
 import Core.Pke (ciphertextDigest)
 import Core.Proof (mkProof, renderHex)
+import Core.SP.AskSubmission (Inputs (..))
+import Core.SP.AskSubmission qualified as AskSubmission
+import Core.SP.DemonstrateCommitment (Inputs (..))
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.Register qualified as Register
 import Core.TxAbs (cardanoTxToTxAbs)
@@ -246,12 +246,12 @@ spec = do
       Mock.verifyCommitProofWithClient mockClient prepareResp commitResp `shouldBe` Right ()
       commitResp.pi `shouldBe` expectedProof
 
-      FinaliseResp {txId = finalTxId, result = finalResult, submittedAt = finalSubmittedAt} <-
+      AskSubmission.Outputs {txId = finalTxId, result = finalResult, submittedAt = finalSubmittedAt} <-
         runHandlerOrFail (Mock.finaliseWithClient mockClient prepareResp)
       pendingAfter <- readTVarIO pendingStore
       Map.notMember expectedTxIdValue pendingAfter `shouldBe` True
       finalTxId `shouldBe` gotTxId
-      finalResult `shouldBe` Finalised
+      finalResult `shouldBe` AskSubmission.Finalised
 
       submittedStatus <- fetchTransaction expectedTxId
       case submittedStatus of
@@ -293,16 +293,16 @@ spec = do
       let commitBigR = Ed.toPublic testCommitSecretKey
       _ <- runHandlerOrFail (Mock.runCommit (mcRun mockClient) expectedTxId commitBigR)
 
-      let validFinaliseReq@FinaliseReq {} =
+      let validFinaliseReq@AskSubmission.Inputs {} =
             Mock.mkFinaliseReq (Mock.mcLcSk mockClient) expectedTxId expectedTxAbsHash
           invalidFinaliseReq =
             validFinaliseReq
               { lcSig = corruptSignature (lcSig validFinaliseReq)
               }
-      FinaliseResp {txId = finalTxId, result = finalResult} <-
-        runHandlerOrFail (runApp env $ finaliseH invalidFinaliseReq)
+      AskSubmission.Outputs {txId = finalTxId, result = finalResult} <-
+        runHandlerOrFail (runApp env $ AskSubmission.handle invalidFinaliseReq)
       finalTxId `shouldBe` expectedTxId
-      finalResult `shouldBe` Rejected "invalid client signature"
+      finalResult `shouldBe` AskSubmission.Rejected "invalid client signature"
       pendingAfter <- readTVarIO pendingStore
       Map.member expectedTxIdValue pendingAfter `shouldBe` True
 
@@ -407,11 +407,11 @@ spec = do
       mockStateVar <- newTVarIO initialMockState
       let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
           clientEnv = mkClientEnv env
-      FinaliseResp {result = finalResult} <-
+      AskSubmission.Outputs {result = finalResult} <-
         runHandlerOrFail $
           Client.withSession clientEnv $
             \session -> Client.runIntent session testIntentW
-      finalResult `shouldBe` Finalised
+      finalResult `shouldBe` AskSubmission.Finalised
       PendingResp {pending = pendingAfter} <-
         runHandlerOrFail (Client.runClient clientEnv Client.listPending)
       pendingAfter `shouldBe` []
@@ -433,7 +433,8 @@ spec = do
         manager <- newManager defaultManagerSettings
         let baseUrl = BaseUrl SC.Http "127.0.0.1" port ""
             servantEnv = SC.mkClientEnv manager baseUrl
-            ( registerClient :<|> prepareClient :<|> commitClient :<|> finaliseClient :<|> clientsClient
+            ( registerClient :<|> demonstrateCommitmentClient :<|> askSubmissionClient :<|> commitClient
+                :<|> clientsClient
                 :<|> pendingClient
                 :<|> transactionClient
               ) =
@@ -469,7 +470,7 @@ spec = do
         -- Ask the SP to construct a transaction based on an intent
         prepareReq <- mkPrepareReqOrFail (ClientId registeredId) testIntentW
         DemonstrateCommitment.Outputs {txId, txAbs} <-
-          runClientOrFail servantEnv (prepareClient prepareReq)
+          runClientOrFail servantEnv (demonstrateCommitmentClient prepareReq)
         let unknownTxId =
               case Text.uncons txId of
                 Nothing -> error "expected non-empty tx id"
@@ -516,9 +517,9 @@ spec = do
 
         -- Tell the SP to submit the transaction
         let finaliseReq = mkFinaliseReq testClientSecretKey txId (hashTxAbs txAbs)
-        FinaliseResp {txId, submittedAt, result} <-
-          runClientOrFail servantEnv (finaliseClient finaliseReq)
-        result `shouldBe` Finalised
+        AskSubmission.Outputs {txId, submittedAt, result} <-
+          runClientOrFail servantEnv (askSubmissionClient finaliseReq)
+        result `shouldBe` AskSubmission.Finalised
 
         -- Ask the SP about pending transactions...there should be none again, since we submitted our transaction
         PendingResp pendingAfter <-
@@ -542,7 +543,7 @@ spec = do
           TransactionMissing ->
             expectationFailure "expected submitted transaction, but it is missing"
 
-mkPrepareReqOrFail :: ClientId -> IntentW -> IO DemonstrateCommitment.Inputs
+mkPrepareReqOrFail :: ClientId -> IntentW -> IO Core.SP.DemonstrateCommitment.Inputs
 mkPrepareReqOrFail cid iw =
   case Mock.mkPrepareReq cid iw of
     Left err -> expectationFailure (Text.unpack err) >> fail "invalid demonstrateCommitment request"

@@ -71,6 +71,7 @@ library
     Core.PaymentProof
     Core.Pke
     Core.Proof
+    Core.SP.AskSubmission
     Core.SP.DemonstrateCommitment
     Core.SP.Register
     Core.TxAbs

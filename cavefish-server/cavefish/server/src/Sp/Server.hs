@@ -9,16 +9,14 @@ import Core.Api.Messages (
   ClientsResp,
   CommitReq,
   CommitResp,
-  FinaliseReq,
-  FinaliseResp,
   PendingResp,
   TransactionResp,
   clientsH,
   commitH,
-  finaliseH,
   pendingH,
   transactionH,
  )
+import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.Register qualified as Register
 import Data.Text (Text)
@@ -46,8 +44,8 @@ type CavefishApi =
     :<|> "demonstrateCommitment"
       :> ReqBody '[JSON] DemonstrateCommitment.Inputs
       :> Post '[JSON] DemonstrateCommitment.Outputs
+    :<|> "askSubmission" :> ReqBody '[JSON] AskSubmission.Inputs :> Post '[JSON] AskSubmission.Outputs
     :<|> "commit" :> ReqBody '[JSON] CommitReq :> Post '[JSON] CommitResp
-    :<|> "finalise" :> ReqBody '[JSON] FinaliseReq :> Post '[JSON] FinaliseResp
     :<|> "clients" :> Get '[JSON] ClientsResp
     :<|> "pending" :> Get '[JSON] PendingResp
     :<|> "transaction" :> Capture "id" Text :> Get '[JSON] TransactionResp
@@ -69,8 +67,8 @@ server :: ServerT CavefishApi AppM
 server =
   Register.handle
     :<|> DemonstrateCommitment.handle
+    :<|> AskSubmission.handle
     :<|> commitH
-    :<|> finaliseH
     :<|> clientsH
     :<|> pendingH
     :<|> transactionH

@@ -26,6 +26,7 @@ import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
 import Core.Intent (ChangeDelta, IntentW (..), satisfies, toInternalIntent)
 import Core.PaymentProof (ProofResult, hashTxAbs, verifyPaymentProof)
 import Core.Proof (renderHex)
+import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.TxAbs (TxAbs)
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Bifunctor (first)
@@ -35,8 +36,8 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
 
-verifyCommitProof :: Ed.PublicKey -> PrepareResp -> ProofResult -> Either Text ()
-verifyCommitProof publicKey PrepareResp {txId = txIdText, txAbs, witnessBundleHex} pi = do
+verifyCommitProof :: Ed.PublicKey -> DemonstrateCommitment.Outputs -> ProofResult -> Either Text ()
+verifyCommitProof publicKey DemonstrateCommitment.Outputs {txId = txIdText, txAbs, witnessBundleHex} pi = do
   witnessBytes <- decodeHex "witness bundle" witnessBundleHex
   ClientWitnessBundle {cwbCiphertext = ciphertext, cwbAuxNonce = auxNonceBytes, cwbTxId = bundleTxId} <-
     first (const "failed to decode witness bundle") (deserialiseClientWitnessBundle witnessBytes)
@@ -97,7 +98,7 @@ commitHelperH CommitHelperReq {txId} = do
           }
 
 finaliseHelperH :: FinaliseHelperReq -> AppM FinaliseHelperResp
-finaliseHelperH FinaliseHelperReq {secretKey, helperPrepareResp = PrepareResp {txId, txAbs}} =
+finaliseHelperH FinaliseHelperReq {secretKey, helperPrepareResp = DemonstrateCommitment.Outputs {txId, txAbs}} =
   pure . FinaliseHelperResp $
     do
       sk <- parseSecretKey secretKey

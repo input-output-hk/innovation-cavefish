@@ -16,7 +16,7 @@ module Client.Impl (
   eitherAs422,
   demonstrateCommitment,
   demonstrateCommitmentAndValidate,
-  finalise,
+  askSubmission,
   runIntent,
   listPending,
   listClients,
@@ -41,8 +41,9 @@ import Control.Monad.Reader (MonadIO (liftIO), MonadReader, ReaderT, ask, runRea
 import Control.Monad.State (MonadState, StateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State (evalStateT)
-import Core.Api.Messages (ClientsResp, CommitResp, FinaliseResp, PendingResp)
+import Core.Api.Messages (ClientsResp, CommitResp, PendingResp)
 import Core.Intent (IntentW)
+import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 (SecretKey)
@@ -126,13 +127,13 @@ commit run txId = do
   let bigR = Ed.toPublic r
   liftHandler (runCommit run txId bigR)
 
-finalise :: ClientSession -> DemonstrateCommitment.Outputs -> ClientM FinaliseResp
-finalise ClientSession {client} resp = liftHandler (finaliseWithClient client resp)
+askSubmission :: ClientSession -> DemonstrateCommitment.Outputs -> ClientM AskSubmission.Outputs
+askSubmission ClientSession {client} resp = liftHandler (finaliseWithClient client resp)
 
-runIntent :: ClientSession -> IntentW -> ClientM FinaliseResp
+runIntent :: ClientSession -> IntentW -> ClientM AskSubmission.Outputs
 runIntent session intent = do
-  resp <- prepareAndValidate session intent
-  finalise session resp
+  resp <- demonstrateCommitmentAndValidate session intent
+  askSubmission session resp
 
 listPending :: ClientM PendingResp
 listPending = do

@@ -10,8 +10,7 @@ module Core.Api.Messages where
 
 import Cardano.Api qualified as Api
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, readTVarIO)
-import Control.Monad (unless, when)
-import Control.Monad.Except (liftEither)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (ask))
 import Core.Api.AppContext (
@@ -49,26 +48,16 @@ import Core.Api.State (
   ),
   renderPublicKey,
  )
-import Core.Cbor (mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
-import Core.Intent (
-  BuildTxResult (BuildTxResult, changeDelta, mockState, tx, txAbs),
-  ChangeDelta,
-  IntentW,
-  satisfies,
-  toInternalIntent,
- )
-import Core.PaymentProof (ProofResult (ProofEd25519), hashTxAbs)
+import Core.Cbor (serialiseTx)
+import Core.PaymentProof (ProofResult (ProofEd25519))
 import Core.Pke (
   ciphertextDigest,
   decrypt,
-  encrypt,
   renderError,
  )
-import Core.Proof (mkProof, parseHex, renderHex)
-import Core.TxAbs (TxAbs)
+import Core.Proof (mkProof, renderHex)
 import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed
-import Crypto.Random (getRandomBytes)
 import Data.Aeson (
   FromJSON (parseJSON),
   ToJSON (toJSON),
@@ -78,17 +67,14 @@ import Data.Aeson (
   (.:),
   (.=),
  )
-import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
 import Data.Map (Map)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (isJust)
 import Data.Text (Text)
-import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime)
+import Data.Time.Clock (UTCTime, getCurrentTime)
 import Data.UUID (UUID)
 import GHC.Generics (Generic)
 import Ledger.Tx.CardanoAPI (CardanoTx, pattern CardanoEmulatorEraTx)
@@ -99,7 +85,6 @@ import Servant (
   err404,
   err409,
   err410,
-  err422,
   err500,
   errBody,
   throwError,
@@ -211,46 +196,6 @@ instance FromJSON CommitResp
 
 instance ToJSON CommitResp
 
-data FinaliseReq = FinaliseReq
-  { txId :: Text
-  , lcSig :: ByteString
-  }
-  deriving (Eq, Show, Generic)
-
-instance FromJSON FinaliseReq where
-  parseJSON = withObject "FinaliseReq" $ \o -> do
-    txId <- o .: "txId"
-    sigHex :: Text <- o .: "lcSig"
-    lcSig <- parseHex sigHex
-    pure FinaliseReq {..}
-
-instance ToJSON FinaliseReq where
-  toJSON FinaliseReq {..} =
-    object
-      [ "txId" .= txId
-      , "lcSig" .= renderHex lcSig
-      ]
-
-data FinaliseResult
-  = Finalised
-  | Rejected Text
-  deriving (Eq, Show, Generic)
-
-instance ToJSON FinaliseResult
-
-instance FromJSON FinaliseResult
-
-data FinaliseResp = FinaliseResp
-  { txId :: Text
-  , submittedAt :: UTCTime
-  , result :: FinaliseResult
-  }
-  deriving (Eq, Show, Generic)
-
-instance ToJSON FinaliseResp
-
-instance FromJSON FinaliseResp
-
 -- TODO WG: Once the crypto machinery lands, we can generate the pair `(c, π)`
 --          and plug this handler into the middle of the demonstrateCommitment/finalise flow.
 commitH :: CommitReq -> AppM CommitResp
@@ -285,46 +230,6 @@ commitH CommitReq {..} = do
                       commitmentBytes = ciphertextDigest ciphertext
                       proof = ProofEd25519 (mkProof spSk txIdVal txAbsHash commitmentBytes)
                   pure CommitResp {pi = proof, c = 0}
-
-finaliseH :: FinaliseReq -> AppM FinaliseResp
-finaliseH FinaliseReq {..} = do
-  env@Env {..} <- ask
-  now <- liftIO getCurrentTime
-  case parseTxIdHex txId of
-    Nothing ->
-      pure $ FinaliseResp txId now (Rejected "malformed tx id")
-    Just wantedTxId -> do
-      mp <- lookupPendingEntry pending wantedTxId
-      case mp of
-        Nothing ->
-          pure $ FinaliseResp txId now (Rejected "unknown or expired tx")
-        Just pendingEntry@Pending {..}
-          | now > expiry -> do
-              removePendingEntry pending wantedTxId
-              pure $ FinaliseResp txId now (Rejected "pending expired")
-          | otherwise -> do
-              unless
-                (isJust commitment)
-                (throwError err410 {errBody = "commitment must be made before submission"})
-              _payload <- either throwError pure (decryptPendingPayload env pendingEntry)
-              mClient <- lookupClientRegistration clientRegistration creator
-              case mClient of
-                Nothing ->
-                  pure $ FinaliseResp txId now (Rejected "unknown client")
-                Just ClientRegistration {userPublicKey} ->
-                  if verifyClientSignature userPublicKey txAbsHash lcSig
-                    then do
-                      res <- liftIO (submit tx mockState)
-                      case res of
-                        Left reason ->
-                          pure $ FinaliseResp txId now (Rejected reason)
-                        Right _ -> do
-                          let completed = Completed {tx, submittedAt = now, creator}
-                          liftIO . atomically $ do
-                            modifyTVar' pending (Map.delete wantedTxId)
-                            modifyTVar' complete (Map.insert wantedTxId completed)
-                          pure $ FinaliseResp txId now Finalised
-                    else pure $ FinaliseResp txId now (Rejected "invalid client signature")
 
 clientsH :: AppM ClientsResp
 clientsH = do

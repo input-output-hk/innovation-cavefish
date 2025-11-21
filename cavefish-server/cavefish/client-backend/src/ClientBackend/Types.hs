@@ -9,6 +9,8 @@ import Core.Api.State (ClientId)
 import Core.Intent (ChangeDelta, IntentW)
 import Core.PaymentProof (ProofResult)
 import Core.Proof (renderHex)
+import Core.SP.AskSubmission qualified as AskSubmission
+import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.TxAbs (TxAbs)
 import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed
@@ -23,7 +25,7 @@ import GHC.Generics (Generic)
 -- TODO WG: I don't like PrepareResp as an input here
 data VerifyReq = VerifyReq
   { publicKey :: Ed.PublicKey
-  , prepared :: PrepareResp
+  , prepared :: DemonstrateCommitment.Outputs
   , proofResult :: ProofResult
   }
   deriving (Eq, Show, Generic)
@@ -107,7 +109,7 @@ instance ToJSON PrepareHelperReq
 
 instance FromJSON PrepareHelperReq
 
-newtype PrepareHelperResp = PrepareHelperResp (Either Text PrepareReq)
+newtype PrepareHelperResp = PrepareHelperResp (Either Text DemonstrateCommitment.Inputs)
   deriving (Eq, Show, Generic)
 
 instance ToJSON PrepareHelperResp
@@ -142,7 +144,7 @@ instance FromJSON CommitHelperResp
 
 data FinaliseHelperReq = FinaliseHelperReq
   { secretKey :: Text
-  , helperPrepareResp :: PrepareResp
+  , helperPrepareResp :: DemonstrateCommitment.Outputs
   }
   deriving (Eq, Show, Generic)
 
@@ -150,7 +152,7 @@ instance ToJSON FinaliseHelperReq
 
 instance FromJSON FinaliseHelperReq
 
-newtype FinaliseHelperResp = FinaliseHelperResp (Either Text FinaliseReq)
+newtype FinaliseHelperResp = FinaliseHelperResp (Either Text AskSubmission.Inputs)
   deriving (Eq, Show, Generic)
 
 instance ToJSON FinaliseHelperResp
