@@ -852,11 +852,11 @@
         }),
       );
 
-      elements.buttons.prepare.addEventListener('click', () =>
-        withBusy('prepare', async () => {
+      elements.buttons.demonstrateCommitment.addEventListener('click', () =>
+        withBusy('demonstrateCommitment', async () => {
           const clientId = elements.clientId.value.trim();
           if (!clientId) {
-            showError('prepare', 'Client ID is required.');
+            showError('demonstrateCommitment', 'Client ID is required.');
             return;
           }
 
@@ -866,7 +866,7 @@
             state.intentW = intent;
             elements.intentPreview.textContent = formatJson(intent);
           } catch (err) {
-            showError('prepare', err.message);
+            showError('demonstrateCommitment', err.message);
             return;
           }
 
@@ -877,7 +877,7 @@
           };
 
           try {
-            const data = await requestService('prepare', '/prepare', prepareReqBody);
+            const data = await requestService('demonstrateCommitment', '/demonstrateCommitment', prepareReqBody);
             state.prepareResp = data;
             if (data && data.txId) {
               elements.commitTxId.value = data.txId;
@@ -889,14 +889,14 @@
             state.commitHelper = null;
             state.satisfiesResult = null;
             state.verifyResult = null;
-            elements.outputs.prepare.textContent = formatJson({
+            elements.outputs.demonstrateCommitment.textContent = formatJson({
               request: prepareReqBody,
               response: data ?? {},
             });
-            showInfo('prepare', 'Intent prepared.');
+            showInfo('demonstrateCommitment', 'Intent prepared.');
             showStep(2);
           } catch (err) {
-            showError('prepare', err.message);
+            showError('demonstrateCommitment', err.message);
           }
         }),
       );
@@ -905,7 +905,7 @@
         withBusy('commit', async () => {
           const txId = elements.commitTxId.value.trim();
           if (!txId) {
-            showError('commit', 'Missing transaction ID from prepare response.');
+            showError('commit', 'Missing transaction ID from demonstrateCommitment response.');
             return;
           }
 
@@ -1033,7 +1033,7 @@
           statuses: {
             register: byId('registerStatus'),
             build: byId('buildStatus'),
-            prepare: byId('prepareStatus'),
+            demonstrateCommitment: byId('prepareStatus'),
             satisfies: byId('satisfiesStatus'),
             commit: byId('commitStatus'),
             verify: byId('verifyStatus'),
@@ -1043,7 +1043,7 @@
           },
           outputs: {
             register: byId('registerOutput'),
-            prepare: byId('prepareOutput'),
+            demonstrateCommitment: byId('prepareOutput'),
             satisfies: byId('satisfiesOutput'),
             commit: byId('commitOutput'),
             verify: byId('verifyOutput'),
@@ -1054,7 +1054,7 @@
             generate: byId('generateKeyBtn'),
             register: byId('registerBtn'),
             build: byId('buildIntentBtn'),
-            prepare: byId('prepareBtn'),
+            demonstrateCommitment: byId('prepareBtn'),
             commit: byId('commitBtn'),
             finalise: byId('finaliseBtn'),
             fetchTx: byId('fetchTxBtn'),

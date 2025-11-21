@@ -52,10 +52,21 @@ register ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) =>
   SignerKey ->
   m ()
-register signerKey = do
-  scheme@FileScheme {..} <- ask
-  accountName <- getAccountFileName . accountId $ signerKey
-  let account = accounts </> accountName
+register signerKey =
+  register' =<< deriveAccountFrom signerKey
+
+deriveAccountFrom ::
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) => SignerKey -> m Account
+deriveAccountFrom signerKey = do
+  FileScheme {..} <- ask
+  (accounts </>) <$> (getAccountFileName . accountId $ signerKey)
+
+register' ::
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailure] m) =>
+  Account ->
+  m ()
+register' account = do
+  FileScheme {..} <- ask
   ensureDir account
   let verificationContextPath = account </> verificationContext
   verificationExists <- liftIO (doesFileExist verificationContextPath)

@@ -9,10 +9,8 @@
 module Core.Api.Messages where
 
 import Cardano.Api qualified as Api
-import Cardano.Crypto.DSIGN (rawDeserialiseVerKeyDSIGN)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, readTVarIO)
-import Control.Monad (unless, when)
-import Control.Monad.Except (liftEither)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (ask))
 import Core.Api.AppContext (
@@ -33,7 +31,7 @@ import Core.Api.AppContext (
  )
 import Core.Api.State (
   ClientId (ClientId),
-  ClientRegistration (ClientRegistration, userPublicKey, xPublicKey),
+  ClientRegistration (ClientRegistration, userPublicKey),
   Completed (Completed, creator, submittedAt, tx),
   Pending (
     Pending,
@@ -48,29 +46,18 @@ import Core.Api.State (
     tx,
     txAbsHash
   ),
-  parsePublicKey,
   renderPublicKey,
  )
-import Core.Cbor (mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
-import Core.Intent (
-  BuildTxResult (BuildTxResult, changeDelta, mockState, tx, txAbs),
-  ChangeDelta,
-  IntentW,
-  satisfies,
-  toInternalIntent,
- )
-import Core.PaymentProof (ProofResult (ProofEd25519), hashTxAbs)
+import Core.Cbor (serialiseTx)
+import Core.PaymentProof (ProofResult (ProofEd25519))
 import Core.Pke (
   ciphertextDigest,
   decrypt,
-  encrypt,
   renderError,
  )
-import Core.Proof (mkProof, parseHex, renderHex)
-import Core.TxAbs (TxAbs)
+import Core.Proof (mkProof, renderHex)
 import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed
-import Crypto.Random (getRandomBytes)
 import Data.Aeson (
   FromJSON (parseJSON),
   ToJSON (toJSON),
@@ -80,21 +67,15 @@ import Data.Aeson (
   (.:),
   (.=),
  )
-import Data.Bifunctor (first)
-import Data.ByteArray qualified as BA
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
-import Data.ByteString.Lazy.Char8 qualified as BL8
 import Data.Map (Map)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (isJust)
 import Data.Text (Text)
-import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime)
+import Data.Time.Clock (UTCTime, getCurrentTime)
 import Data.UUID (UUID)
-import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
 import Ledger.Tx.CardanoAPI (CardanoTx, pattern CardanoEmulatorEraTx)
 import Servant (
@@ -104,14 +85,10 @@ import Servant (
   err404,
   err409,
   err410,
-  err422,
   err500,
   errBody,
   throwError,
  )
-import WBPS qualified
-import WBPS.Adapter.CardanoCryptoClass.Crypto qualified as W
-import WBPS.Core (SignerKey, WbpsPublicKey)
 
 -- | Cavefish API a
 data TransactionResp
@@ -207,87 +184,6 @@ instance ToJSON PendingItem
 
 instance FromJSON PendingItem
 
-data RegisterReq = RegisterReq
-  { userPublicKey :: Ed.PublicKey
-  , xPublicKey :: WbpsPublicKey
-  }
-  deriving (Eq, Show, Generic)
-
-instance FromJSON RegisterReq where
-  parseJSON = withObject "RegisterReq" $ \o -> do
-    userPublicKey <- parsePublicKey =<< o .: "userPublicKey"
-    xPublicKey <- o .: "X"
-    pure RegisterReq {userPublicKey, xPublicKey}
-
-instance ToJSON RegisterReq where
-  toJSON RegisterReq {..} =
-    object
-      [ "userPublicKey" .= renderHex (renderPublicKey userPublicKey)
-      , "X" .= xPublicKey
-      ]
-
-data RegisterResp = RegisterResp
-  { id :: UUID
-  , spPk :: Ed.PublicKey
-  , verificationContext :: Value
-  }
-  deriving (Eq, Show, Generic)
-
-instance ToJSON RegisterResp where
-  toJSON RegisterResp {id, spPk, verificationContext} =
-    object
-      [ "id" .= id
-      , "spPk" .= renderHex (BA.convert spPk)
-      , "verificationContext" .= verificationContext
-      ]
-
-instance FromJSON RegisterResp where
-  parseJSON = withObject "RegisterResp" $ \o -> do
-    id <- o .: "id"
-    spHex :: Text <- o .: "spPk"
-    bytes <- parseHex spHex
-    verificationContext <- o .: "verificationContext"
-    case Ed.publicKey bytes of
-      CryptoFailed err -> fail ("invalid service public key: " <> show err)
-      CryptoPassed pk -> pure RegisterResp {spPk = pk, id, verificationContext}
-
--- | Request to prepare a transaction.
-data PrepareReq = PrepareReq
-  { intent :: IntentW
-  , observer :: Maybe ByteString
-  , clientId :: ClientId
-  }
-  deriving (Eq, Show, Generic)
-
-instance FromJSON PrepareReq where
-  parseJSON = withObject "PrepareReq" $ \o -> do
-    intent <- o .: "intent"
-    obsHex :: Maybe Text <- o .: "observer"
-    observer <- traverse parseHex obsHex
-    clientId <- o .: "clientId"
-    pure PrepareReq {..}
-
-instance ToJSON PrepareReq where
-  toJSON PrepareReq {..} =
-    object
-      [ "intent" .= intent
-      , "observer" .= fmap renderHex observer
-      , "clientId" .= clientId
-      ]
-
-data PrepareResp = PrepareResp
-  { txId :: Text
-  , txAbs :: TxAbs Api.ConwayEra
-  , -- We need to include a `consumed - produced` here, otherwise the client can't run `satisfies` for `ChangeTo`
-    changeDelta :: ChangeDelta
-  , witnessBundleHex :: Text
-  }
-  deriving (Eq, Show, Generic)
-
-instance FromJSON PrepareResp
-
-instance ToJSON PrepareResp
-
 data CommitReq = CommitReq {txId :: Text, bigR :: Ed.PublicKey} deriving (Eq, Show, Generic)
 
 instance FromJSON CommitReq
@@ -300,116 +196,8 @@ instance FromJSON CommitResp
 
 instance ToJSON CommitResp
 
-data FinaliseReq = FinaliseReq
-  { txId :: Text
-  , lcSig :: ByteString
-  }
-  deriving (Eq, Show, Generic)
-
-instance FromJSON FinaliseReq where
-  parseJSON = withObject "FinaliseReq" $ \o -> do
-    txId <- o .: "txId"
-    sigHex :: Text <- o .: "lcSig"
-    lcSig <- parseHex sigHex
-    pure FinaliseReq {..}
-
-instance ToJSON FinaliseReq where
-  toJSON FinaliseReq {..} =
-    object
-      [ "txId" .= txId
-      , "lcSig" .= renderHex lcSig
-      ]
-
-data FinaliseResult
-  = Finalised
-  | Rejected Text
-  deriving (Eq, Show, Generic)
-
-instance ToJSON FinaliseResult
-
-instance FromJSON FinaliseResult
-
-data FinaliseResp = FinaliseResp
-  { txId :: Text
-  , submittedAt :: UTCTime
-  , result :: FinaliseResult
-  }
-  deriving (Eq, Show, Generic)
-
-instance ToJSON FinaliseResp
-
-instance FromJSON FinaliseResp
-
-prepareH :: PrepareReq -> AppM PrepareResp
-prepareH PrepareReq {..} = do
-  Env {pending, clientRegistration, ttl, pkePublic, build} <- ask
-  internalIntent <- liftIO $ either (ioError . userError . T.unpack) pure (toInternalIntent intent)
-
-  clientKnown <- liftIO . atomically $ do
-    registry <- readTVar clientRegistration
-    pure (Map.member clientId registry)
-  unless clientKnown $
-    throwError err403 {errBody = "unknown client"}
-
-  -- TODO WG: We can't do this exactly, but it'd be nice to say at this point whether or not the observer is coherent with the intent
-  -- expectedObserverBytes <-
-  --   liftIO $ either (ioError . userError . T.unpack) pure (intentStakeValidatorBytes intent)
-
-  -- when (observer /= expectedObserverBytes) $
-  --   throwError err422{errBody = "observer script does not match intent"}
-
-  BuildTxResult {tx = tx, txAbs = txAbs, mockState = builtState, changeDelta = cd} <-
-    liftIO $ build internalIntent observer
-
-  auxNonceBytes :: ByteString <- liftIO $ getRandomBytes 32
-  rhoBytes :: ByteString <- liftIO $ getRandomBytes 32
-
-  let payload = serialiseTx tx <> auxNonceBytes
-      toServerErr msg = err500 {errBody = BL.fromStrict (TE.encodeUtf8 msg)}
-      toPkeErr err = err500 {errBody = BL.fromStrict (TE.encodeUtf8 ("pke encryption failed: " <> renderError err))}
-  -- The part from the paper: C ← PKE.Enc(ek, m; ρ) with ek = pkePublic, m = serialiseTx tx <> auxNonceBytes
-  ciphertext <- liftEither $ first toPkeErr (encrypt pkePublic payload rhoBytes)
-  witnessBundle <-
-    liftEither $ first toServerErr $ mkWitnessBundle tx txAbs observer auxNonceBytes ciphertext
-  let witnessBundleHex = renderHex (serialiseClientWitnessBundle witnessBundle)
-
-  unless (satisfies cd internalIntent txAbs) $
-    throwError err422 {errBody = "transaction does not satisfy intent"}
-
-  let txBody = Api.getTxBody tx
-      txId = Api.getTxId txBody
-      txIdTxt = Api.serialiseToRawBytesHexText txId
-      txAbsHash :: ByteString
-      txAbsHash = hashTxAbs txAbs
-  now <- liftIO getCurrentTime
-  let expiry = addUTCTime ttl now
-  liftIO . atomically $
-    modifyTVar' pending $
-      Map.insert
-        txId
-        Pending
-          { tx
-          , txAbsHash
-          , expiry
-          , mockState = builtState
-          , creator = clientId
-          , ciphertext
-          , auxNonce = auxNonceBytes
-          , rho = rhoBytes
-          , commitment = Nothing
-          , challenge = Nothing
-          }
-
-  pure
-    PrepareResp
-      { txId = txIdTxt
-      , txAbs
-      , changeDelta = cd
-      , witnessBundleHex
-      }
-
 -- TODO WG: Once the crypto machinery lands, we can generate the pair `(c, π)`
---          and plug this handler into the middle of the prepare/finalise flow.
+--          and plug this handler into the middle of the demonstrateCommitment/finalise flow.
 commitH :: CommitReq -> AppM CommitResp
 commitH CommitReq {..} = do
   env@Env {..} <- ask
@@ -442,80 +230,6 @@ commitH CommitReq {..} = do
                       commitmentBytes = ciphertextDigest ciphertext
                       proof = ProofEd25519 (mkProof spSk txIdVal txAbsHash commitmentBytes)
                   pure CommitResp {pi = proof, c = 0}
-
-finaliseH :: FinaliseReq -> AppM FinaliseResp
-finaliseH FinaliseReq {..} = do
-  env@Env {..} <- ask
-  now <- liftIO getCurrentTime
-  case parseTxIdHex txId of
-    Nothing ->
-      pure $ FinaliseResp txId now (Rejected "malformed tx id")
-    Just wantedTxId -> do
-      mp <- lookupPendingEntry pending wantedTxId
-      case mp of
-        Nothing ->
-          pure $ FinaliseResp txId now (Rejected "unknown or expired tx")
-        Just pendingEntry@Pending {..}
-          | now > expiry -> do
-              removePendingEntry pending wantedTxId
-              pure $ FinaliseResp txId now (Rejected "pending expired")
-          | otherwise -> do
-              unless
-                (isJust commitment)
-                (throwError err410 {errBody = "commitment must be made before submission"})
-              _payload <- either throwError pure (decryptPendingPayload env pendingEntry)
-              mClient <- lookupClientRegistration clientRegistration creator
-              case mClient of
-                Nothing ->
-                  pure $ FinaliseResp txId now (Rejected "unknown client")
-                Just ClientRegistration {userPublicKey} ->
-                  if verifyClientSignature userPublicKey txAbsHash lcSig
-                    then do
-                      res <- liftIO (submit tx mockState)
-                      case res of
-                        Left reason ->
-                          pure $ FinaliseResp txId now (Rejected reason)
-                        Right _ -> do
-                          let completed = Completed {tx, submittedAt = now, creator}
-                          liftIO . atomically $ do
-                            modifyTVar' pending (Map.delete wantedTxId)
-                            modifyTVar' complete (Map.insert wantedTxId completed)
-                          pure $ FinaliseResp txId now Finalised
-                    else pure $ FinaliseResp txId now (Rejected "invalid client signature")
-
-registerH :: RegisterReq -> AppM RegisterResp
-registerH RegisterReq {userPublicKey, xPublicKey} = do
-  Env {clientRegistration, spSk, wbpsScheme} <- ask
-  signerKey <-
-    maybe
-      (throwError err422 {errBody = "invalid signer public key"})
-      pure
-      (mkSignerKey userPublicKey)
-  result <- liftIO $ WBPS.withFileSchemeIO wbpsScheme (WBPS.getVerificationContext signerKey)
-  verificationValue <-
-    either
-      ( \failures -> throwError err500 {errBody = BL8.pack ("verification context unavailable: " <> show failures)}
-      )
-      pure
-      result
-  let userPublicKeyHex = renderHex (renderPublicKey userPublicKey)
-  storeResult <-
-    liftIO $
-      WBPS.withFileSchemeIO
-        wbpsScheme
-        (WBPS.storeAccountArtifacts signerKey userPublicKeyHex xPublicKey)
-  either
-    ( \failures ->
-        throwError err500 {errBody = BL8.pack ("failed to persist account artifacts: " <> show failures)}
-    )
-    pure
-    storeResult
-  uuid <- liftIO nextRandom
-  liftIO . atomically $
-    modifyTVar'
-      clientRegistration
-      (Map.insert (ClientId uuid) (ClientRegistration userPublicKey xPublicKey))
-  pure RegisterResp {id = uuid, spPk = Ed.toPublic spSk, verificationContext = verificationValue}
 
 clientsH :: AppM ClientsResp
 clientsH = do
@@ -574,10 +288,6 @@ verifyClientSignature pk txAbsHash sigBytes =
     CryptoPassed sig ->
       let message = clientSignatureMessage txAbsHash
        in Ed.verify pk message sig
-
-mkSignerKey :: Ed.PublicKey -> Maybe SignerKey
-mkSignerKey pk =
-  W.PublicKey <$> rawDeserialiseVerKeyDSIGN (BA.convert pk)
 
 decryptPendingPayload :: Env -> Pending -> Either ServerError ByteString
 decryptPendingPayload Env {pkeSecret} Pending {ciphertext = pendingCiphertext, auxNonce = pendingAuxNonce, tx} =

@@ -5,10 +5,10 @@ module Core.CborSpec (spec) where
 import Cardano.Api qualified as Api
 import Client.Mock qualified as Mock
 import Control.Concurrent.STM (newTVarIO)
-import Core.Api.Messages (PrepareReq (observer))
 import Core.Api.State (ClientId (ClientId))
 import Core.Cbor (maskTxBody, serialiseTxBody)
 import Core.Intent (BuildTxResult (BuildTxResult, tx), toInternalIntent)
+import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
 import Data.UUID qualified as UUID
@@ -47,7 +47,7 @@ spec =
 
       prepareReq <-
         case Mock.mkPrepareReq (ClientId UUID.nil) testIntentW of
-          Left err -> expectationFailure (T.unpack err) >> fail "invalid prepare request"
+          Left err -> expectationFailure (T.unpack err) >> fail "invalid demonstrateCommitment request"
           Right req -> pure req
 
       intent <-
@@ -55,7 +55,7 @@ spec =
           Left err -> expectationFailure (T.unpack err) >> fail "invalid intent"
           Right v -> pure v
 
-      let observerBytes = observer prepareReq
+      let observerBytes = DemonstrateCommitment.observer prepareReq
 
       buildResult <- buildWithCooked mockState env intent observerBytes
       let BuildTxResult {tx = builtTx} = buildResult

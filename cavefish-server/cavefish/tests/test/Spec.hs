@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-missing-import-lists #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -21,20 +22,11 @@ import Core.Api.Messages (
   ClientsResp (ClientsResp, clients),
   CommitReq (CommitReq, bigR, txId),
   CommitResp (pi),
-  FinaliseReq (FinaliseReq, lcSig),
-  FinaliseResp (FinaliseResp, result, submittedAt, txId),
-  FinaliseResult (Finalised, Rejected),
   PendingItem (PendingItem, clientId, expiresAt, txAbsHash, txId),
   PendingResp (PendingResp, pending),
   PendingSummary (PendingSummary, pendingClientId, pendingExpiresAt),
-  PrepareReq (intent, observer),
-  PrepareResp (PrepareResp, txAbs, txId, witnessBundleHex),
-  RegisterReq (RegisterReq, userPublicKey, xPublicKey),
-  RegisterResp (RegisterResp, id, verificationContext),
   SubmittedSummary (SubmittedSummary, submittedAt, submittedClientId, submittedTx),
   TransactionResp (TransactionMissing, TransactionPending, TransactionSubmitted),
-  finaliseH,
-  mkSignerKey,
   transactionH,
  )
 import Core.Api.State (
@@ -58,6 +50,11 @@ import Core.Intent (
 import Core.PaymentProof (ProofResult (ProofEd25519), hashTxAbs)
 import Core.Pke (ciphertextDigest)
 import Core.Proof (mkProof, renderHex)
+import Core.SP.AskSubmission (Inputs (..))
+import Core.SP.AskSubmission qualified as AskSubmission
+import Core.SP.DemonstrateCommitment (Inputs (..))
+import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
+import Core.SP.Register qualified as Register
 import Core.TxAbs (cardanoTxToTxAbs)
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Aeson qualified as Aeson
@@ -153,7 +150,7 @@ spec = do
   wbpsScheme <- runIO (mkFileSchemeFromRoot "../../wbps")
   CborSpec.spec
   describe "buildTx integration" $ do
-    it "prepare -> finalise roundtrip uses buildTx" $ do
+    it "demonstrateCommitment -> finalise roundtrip uses buildTx" $ do
       pendingStore <- newTVarIO Map.empty
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
@@ -196,8 +193,8 @@ spec = do
         Right resp -> expectationFailure ("expected missing transaction but got " <> show resp)
         Left err -> expectationFailure ("expected missing transaction but got error: " <> show err)
 
-      prepareResp@PrepareResp {txId = gotTxId, txAbs = gotTxAbs, witnessBundleHex} <-
-        runHandlerOrFail (Mock.prepareWithClient mockClient testIntentW)
+      prepareResp@DemonstrateCommitment.Outputs {txId = gotTxId, txAbs = gotTxAbs, witnessBundleHex} <-
+        runHandlerOrFail (Mock.demonstrateCommitmentWithClient mockClient testIntentW)
       gotTxId `shouldBe` expectedTxId
       gotTxAbs `shouldBe` expectedTxAbs
       satisfies expectedDelta internalIntent gotTxAbs `shouldBe` True
@@ -249,12 +246,12 @@ spec = do
       Mock.verifyCommitProofWithClient mockClient prepareResp commitResp `shouldBe` Right ()
       commitResp.pi `shouldBe` expectedProof
 
-      FinaliseResp {txId = finalTxId, result = finalResult, submittedAt = finalSubmittedAt} <-
+      AskSubmission.Outputs {txId = finalTxId, result = finalResult, submittedAt = finalSubmittedAt} <-
         runHandlerOrFail (Mock.finaliseWithClient mockClient prepareResp)
       pendingAfter <- readTVarIO pendingStore
       Map.notMember expectedTxIdValue pendingAfter `shouldBe` True
       finalTxId `shouldBe` gotTxId
-      finalResult `shouldBe` Finalised
+      finalResult `shouldBe` AskSubmission.Finalised
 
       submittedStatus <- fetchTransaction expectedTxId
       case submittedStatus of
@@ -290,22 +287,22 @@ spec = do
       let expectedTxIdValue = Api.getTxId (Api.getTxBody expectedTx)
           expectedTxId = Api.serialiseToRawBytesHexText expectedTxIdValue
           expectedTxAbsHash = hashTxAbs expectedTxAbs
-      _ <- runHandlerOrFail (Mock.prepareWithClient mockClient testIntentW)
+      _ <- runHandlerOrFail (Mock.demonstrateCommitmentWithClient mockClient testIntentW)
       pendingMap <- readTVarIO pendingStore
       Map.member expectedTxIdValue pendingMap `shouldBe` True
       let commitBigR = Ed.toPublic testCommitSecretKey
       _ <- runHandlerOrFail (Mock.runCommit (mcRun mockClient) expectedTxId commitBigR)
 
-      let validFinaliseReq@FinaliseReq {} =
+      let validFinaliseReq@AskSubmission.Inputs {} =
             Mock.mkFinaliseReq (Mock.mcLcSk mockClient) expectedTxId expectedTxAbsHash
           invalidFinaliseReq =
             validFinaliseReq
               { lcSig = corruptSignature (lcSig validFinaliseReq)
               }
-      FinaliseResp {txId = finalTxId, result = finalResult} <-
-        runHandlerOrFail (runApp env $ finaliseH invalidFinaliseReq)
+      AskSubmission.Outputs {txId = finalTxId, result = finalResult} <-
+        runHandlerOrFail (runApp env $ AskSubmission.handle invalidFinaliseReq)
       finalTxId `shouldBe` expectedTxId
-      finalResult `shouldBe` Rejected "invalid client signature"
+      finalResult `shouldBe` AskSubmission.Rejected "invalid client signature"
       pendingAfter <- readTVarIO pendingStore
       Map.member expectedTxIdValue pendingAfter `shouldBe` True
 
@@ -385,7 +382,7 @@ spec = do
       let expectedTxIdValue = Api.getTxId (Api.getTxBody expectedTx)
           expectedTxId = Api.serialiseToRawBytesHexText expectedTxIdValue
           expectedTxAbsHash = hashTxAbs expectedTxAbs
-      _ <- runHandlerOrFail (Mock.prepareWithClient mockClient testIntentW)
+      _ <- runHandlerOrFail (Mock.demonstrateCommitmentWithClient mockClient testIntentW)
       pendingMap <- readTVarIO pendingStore
       case Map.lookup expectedTxIdValue pendingMap of
         Nothing -> expectationFailure "pending entry not stored"
@@ -403,18 +400,18 @@ spec = do
           items `shouldBe` [expectedItem]
 
   describe "Client implementation" $ do
-    it "runIntent performs prepare/verify/finalise" $ do
+    it "runIntent performs demonstrateCommitment/verify/finalise" $ do
       pendingStore <- newTVarIO Map.empty
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
       let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
           clientEnv = mkClientEnv env
-      FinaliseResp {result = finalResult} <-
+      AskSubmission.Outputs {result = finalResult} <-
         runHandlerOrFail $
           Client.withSession clientEnv $
             \session -> Client.runIntent session testIntentW
-      finalResult `shouldBe` Finalised
+      finalResult `shouldBe` AskSubmission.Finalised
       PendingResp {pending = pendingAfter} <-
         runHandlerOrFail (Client.runClient clientEnv Client.listPending)
       pendingAfter `shouldBe` []
@@ -425,7 +422,7 @@ spec = do
         _ -> expectationFailure "expected exactly one registered client"
 
   describe "Http server roundtrip" $ do
-    it "prepare -> finalise roundtrip uses buildTx" $ do
+    it "demonstrateCommitment -> finalise roundtrip uses buildTx" $ do
       pendingStore <- newTVarIO Map.empty
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
@@ -436,7 +433,8 @@ spec = do
         manager <- newManager defaultManagerSettings
         let baseUrl = BaseUrl SC.Http "127.0.0.1" port ""
             servantEnv = SC.mkClientEnv manager baseUrl
-            ( prepareClient :<|> commitClient :<|> finaliseClient :<|> registerClient :<|> clientsClient
+            ( registerClient :<|> demonstrateCommitmentClient :<|> askSubmissionClient :<|> commitClient
+                :<|> clientsClient
                 :<|> pendingClient
                 :<|> transactionClient
               ) =
@@ -447,13 +445,13 @@ spec = do
           runClientOrFail
             servantEnv
             ( registerClient
-                RegisterReq
+                Register.Inputs
                   { userPublicKey = Ed.toPublic testClientSecretKey
                   , xPublicKey = testWbpsPublicKey
                   }
             )
 
-        let RegisterResp {verificationContext = verificationPayload, id = registeredId} = registerResp
+        let Register.Outputs {verificationContext = verificationPayload, id = registeredId} = registerResp
 
         case verificationPayload of
           Aeson.Object _ -> pure ()
@@ -471,8 +469,8 @@ spec = do
 
         -- Ask the SP to construct a transaction based on an intent
         prepareReq <- mkPrepareReqOrFail (ClientId registeredId) testIntentW
-        PrepareResp {txId, txAbs} <-
-          runClientOrFail servantEnv (prepareClient prepareReq)
+        DemonstrateCommitment.Outputs {txId, txAbs} <-
+          runClientOrFail servantEnv (demonstrateCommitmentClient prepareReq)
         let unknownTxId =
               case Text.uncons txId of
                 Nothing -> error "expected non-empty tx id"
@@ -519,9 +517,9 @@ spec = do
 
         -- Tell the SP to submit the transaction
         let finaliseReq = mkFinaliseReq testClientSecretKey txId (hashTxAbs txAbs)
-        FinaliseResp {txId, submittedAt, result} <-
-          runClientOrFail servantEnv (finaliseClient finaliseReq)
-        result `shouldBe` Finalised
+        AskSubmission.Outputs {txId, submittedAt, result} <-
+          runClientOrFail servantEnv (askSubmissionClient finaliseReq)
+        result `shouldBe` AskSubmission.Finalised
 
         -- Ask the SP about pending transactions...there should be none again, since we submitted our transaction
         PendingResp pendingAfter <-
@@ -545,10 +543,10 @@ spec = do
           TransactionMissing ->
             expectationFailure "expected submitted transaction, but it is missing"
 
-mkPrepareReqOrFail :: ClientId -> IntentW -> IO PrepareReq
+mkPrepareReqOrFail :: ClientId -> IntentW -> IO Core.SP.DemonstrateCommitment.Inputs
 mkPrepareReqOrFail cid iw =
   case Mock.mkPrepareReq cid iw of
-    Left err -> expectationFailure (Text.unpack err) >> fail "invalid prepare request"
+    Left err -> expectationFailure (Text.unpack err) >> fail "invalid demonstrateCommitment request"
     Right req -> pure req
 
 corruptSignature :: ByteString -> ByteString
@@ -559,7 +557,7 @@ corruptSignature bs =
 
 expectSignerKey :: IO SignerKey
 expectSignerKey =
-  case mkSignerKey (Ed.toPublic testClientSecretKey) of
+  case Register.mkSignerKey (Ed.toPublic testClientSecretKey) of
     Nothing -> expectationFailure "expected valid signer key for test client" >> fail "invalid signer key"
     Just signerKey -> pure signerKey
 
