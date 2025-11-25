@@ -19,14 +19,11 @@ let
         project
         utils
         ghc
-      ;
+        ;
     };
 
-
-
   packages = {
-    cavefish-server =
-      project.hsPkgs.cavefish-server.components.exes.cavefish-server;
+    cavefish-server = project.hsPkgs.cavefish-server.components.exes.cavefish-server;
     cavefish-client-backend =
       project.hsPkgs.cavefish-client-backend.components.exes.cavefish-client-backend;
   };
