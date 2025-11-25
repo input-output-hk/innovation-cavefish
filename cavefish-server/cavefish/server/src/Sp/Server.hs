@@ -4,6 +4,7 @@
 
 module Sp.Server where
 
+import Blammo.Logging.Logger (HasLogger)
 import Core.Api.AppContext (AppM, Env, runApp)
 import Core.Api.Messages (
   ClientsResp,
@@ -26,6 +27,7 @@ import Network.Wai.Middleware.Cors (
   cors,
   simpleCorsResourcePolicy,
  )
+import Network.Wai.Middleware.Logging (requestLogger)
 import Servant (
   Capture,
   Get,
@@ -52,6 +54,9 @@ type CavefishApi =
 
 cavefishApi :: Proxy CavefishApi
 cavefishApi = Proxy
+
+withRequestLogging :: HasLogger env => env -> Application -> Application
+withRequestLogging env app = requestLogger env app
 
 mkApp :: Env -> Application
 mkApp env =

@@ -9,6 +9,7 @@
 
 module Spec (spec) where
 
+import Blammo.Logging.Simple (Logger, defaultLogSettings, newLogger)
 import Cardano.Api qualified as Api
 import Client.Impl qualified as Client
 import Client.Mock (MockClient (mcRun, mcVerificationContext), mkFinaliseReq)
@@ -113,8 +114,14 @@ runClientOrFail clientEnv action = do
     Right value -> pure value
 
 mkEnv ::
-  FileScheme -> PendingStore -> CompleteStore -> ClientRegistrationStore -> TVar MockChainState -> Env
-mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar =
+  FileScheme ->
+  PendingStore ->
+  CompleteStore ->
+  ClientRegistrationStore ->
+  TVar MockChainState ->
+  Logger ->
+  Env
+mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar logger =
   mkCookedEnv
     mockStateVar
     pendingStore
@@ -123,9 +130,8 @@ mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar =
     testSecretKey
     testPkeSecretKey
     testSpWallet
-    3600
-    0
     wbpsScheme
+    logger
 
 expectedUserPublicKeyHex :: Text
 expectedUserPublicKeyHex =
@@ -155,7 +161,8 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
+      logger <- newLogger defaultLogSettings
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar logger
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
       case Mock.mcVerificationContext mockClient of
@@ -268,7 +275,8 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
+      logger <- newLogger defaultLogSettings
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar logger
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
       let registeredClientId = Mock.mcClientId mockClient
@@ -313,7 +321,8 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
+      logger <- newLogger defaultLogSettings
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar logger
           mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
       mcVerificationContext mockClient `shouldBe` expectedValue
@@ -332,7 +341,8 @@ spec = do
         completeStore <- newTVarIO Map.empty
         clientRegVar <- newTVarIO Map.empty
         mockStateVar <- newTVarIO initialMockState
-        let env = mkEnv wbpsSchemeTmp pendingStore completeStore clientRegVar mockStateVar
+        logger <- newLogger defaultLogSettings
+        let env = mkEnv wbpsSchemeTmp pendingStore completeStore clientRegVar mockStateVar logger
             mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
         result <- runExceptT (runHandler' (Mock.register mockClient0))
         case result of
@@ -349,7 +359,8 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
+      logger <- newLogger defaultLogSettings
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar logger
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
       let ClientId clientUuid = Mock.mcClientId mockClient
@@ -363,7 +374,8 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
+      logger <- newLogger defaultLogSettings
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar logger
       let mockClient0 = Mock.initMockClient (runApp env) testClientSecretKey
       mockClient <- runHandlerOrFail (Mock.register mockClient0)
       let ClientId clientUuid = Mock.mcClientId mockClient
@@ -405,7 +417,8 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
+      logger <- newLogger defaultLogSettings
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar logger
           clientEnv = mkClientEnv env
       AskSubmission.Outputs {result = finalResult} <-
         runHandlerOrFail $
@@ -427,7 +440,8 @@ spec = do
       completeStore <- newTVarIO Map.empty
       clientRegVar <- newTVarIO Map.empty
       mockStateVar <- newTVarIO initialMockState
-      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar
+      logger <- newLogger defaultLogSettings
+      let env = mkEnv wbpsScheme pendingStore completeStore clientRegVar mockStateVar logger
       let application = pure (mkApp env)
       Warp.testWithApplication application $ \port -> do
         manager <- newManager defaultManagerSettings

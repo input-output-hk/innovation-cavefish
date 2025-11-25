@@ -79,6 +79,8 @@ library
 
   build-depends:
     , aeson
+    , Blammo
+    , Blammo-wai
     , bytestring
     , cardano-api
     , cardano-binary
@@ -89,6 +91,7 @@ library
     , containers
     , cooked-validators
     , crypton
+    , lens
     , memory
     , mtl
     , plutus-core
@@ -102,6 +105,8 @@ library
     , text
     , time
     , uuid
+    , wai
+    , warp
     , wbps
 
   if flag(ide-stub)

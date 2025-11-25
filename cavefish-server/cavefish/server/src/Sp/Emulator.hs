@@ -8,6 +8,7 @@
 --    mock chain state.
 module Sp.Emulator where
 
+import Blammo.Logging.Simple (Logger)
 import Cardano.Api qualified as Api
 import Control.Concurrent.STM (TVar, atomically, readTVarIO, writeTVar)
 import Control.Monad.Identity (runIdentity)
@@ -26,6 +27,8 @@ import Core.Api.AppContext (
     build,
     clientRegistration,
     complete,
+    httpServerConfig,
+    logger,
     pending,
     pkePublic,
     pkeSecret,
@@ -37,6 +40,7 @@ import Core.Api.AppContext (
     ttl,
     wbpsScheme
   ),
+  HttpServerConfig (HttpServerConfig),
   defaultWalletResolver,
  )
 import Core.Api.State (ClientRegistrationStore, CompleteStore, PendingStore)
@@ -54,7 +58,6 @@ import Data.ByteString (ByteString)
 import Data.Default (def)
 import Data.Foldable (traverse_)
 import Data.Text (Text)
-import Data.Time.Clock (NominalDiffTime)
 import Ledger (
   getCardanoTxOutputs,
  )
@@ -77,29 +80,39 @@ mkCookedEnv ::
   SecretKey ->
   PkeSecretKey ->
   Wallet ->
-  NominalDiffTime ->
-  Integer ->
   FileScheme ->
+  Logger ->
   Env
-mkCookedEnv mockState pendingStore completeStore clientRegStore spSk pkeSk spWallet ttl spFee wbpsSchemeValue = env
-  where
-    pkePk = toPublicKey pkeSk
-    env =
-      Env
-        { spSk
-        , pending = pendingStore
-        , complete = completeStore
-        , clientRegistration = clientRegStore
-        , ttl
-        , spWallet
-        , resolveWallet = defaultWalletResolver
-        , spFee
-        , pkeSecret = pkeSk
-        , pkePublic = pkePk
-        , wbpsScheme = wbpsSchemeValue
-        , build = buildWithCooked mockState env
-        , submit = submitWithCooked mockState env
-        }
+mkCookedEnv
+  mockState
+  pendingStore
+  completeStore
+  clientRegStore
+  spSk
+  pkeSk
+  spWallet
+  wbpsSchemeValue
+  logger = env
+    where
+      pkePk = toPublicKey pkeSk
+      env =
+        Env
+          { spSk
+          , pending = pendingStore
+          , complete = completeStore
+          , clientRegistration = clientRegStore
+          , ttl = (fromInteger 3600)
+          , spWallet
+          , resolveWallet = defaultWalletResolver
+          , spFee = 0
+          , pkeSecret = pkeSk
+          , pkePublic = pkePk
+          , wbpsScheme = wbpsSchemeValue
+          , build = buildWithCooked mockState env
+          , submit = submitWithCooked mockState env
+          , httpServerConfig = HttpServerConfig "0.0.0.0" 8080
+          , logger
+          }
 
 -- | Build a transaction using the Cooked mock chain.
 buildWithCooked ::

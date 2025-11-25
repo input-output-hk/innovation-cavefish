@@ -2,6 +2,7 @@
 
 module Core.CborSpec (spec) where
 
+import Blammo.Logging.Simple (defaultLogSettings, newLogger)
 import Cardano.Api qualified as Api
 import Client.Mock qualified as Mock
 import Control.Concurrent.STM (newTVarIO)
@@ -31,6 +32,7 @@ spec =
       completeStore <- newTVarIO Map.empty
       clientStore <- newTVarIO Map.empty
       wbpsScheme <- mkFileSchemeFromRoot "../../wbps"
+      logger <- newLogger defaultLogSettings
 
       let env =
             mkCookedEnv
@@ -41,9 +43,8 @@ spec =
               testSecretKey
               testPkeSecretKey
               testSpWallet
-              3600
-              0
               wbpsScheme
+              logger
 
       prepareReq <-
         case Mock.mkPrepareReq (ClientId UUID.nil) testIntentW of

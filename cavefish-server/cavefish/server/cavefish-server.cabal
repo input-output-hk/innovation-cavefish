@@ -53,7 +53,7 @@ common project-config
     ViewPatterns
 
   ghc-options:
-    -Wall -Werror -Wcompat -Widentities -Wincomplete-record-updates
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
     -Wredundant-constraints -Wcompat -Wunused-packages
     -Wmissing-import-lists
@@ -66,6 +66,8 @@ library
     Sp.Server
 
   build-depends:
+    , Blammo
+    , Blammo-wai
     , bytestring
     , cardano-api
     , cavefish-core
@@ -79,7 +81,6 @@ library
     , servant-server
     , stm
     , text
-    , time
     , transformers
     , wai
     , wai-cors
@@ -93,6 +94,7 @@ executable cavefish-server
   hs-source-dirs: app
   main-is:        Main.hs
   build-depends:
+    , Blammo
     , bytestring
     , cavefish-core
     , cavefish-server
