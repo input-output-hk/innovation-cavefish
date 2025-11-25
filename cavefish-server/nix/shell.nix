@@ -44,6 +44,11 @@ let
 
   tools = allTools.${ghc};
 
+  hlswrapper = pkgs.writeShellScriptBin "haskell-language-server-wrapper" ''
+    #!/bin/bash
+    exec haskell-language-server
+  '';
+
   cardanoPackages =
     if pkgs.hostPlatform.isAarch64 then
       [ ]
@@ -107,6 +112,7 @@ let
 
   commonPkgs = [
     tools.haskell-language-server
+    hlswrapper
     tools.stylish-haskell
     tools.fourmolu
     tools.cabal

@@ -2,28 +2,57 @@
 {-# LANGUAGE TypeOperators #-}
 
 module ClientBackend.Api (
-  module ClientBackend.App,
+  Env (..),
   ClientApi,
   clientApi,
   mkApp,
   server,
 ) where
 
-import ClientBackend.App
-import ClientBackend.Handlers
-import ClientBackend.Types
+import ClientBackend.App (AppM, Env (Env), runApp)
+import ClientBackend.Handlers (
+  commitHelperH,
+  demoAddressesH,
+  finaliseHelperH,
+  payToIntentH,
+  prepareHelperH,
+  registerHelperH,
+  satisfiesH,
+  verifyH,
+ )
+import ClientBackend.Types (
+  CommitHelperReq,
+  CommitHelperResp,
+  DemoAddressesResp,
+  FinaliseHelperReq,
+  FinaliseHelperResp,
+  IntentHelperResp,
+  PayToIntentReq,
+  PrepareHelperReq,
+  PrepareHelperResp,
+  RegisterHelperReq,
+  RegisterHelperResp,
+  SatisfiesReq,
+  SatisfiesResp,
+  VerifyReq,
+  VerifyResp,
+ )
 import Network.Wai (Application)
-import Network.Wai.Middleware.Cors (CorsResourcePolicy (..), cors, simpleCorsResourcePolicy)
+import Network.Wai.Middleware.Cors (
+  CorsResourcePolicy (corsMethods, corsRequestHeaders),
+  cors,
+  simpleCorsResourcePolicy,
+ )
 import Servant (
   Get,
   HasServer (ServerT),
   JSON,
   Post,
-  Proxy (..),
+  Proxy (Proxy),
   ReqBody,
   hoistServer,
   serve,
-  type (:<|>) (..),
+  type (:<|>) ((:<|>)),
   type (:>),
  )
 

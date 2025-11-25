@@ -12,7 +12,7 @@ module ClientBackend.Helpers (
 import Cardano.Api qualified as Api
 import Client.Mock (decodeHex)
 import Cooked (Wallet, wallet)
-import Core.Intent (AddressW (..))
+import Core.Intent (AddressW (AddressW))
 import Core.Proof (renderHex)
 import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed

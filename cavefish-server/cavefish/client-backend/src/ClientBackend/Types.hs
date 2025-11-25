@@ -4,7 +4,7 @@ module ClientBackend.Types where
 
 import Cardano.Api qualified as Api
 import Client.Mock (decodeHex)
-import Core.Api.Messages
+import Core.Api.Messages (CommitReq)
 import Core.Api.State (ClientId)
 import Core.Intent (ChangeDelta, IntentW)
 import Core.PaymentProof (ProofResult)
@@ -14,8 +14,8 @@ import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.TxAbs (TxAbs)
 import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
 import Crypto.PubKey.Ed25519 qualified as Ed
-import Data.Aeson (KeyValue (..), withObject)
-import Data.Aeson.Types (FromJSON (..), ToJSON (..), object, (.:))
+import Data.Aeson (KeyValue ((.=)), withObject)
+import Data.Aeson.Types (FromJSON (parseJSON), ToJSON (toJSON), object, (.:))
 import Data.ByteArray qualified as BA
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)

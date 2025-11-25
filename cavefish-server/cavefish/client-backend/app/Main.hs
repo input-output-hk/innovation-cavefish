@@ -1,6 +1,6 @@
 module Main (main) where
 
-import ClientBackend.Server (Env (..), mkApp)
+import ClientBackend.Server (Env (Env), mkApp)
 import Network.Wai.Handler.Warp qualified as Warp
 
 main :: IO ()

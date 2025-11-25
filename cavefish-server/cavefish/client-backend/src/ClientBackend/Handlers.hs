@@ -17,13 +17,54 @@ module ClientBackend.Handlers (
 import Cardano.Api qualified as Api
 import Client.Mock (decodeHex, mkFinaliseReq, mkPrepareReq)
 import ClientBackend.App (AppM)
-import ClientBackend.Helpers
-import ClientBackend.Types
+import ClientBackend.Helpers (
+  demoAddresses,
+  demoChangeAddressW,
+  demoFundingAddressW,
+  generateSecret,
+  parseAddress,
+  parseSecretKey,
+ )
+import ClientBackend.Types (
+  CommitHelperPayload (CommitHelperPayload, commitReq, littleR),
+  CommitHelperReq (CommitHelperReq, txId),
+  CommitHelperResp (CommitHelperResp),
+  DemoAddressesResp (DemoAddressesResp),
+  FinaliseHelperReq (FinaliseHelperReq, helperPrepareResp, secretKey),
+  FinaliseHelperResp (FinaliseHelperResp),
+  IntentHelperResp (IntentHelperResp),
+  PayToIntentReq (
+    PayToIntentReq,
+    changeToAddress,
+    payToMaxFee,
+    payToMaxInterval,
+    payToOutputs,
+    spendFromAddress
+  ),
+  PayToOutputReq (PayToOutputReq, address, amount),
+  PrepareHelperReq (PrepareHelperReq, clientId, intent),
+  PrepareHelperResp (PrepareHelperResp),
+  RegisterHelperPayload (RegisterHelperPayload, clientSecret, userPublicKey),
+  RegisterHelperReq (RegisterHelperReq, secretKey),
+  RegisterHelperResp (RegisterHelperResp),
+  SatisfiesReq (SatisfiesReq, changeDelta, intent, txAbs),
+  SatisfiesResp (SatisfiesResp),
+  VerifyReq (VerifyReq, prepared, proofResult, publicKey),
+  VerifyResp (VerifyResp),
+ )
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
-import Core.Api.Messages
-import Core.Cbor (ClientWitnessBundle (..), deserialiseClientWitnessBundle)
-import Core.Intent (ChangeDelta, IntentW (..), satisfies, toInternalIntent)
+import Core.Api.Messages (CommitReq (CommitReq, bigR, txId))
+import Core.Cbor (
+  ClientWitnessBundle (ClientWitnessBundle, cwbAuxNonce, cwbCiphertext, cwbTxId),
+  deserialiseClientWitnessBundle,
+ )
+import Core.Intent (
+  ChangeDelta,
+  IntentW (AndExpsW, ChangeToW, MaxFeeW, MaxIntervalW, PayToW, SpendFromW),
+  satisfies,
+  toInternalIntent,
+ )
 import Core.PaymentProof (ProofResult, hashTxAbs, verifyPaymentProof)
 import Core.Proof (renderHex)
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
@@ -31,7 +72,7 @@ import Core.TxAbs (TxAbs)
 import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Bifunctor (first)
 import Data.ByteArray qualified as BA
-import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
