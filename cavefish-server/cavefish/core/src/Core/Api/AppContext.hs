@@ -1,6 +1,12 @@
 module Core.Api.AppContext where
 
-import Blammo.Logging.Simple (HasLogger (loggerL), Logger)
+import Blammo.Logging.Simple (
+  HasLogger (loggerL),
+  Logger,
+  MonadLogger,
+  MonadLoggerIO,
+  WithLogger (WithLogger),
+ )
 import Cardano.Api qualified as Api
 import Control.Lens (lens)
 import Control.Monad.Error.Class (MonadError)
@@ -60,7 +66,15 @@ instance HasLogger Env where
   loggerL = lens logger (\x y -> x {logger = y})
 
 newtype AppM a = AppM {unAppM :: ReaderT Env Handler a}
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader Env, MonadError ServerError)
+  deriving newtype
+    ( Functor
+    , Applicative
+    , Monad
+    , MonadIO
+    , MonadReader Env
+    , MonadError ServerError
+    )
+  deriving (MonadLogger, MonadLoggerIO) via (WithLogger Env Handler)
 
 runApp :: Env -> AppM a -> Handler a
 runApp env (AppM m) = runReaderT m env
