@@ -253,10 +253,3 @@ payloadBits bs =
       [ if testBit b i then 1 else 0
       | i <- [0 .. 7]
       ]
-
--- Split a list into chunks of at most n elements.
-chunk :: Int -> [a] -> [[a]]
-chunk _ [] = []
-chunk n xs =
-  let (h, t) = splitAt n xs
-   in h : chunk n t

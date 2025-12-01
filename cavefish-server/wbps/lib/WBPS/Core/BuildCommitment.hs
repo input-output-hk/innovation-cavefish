@@ -10,6 +10,7 @@ module WBPS.Core.BuildCommitment (
   runBuildCommitment,
 ) where
 
+import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ask, runReader)
 import Crypto.Hash (SHA256, hash)
@@ -86,6 +87,9 @@ integerToBytes n
       let (q, r) = k `quotRem` 256
        in Just (fromIntegral r, q)
 
+allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM p = fmap and . mapM p
+
 runBuildCommitment ::
   (MonadIO m, MonadReader FileScheme m) =>
   BuildCommitmentParams ->
@@ -118,10 +122,19 @@ runBuildCommitment params BuildCommitmentInput {..} = do
       (MonadIO m, MonadReader FileScheme m) =>
       BuildCommitmentParams ->
       m FileScheme
-    compileAndScheme ps = do
-      compileProc <- compileBuildCommitmentForFileScheme
-      liftIO $ compileProc &!> StdOut
-      ask
+    compileAndScheme _ = do
+      scheme@FileScheme {buildCommitmentWASM, buildCommitmentR1CS} <- ask
+      let requiredArtifacts =
+            [ buildCommitmentWASM
+            , buildCommitmentR1CS
+            ]
+      artifactsPresent <-
+        liftIO $
+          allM doesFileExist requiredArtifacts
+      unless artifactsPresent $ do
+        compileProc <- compileBuildCommitmentForFileScheme
+        liftIO $ compileProc &!> StdOut
+      pure scheme
 
     parseOutputs scheme statementPath params@BuildCommitmentParams {..} = do
       bytes <- BL.readFile (toFilePath statementPath)
