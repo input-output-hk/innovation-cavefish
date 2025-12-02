@@ -18,6 +18,7 @@ import Data.UUID (UUID)
 import GHC.Conc (TVar)
 import GHC.Generics (Generic)
 import WBPS.Core (WbpsPublicKey)
+import WBPS.Core.BuildCommitment (ComId)
 
 data Pending = Pending
   { tx :: Tx ConwayEra
@@ -28,6 +29,9 @@ data Pending = Pending
   , ciphertext :: PkeCiphertext
   , auxNonce :: ByteString
   , rho :: ByteString
+  , message :: ByteString
+  , comId :: ComId
+  , comTx :: [Integer]
   , commitment :: Maybe PublicKey
   , challenge :: Maybe ByteString
   }

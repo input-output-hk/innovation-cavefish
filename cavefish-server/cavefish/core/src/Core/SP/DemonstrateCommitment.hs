@@ -12,7 +12,7 @@ import Control.Concurrent.STM (atomically, modifyTVar', readTVar)
 import Control.Monad (unless)
 import Control.Monad.Except (liftEither)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (MonadReader (ask))
+import Control.Monad.Reader (MonadReader (ask), runReaderT)
 import Core.Api.AppContext (
   AppM,
   Env (
@@ -21,7 +21,8 @@ import Core.Api.AppContext (
     clientRegistration,
     pending,
     pkePublic,
-    ttl
+    ttl,
+    wbpsScheme
   ),
  )
 import Core.Api.State (
@@ -31,9 +32,12 @@ import Core.Api.State (
     auxNonce,
     challenge,
     ciphertext,
+    comId,
+    comTx,
     commitment,
     creator,
     expiry,
+    message,
     mockState,
     rho,
     tx,
@@ -50,7 +54,8 @@ import Core.Intent (
  )
 import Core.PaymentProof (hashTxAbs)
 import Core.Pke (
-  encrypt,
+  CommitmentSeeds (CommitmentSeeds, seedX, seedY),
+  encryptWithSeeds,
   renderError,
  )
 import Core.Proof (parseHex, renderHex)
@@ -65,13 +70,16 @@ import Data.Aeson (
   (.=),
  )
 import Data.Bifunctor (first)
+import Data.Bits (testBit)
 import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.Time.Clock (addUTCTime, getCurrentTime)
+import GHC.Base (when)
 import GHC.Generics (Generic)
 import Servant (
   err403,
@@ -80,6 +88,15 @@ import Servant (
   errBody,
   throwError,
  )
+import WBPS.Core.BuildCommitment (
+  BuildCommitmentInput (BuildCommitmentInput),
+  BuildCommitmentOutput (maskedChunks),
+  ComId (unComId),
+  Commitment (Commitment),
+  computeComId,
+  runBuildCommitment,
+ )
+import WBPS.Core.Primitives.Circom (BuildCommitmentParams (BuildCommitmentParams))
 
 data Inputs = Inputs
   { intent :: IntentW
@@ -109,17 +126,37 @@ data Outputs = Outputs
   , txAbs :: TxAbs Api.ConwayEra
   , -- We need to include a `consumed - produced` here, otherwise the client can't run `satisfies` for `ChangeTo`
     changeDelta :: ChangeDelta
+  , comId :: ByteString
+  , comTx :: [Integer]
   , witnessBundleHex :: Text
   }
   deriving (Eq, Show, Generic)
 
-instance FromJSON Outputs
+instance FromJSON Outputs where
+  parseJSON = withObject "Outputs" $ \o -> do
+    txId <- o .: "txId"
+    txAbs <- o .: "txAbs"
+    changeDelta <- o .: "changeDelta"
+    comIdHex :: Text <- o .: "comId"
+    comId <- parseHex comIdHex
+    comTx <- o .: "comTx"
+    witnessBundleHex <- o .: "witnessBundleHex"
+    pure Outputs {..}
 
-instance ToJSON Outputs
+instance ToJSON Outputs where
+  toJSON Outputs {..} =
+    object
+      [ "txId" .= txId
+      , "txAbs" .= txAbs
+      , "changeDelta" .= changeDelta
+      , "comId" .= renderHex comId
+      , "comTx" .= comTx
+      , "witnessBundleHex" .= witnessBundleHex
+      ]
 
 handle :: Inputs -> AppM Outputs
 handle Inputs {..} = do
-  Env {pending, clientRegistration, ttl, pkePublic, build} <- ask
+  Env {pending, clientRegistration, ttl, pkePublic, build, wbpsScheme} <- ask
   internalIntent <- liftIO $ either (ioError . userError . T.unpack) pure (toInternalIntent intent)
 
   clientKnown <- liftIO . atomically $ do
@@ -145,7 +182,24 @@ handle Inputs {..} = do
       toServerErr msg = err500 {errBody = BL.fromStrict (TE.encodeUtf8 msg)}
       toPkeErr err = err500 {errBody = BL.fromStrict (TE.encodeUtf8 ("pke encryption failed: " <> renderError err))}
   -- The part from the paper: C ← PKE.Enc(ek, m; ρ) with ek = pkePublic, m = serialiseTx tx <> auxNonceBytes
-  ciphertext <- liftEither $ first toPkeErr (encrypt pkePublic payload rhoBytes)
+  (ciphertext, CommitmentSeeds {seedX, seedY}) <-
+    liftEither $ first toPkeErr (encryptWithSeeds pkePublic payload rhoBytes)
+  -- Run the BuildCommitment circuit to derive comTx. comTx is the list of out_masked_chunk values
+  -- (each packed message limb plus its Poseidon-derived mask).
+  -- Parameters cover max payload (16KB tx + 32B nonce): 131,328 bits.
+  -- We use 252-bit limbs to avoid mod-p aliasing and stay aligned with the wbps_cardano verifier circuit.
+  let commitmentParams@(BuildCommitmentParams msgSize _ _) = BuildCommitmentParams 131544 252 522
+      messageBits =
+        take msgSize (payloadBits payload ++ repeat 0)
+  let bcInput =
+        BuildCommitmentInput seedX seedY messageBits
+  comTx <-
+    liftIO $
+      runReaderT
+        (runBuildCommitment commitmentParams bcInput)
+        wbpsScheme
+        >>= either (ioError . userError) (pure . maskedChunks)
+  let comIdVal = computeComId (Commitment comTx)
   witnessBundle <-
     liftEither $ first toServerErr $ mkWitnessBundle tx txAbs observer auxNonceBytes ciphertext
   let witnessBundleHex = renderHex (serialiseClientWitnessBundle witnessBundle)
@@ -160,10 +214,7 @@ handle Inputs {..} = do
       txAbsHash = hashTxAbs txAbs
   now <- liftIO getCurrentTime
   let expiry = addUTCTime ttl now
-  liftIO . atomically $
-    modifyTVar' pending $
-      Map.insert
-        txId
+      pendingEntry =
         Pending
           { tx
           , txAbsHash
@@ -173,14 +224,32 @@ handle Inputs {..} = do
           , ciphertext
           , auxNonce = auxNonceBytes
           , rho = rhoBytes
+          , message = payload
+          , comId = comIdVal
+          , comTx
           , commitment = Nothing
           , challenge = Nothing
           }
+  liftIO . atomically $
+    modifyTVar' pending $
+      Map.insert txId pendingEntry
 
   pure
     Outputs
       { txId = txIdTxt
       , txAbs
       , changeDelta = cd
+      , comId = unComId comIdVal
+      , comTx
       , witnessBundleHex
       }
+
+-- Convert a bytestring to a little-endian bit vector.
+payloadBits :: ByteString -> [Int]
+payloadBits bs =
+  concatMap byteToBits (BS.unpack bs)
+  where
+    byteToBits b =
+      [ if testBit b i then 1 else 0
+      | i <- [0 .. 7]
+      ]

@@ -197,13 +197,13 @@ template CommitmentScalars() {
 //   in_message[message_size]                      : μ_bits
 //   in_commitment_payload[nb_commitment_limbs]  : Cmsg limbs
 // Outputs (debug):
-//   out_message_chunk[nb_commitment_limbs]      : μ̂[i] (254-bit packing)
+//   out_message_chunk[nb_commitment_limbs]      : μ̂[i] (252-bit packing)
 //   out_masked_chunk[nb_commitment_limbs]       : μ̂[i] + PRF[i]
 //   out_delta[nb_commitment_limbs]              : Cmsg[i] − (μ̂[i] + PRF[i])
 //
 // Property (P2):
 //   RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF)
-//   (PRF via PoseidonEx seeded with ek^ρ; μ packed into 254-bit limbs with Bits2Num)
+//   (PRF via PoseidonEx seeded with ek^ρ; μ packed into 252-bit limbs with Bits2Num)
 // ======================================================================
 template RebuildCommitment(message_size, commitment_limb_size, nb_commitment_limbs) {
     signal input  in_seed_x;
@@ -315,7 +315,7 @@ template RebuildChallenge(message_size) {
 //   - P3: RebuildChallenge(R, X, μ) → digest and assert challenge == digest
 // ======================================================================
 template CardanoWBPS(message_size, message_private_part_size, message_private_part_offset) {
-    var commitment_limb_size = 254;
+    var commitment_limb_size = 252;
     assert(message_size % commitment_limb_size == 0);
     var nb_commitment_limbs = message_size \ commitment_limb_size;
 
@@ -393,4 +393,4 @@ component main { public [
     commitment_payload, // Com_tx   
     challenge, // c
     message_public_part // TxAbs
-] } = CardanoWBPS(9*254, 333, 32);
+] } = CardanoWBPS(9*252, 333, 32);

@@ -36,13 +36,10 @@ import Core.Api.State (
   Pending (
     Pending,
     auxNonce,
-    challenge,
     ciphertext,
     commitment,
     creator,
     expiry,
-    mockState,
-    rho,
     tx,
     txAbsHash
   ),
@@ -210,7 +207,7 @@ commitH CommitReq {..} = do
       case mp of
         Nothing ->
           throwError err404 {errBody = "unknown or expired tx"}
-        Just pendingEntry@Pending {..} -> do
+        Just pendingEntry@Pending {expiry, creator, commitment, ciphertext, txAbsHash, tx} -> do
           when (now > expiry) $ do
             removePendingEntry pending wantedTxId
             throwError err410 {errBody = "pending expired"}
@@ -251,7 +248,7 @@ pendingH = do
   pure . PendingResp $ fmap (uncurry mkPendingItem) pendings
   where
     mkPendingItem :: Api.TxId -> Pending -> PendingItem
-    mkPendingItem txId Pending {..} =
+    mkPendingItem txId Pending {creator, txAbsHash, expiry} =
       let ClientId creatorId = creator
        in PendingItem
             { txId = Api.serialiseToRawBytesHexText txId

@@ -58,6 +58,7 @@ library
     WBPS.Adapter.CardanoCryptoClass.Crypto
     WBPS.Adapter.Data
     WBPS.Core
+    WBPS.Core.BuildCommitment
     WBPS.Core.FileScheme
     WBPS.Core.Primitives.Circom
     WBPS.Core.Primitives.Snarkjs
@@ -68,7 +69,10 @@ library
     , base16-bytestring
     , bytestring
     , cardano-crypto-class
+    , cryptonite
+    , filepath
     , hex-text
+    , memory
     , mtl
     , path                  >=0.9.0 && <0.10
     , path-io               >=1.8.0 && <1.9
@@ -76,6 +80,7 @@ library
     , text
     , transformers
     , validation
+    , vector
 
 test-suite wbps-unit-tests
   import:         base, project-config
@@ -88,6 +93,7 @@ test-suite wbps-unit-tests
     , bytestring
     , directory
     , filepath
+    , mtl
     , path
     , path-io
     , tasty

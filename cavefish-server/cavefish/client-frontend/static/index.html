@@ -975,7 +975,7 @@
               elements.lcSig.value = helperPayload.lcSig ?? '';
             }
 
-            const data = await requestService('finalise', '/finalise', finaliseReq);
+            const data = await requestService('finalise', '/askSubmission', finaliseReq);
             state.finaliseResp = data;
             elements.outputs.finalise.textContent = formatJson(
               helperPayload

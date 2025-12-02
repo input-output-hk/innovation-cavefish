@@ -4,11 +4,14 @@ module Core.Pke (
   PkeSecretKey (..),
   PkePublicKey (..),
   PkeCiphertext (..),
+  CommitmentSeeds (..),
   PkeError (..),
   generateKeyPair,
   deriveSecretKey,
   toPublicKey,
   encrypt,
+  encryptWithSeeds,
+  deriveCommitmentSeeds,
   decrypt,
   serialiseCiphertext,
   ciphertextDigest,
@@ -46,6 +49,12 @@ data PkeCiphertext = PkeCiphertext
   }
   deriving (Eq, Show)
 
+data CommitmentSeeds = CommitmentSeeds
+  { seedX :: Integer
+  , seedY :: Integer
+  }
+  deriving (Eq, Show)
+
 data PkeError
   = PkeInvalidSeed
   | PkeCipherInitFailed
@@ -73,11 +82,21 @@ encrypt ::
   ByteString ->
   ByteString ->
   Either PkeError PkeCiphertext
-encrypt (PkePublicKey serverPk) message randomnessSeed = do
+encrypt pk message randomnessSeed =
+  fst <$> encryptWithSeeds pk message randomnessSeed
+
+-- | Encrypt and also derive commitment seeds tied to the same shared secret.
+encryptWithSeeds ::
+  PkePublicKey ->
+  ByteString ->
+  ByteString ->
+  Either PkeError (PkeCiphertext, CommitmentSeeds)
+encryptWithSeeds (PkePublicKey serverPk) message randomnessSeed = do
   (ephemeralSk, nonceBytes) <- deriveEphemeral randomnessSeed
   let sharedSecret = Curve25519.dh serverPk ephemeralSk
       sharedBytes = BA.convert sharedSecret :: ByteString
-      keyMaterial = BA.convert (hash @_ @SHA512 (sharedBytes <> nonceCombined)) :: ByteString
+      seeds = deriveCommitmentSeeds sharedBytes
+      keyMaterial = BA.convert (hash @_ @SHA512 (sharedBytes <> nonceBytes)) :: ByteString
       (keyBytes, rest) = BS.splitAt 32 keyMaterial
       (nonceAdd, _) = BS.splitAt 12 rest
       nonceCombined =
@@ -93,13 +112,14 @@ encrypt (PkePublicKey serverPk) message randomnessSeed = do
   let (cipherBytes, state1) = ChaCha.encrypt message state0
       auth = ChaCha.finalize state1
       ephemeralPk = Curve25519.toPublic ephemeralSk
-  pure
-    PkeCiphertext
-      { ephemeralPublic = BA.convert ephemeralPk
-      , nonce = nonceCombined
-      , payload = cipherBytes
-      , authTag = BA.convert auth
-      }
+      ciphertext =
+        PkeCiphertext
+          { ephemeralPublic = BA.convert ephemeralPk
+          , nonce = nonceCombined
+          , payload = cipherBytes
+          , authTag = BA.convert auth
+          }
+  pure (ciphertext, seeds)
 
 decrypt ::
   PkeSecretKey ->
@@ -137,6 +157,26 @@ deriveEphemeral seed =
    in case Curve25519.secretKey secretSeed of
         CryptoFailed _ -> Left PkeInvalidSeed
         CryptoPassed sk -> Right (sk, nonceBytes)
+
+-- | Reduce arbitrary bytes to two field elements in the BN254 field used by the Circom circuits.
+deriveCommitmentSeeds :: ByteString -> CommitmentSeeds
+deriveCommitmentSeeds sharedBytes =
+  let digest = BA.convert (hash @_ @SHA512 sharedBytes) :: ByteString
+      (sxBytes, syBytes) = BS.splitAt 32 digest
+   in CommitmentSeeds
+        { seedX = toFieldElement sxBytes
+        , seedY = toFieldElement syBytes
+        }
+  where
+    -- BN254 scalar field prime: 21888242871839275222246405745257275088548364400416034343698204186575808495617
+    bn254Prime :: Integer
+    bn254Prime = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+    toFieldElement :: ByteString -> Integer
+    toFieldElement bs = bsToInteger bs `mod` bn254Prime
+
+    bsToInteger :: ByteString -> Integer
+    bsToInteger = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
 
 serialiseCiphertext :: PkeCiphertext -> ByteString
 serialiseCiphertext PkeCiphertext {ephemeralPublic, nonce, payload, authTag} =

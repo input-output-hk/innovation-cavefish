@@ -97,6 +97,10 @@ jobs:
           circom --version
           snarkjs -v || true
 
+      - name: Circomlib
+        working-directory: ./wbps
+        run: make deps-circomlib
+
       - name: Install Haskell
         id: install-haskell
         uses: input-output-hk/actions/haskell@latest

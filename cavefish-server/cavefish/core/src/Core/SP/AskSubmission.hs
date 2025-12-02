@@ -85,33 +85,34 @@ handle Inputs {..} = do
       case mp of
         Nothing ->
           pure $ Outputs txId now (Rejected "unknown or expired tx")
-        Just pendingEntry@Pending {..}
-          | now > expiry -> do
-              removePendingEntry pending wantedTxId
-              pure $ Outputs txId now (Rejected "pending expired")
-          | otherwise -> do
-              unless
-                (isJust commitment)
-                (throwError err410 {errBody = "commitment must be made before submission"})
-              _payload <- either throwError pure (decryptPendingPayload env pendingEntry)
-              mClient <- lookupClientRegistration clientRegistration creator
-              case mClient of
-                Nothing ->
-                  pure $ Outputs txId now (Rejected "unknown client")
-                Just ClientRegistration {userPublicKey} ->
-                  if verifyClientSignature userPublicKey txAbsHash lcSig
-                    then do
-                      res <- liftIO (submit tx mockState)
-                      case res of
-                        Left reason ->
-                          pure $ Outputs txId now (Rejected reason)
-                        Right _ -> do
-                          let completed = Completed {tx, submittedAt = now, creator}
-                          liftIO . atomically $ do
-                            modifyTVar' pending (Map.delete wantedTxId)
-                            modifyTVar' complete (Map.insert wantedTxId completed)
-                          pure $ Outputs txId now Finalised
-                    else pure $ Outputs txId now (Rejected "invalid client signature")
+        Just
+          pendingEntry@Pending {commitment, expiry, creator, ciphertext, auxNonce, rho, tx, txAbsHash, mockState}
+            | now > expiry -> do
+                removePendingEntry pending wantedTxId
+                pure $ Outputs txId now (Rejected "pending expired")
+            | otherwise -> do
+                unless
+                  (isJust commitment)
+                  (throwError err410 {errBody = "commitment must be made before submission"})
+                _payload <- either throwError pure (decryptPendingPayload env pendingEntry)
+                mClient <- lookupClientRegistration clientRegistration creator
+                case mClient of
+                  Nothing ->
+                    pure $ Outputs txId now (Rejected "unknown client")
+                  Just ClientRegistration {userPublicKey} ->
+                    if verifyClientSignature userPublicKey txAbsHash lcSig
+                      then do
+                        res <- liftIO (submit tx mockState)
+                        case res of
+                          Left reason ->
+                            pure $ Outputs txId now (Rejected reason)
+                          Right _ -> do
+                            let completed = Completed {tx, submittedAt = now, creator}
+                            liftIO . atomically $ do
+                              modifyTVar' pending (Map.delete wantedTxId)
+                              modifyTVar' complete (Map.insert wantedTxId completed)
+                            pure $ Outputs txId now Finalised
+                      else pure $ Outputs txId now (Rejected "invalid client signature")
 
 data Inputs = Inputs
   { txId :: Text
