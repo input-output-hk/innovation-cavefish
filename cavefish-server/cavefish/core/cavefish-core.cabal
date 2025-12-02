@@ -66,6 +66,7 @@ library
     Core.Api.Config
     Core.Api.Messages
     Core.Api.State
+    Core.Cardano.MonadBlockchain
     Core.Cbor
     Core.Intent
     Core.Observers.Observer
@@ -87,6 +88,8 @@ library
     , cardano-crypto-class
     , cardano-ledger-alonzo
     , cardano-ledger-core
+    , cardano-ledger-shelley
+    , cardano-slotting
     , cborg
     , containers
     , cooked-validators
@@ -95,6 +98,8 @@ library
     , lens
     , memory
     , mtl
+    , ouroboros-consensus
+    , ouroboros-network-protocols
     , plutus-core
     , plutus-ledger
     , plutus-ledger-api
@@ -106,6 +111,7 @@ library
     , text
     , time
     , toml-parser
+    , transformers
     , uuid
     , wbps
 
