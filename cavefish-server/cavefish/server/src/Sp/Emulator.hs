@@ -19,43 +19,26 @@ import Control.Monad.Identity (runIdentity)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.State.Strict (runStateT)
 import Control.Monad.Trans.Writer (WriterT (runWriterT))
-import Cooked (MockChain, MockChainError, MockChainT (unMockChain), Wallet)
+import Cooked (MockChain, MockChainError, MockChainT (unMockChain))
 import Cooked.MockChain (registerStakingCred)
 import Cooked.MockChain.MockChainState (
   MockChainState,
   mockChainState0,
  )
 import Core.Api.AppContext (
-  Env (
-    Env,
-    build,
-    clientRegistration,
-    complete,
-    pending,
-    pkePublic,
-    pkeSecret,
-    resolveWallet,
-    spFee,
-    spSk,
-    spWallet,
-    submit,
-    ttl,
-    wbpsScheme
-  ),
+  Env (..),
   defaultWalletResolver,
  )
 import Core.Api.Config qualified as Cfg
-import Core.Api.State (ClientRegistrationStore, CompleteStore, PendingStore)
+import Core.Api.State (CompleteStore, PendingStore)
 import Core.Intent (
   BuildTxResult (BuildTxResult, changeDelta, mockState, tx, txAbs),
   ChangeDelta,
   Intent,
  )
 import Core.Observers.Observer (stakeValidatorFromBytes)
-import Core.Pke (PkeSecretKey, toPublicKey)
 import Core.TxAbs (TxAbs (outputs), cardanoTxToTxAbs)
 import Core.TxBuilder (buildTx)
-import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.ByteString (ByteString)
 import Data.Default (def)
 import Data.Foldable (traverse_)
@@ -78,9 +61,6 @@ mkCookedEnv ::
   TVar MockChainState ->
   PendingStore ->
   CompleteStore ->
-  SecretKey ->
-  PkeSecretKey ->
-  Wallet ->
   FileScheme ->
   Cfg.Config ->
   Env
@@ -88,27 +68,17 @@ mkCookedEnv
   mockState
   pendingStore
   completeStore
-  clientRegStore
-  spSk
-  pkeSk
-  spWallet
   wbpsSchemeValue
   config =
     env
     where
-      pkePk = toPublicKey pkeSk
       env =
         Env
-          { spSk
-          , pending = pendingStore
+          { pending = pendingStore
           , complete = completeStore
-          , clientRegistration = clientRegStore
           , ttl = fromInteger $ Cfg.seconds $ Cfg.transactionExpiry config
-          , spWallet
           , resolveWallet = defaultWalletResolver
           , spFee = Cfg.amount (Cfg.serviceProviderFee config)
-          , pkeSecret = pkeSk
-          , pkePublic = pkePk
           , wbpsScheme = wbpsSchemeValue
           , build = buildWithCooked mockState env
           , submit = submitWithCooked mockState env

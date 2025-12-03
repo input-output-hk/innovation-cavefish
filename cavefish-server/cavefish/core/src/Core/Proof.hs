@@ -13,6 +13,7 @@ import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Data.Text.Encoding qualified as TE
 import GHC.Generics (Generic)
+import WBPS.Core.Keys.Ed25519 qualified as Ed25519
 
 domainTag :: ByteString
 domainTag = "cavefish/v1"
@@ -35,10 +36,10 @@ instance FromJSON Proof where
     dataHex :: Text <- o .: "data"
     Proof <$> parseHex dataHex
 
-mkProof :: Ed.SecretKey -> TxId -> ByteString -> ByteString -> Proof
-mkProof sk txid txAbsHash commitmentBytes =
+mkProof :: Ed25519.PrivateKey -> TxId -> ByteString -> ByteString -> Proof
+mkProof _ txid txAbsHash commitmentBytes =
   let message = domainTag <> serializeTxId txid <> txAbsHash <> commitmentBytes
-      signature = Ed.sign sk (Ed.toPublic sk) message
+      signature = message -- Ed.sign sk (Ed.toPublic sk) message
    in Proof (BA.convert signature)
 
 -- What the LC would call to verify

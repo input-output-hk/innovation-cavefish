@@ -72,7 +72,6 @@ library
     , cavefish-core
     , clock
     , cooked-validators
-    , crypton
     , data-default
     , http-types
     , mtl
@@ -93,14 +92,13 @@ library
 executable cavefish-server
   import:         base, project-config
   hs-source-dirs: app
-  data-file:      config/config.toml
+  data-files:     config/config.toml
   main-is:        Main.hs
   build-depends:
     , bytestring
     , cavefish-core
     , cavefish-server
     , cooked-validators
-    , crypton
     , stm
     , warp
     , wbps

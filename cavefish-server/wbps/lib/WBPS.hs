@@ -1,6 +1,5 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module WBPS (
   register,
@@ -137,7 +136,7 @@ register' ::
 register' account = do
   FileScheme {..} <- ask
   ensureDir account
-  ElGamal.generateKeypair >>= writeTo (account </> encryptionKeys)
+  ElGamal.generateKeyPair >>= writeTo (account </> encryptionKeys)
   generateProvingKeyProcess <- getGenerateProvingKeyProcess account
   generateVerificationKeyProcess <- getGenerateVerificationKeyProcess account
   shellLogsFilepath <- getShellLogsFilepath account

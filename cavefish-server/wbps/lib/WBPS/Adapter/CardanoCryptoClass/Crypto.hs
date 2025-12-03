@@ -13,6 +13,7 @@ module WBPS.Adapter.CardanoCryptoClass.Crypto (
   Codec (..),
   sign,
   generateKeyPair,
+  generateKeyPairOverMonadRandom,
   Ed25519DSIGN,
   DSIGNAlgorithm (..),
   ToByteString (..),
@@ -23,24 +24,48 @@ module WBPS.Adapter.CardanoCryptoClass.Crypto (
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.Hash (ByteString)
 import Cardano.Crypto.Seed (mkSeedFromBytes)
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Crypto.Error (CryptoFailable (..))
+import Crypto.PubKey.Ed25519 qualified as E
 import Crypto.Random
 import Data.Aeson as A hiding (decode, decode', encode)
+import Data.ByteArray qualified as BA
 import Data.ByteString qualified as BS
 import Data.Coerce (coerce)
 import Data.Data (Proxy (..))
 import Data.List qualified as T
+import Data.Maybe (fromMaybe)
 import Data.String
 import Data.Text as Text hiding (drop)
 import GHC.Generics
 import GHC.Stack (HasCallStack)
 import Text.Hex (decodeHex, encodeHex)
 
+generateKeyPair :: forall a m. (DSIGNAlgorithm a, MonadIO m) => m (KeyPair a)
+generateKeyPair = liftIO $ do
+  -- How many bytes of entropy does Ed25519DSIGN expect?
+  let n :: Int
+      n = fromIntegral (seedSizeDSIGN (Proxy :: Proxy a))
+
+  -- Draw n random bytes as seed
+  seedBytes :: ByteString <- getRandomBytes n
+
+  -- Turn them into a Seed and derive signing/verifying keys
+  let seed = mkSeedFromBytes seedBytes
+      sk = genKeyDSIGN @a seed
+      vk = deriveVerKeyDSIGN sk
+  pure
+    KeyPair
+      { signatureKey = PrivateKey sk
+      , verificationKey = PublicKey vk
+      }
+
 -- | Generate a fresh DSIGN keypair (e.g. Ed25519DSIGN).
-generateKeyPair ::
+generateKeyPairOverMonadRandom ::
   forall a m.
   (DSIGNAlgorithm a, MonadRandom m) =>
   m (KeyPair a)
-generateKeyPair = do
+generateKeyPairOverMonadRandom = do
   -- Determine how many bytes of entropy are needed for this DSIGN algorithm
   let nBytes :: Int
       nBytes = fromIntegral (seedSizeDSIGN (Proxy @a))
@@ -80,7 +105,7 @@ instance DSIGNAlgorithm a => FromByteString (PrivateKey a) where
     PrivateKey
       . ( \case
             Just rawPrivateKey -> rawPrivateKey
-            Nothing -> error "Failed to decode signature key from Hexadecimal format"
+            Nothing -> error "Failed to decode Private key from Hexadecimal format"
         )
       . rawDeserialiseSignKeyDSIGN @a
 
@@ -97,16 +122,38 @@ instance FromByteString Hexadecimal where
   fromByteString = Hexadecimal
 
 instance DSIGNAlgorithm a => FromJSON (PublicKey a) where
-  parseJSON (A.String s) = pure . fromString @(PublicKey a) . removeOx . Text.unpack $ s
+  parseJSON (A.String s) =
+    pure . fromString @(PublicKey a) . Text.unpack . dropOx $ s
     where
-      removeOx = T.drop 2
+      dropOx t =
+        case Text.stripPrefix "0x" t of
+          Just withoutPrefix -> withoutPrefix
+          Nothing -> fromMaybe t (stripPrefix "0X" t)
   parseJSON _ = fail "Expected a string"
 
+instance DSIGNAlgorithm a => ToJSON (PublicKey a) where
+  toJSON =
+    A.String
+      . encode @Hexadecimal
+      . fromByteString @Hexadecimal
+      . toByteString @(PublicKey a)
+
 instance DSIGNAlgorithm a => FromJSON (PrivateKey a) where
-  parseJSON (A.String s) = pure . fromString @(PrivateKey a) . removeOx . Text.unpack $ s
+  parseJSON (A.String s) =
+    pure . fromString @(PrivateKey a) . Text.unpack . dropOx $ s
     where
-      removeOx = T.drop 2
+      dropOx t =
+        case Text.stripPrefix "0x" t of
+          Just withoutPrefix -> withoutPrefix
+          Nothing -> fromMaybe t (stripPrefix "0X" t)
   parseJSON _ = fail "Expected a string"
+
+instance DSIGNAlgorithm a => ToJSON (PrivateKey a) where
+  toJSON =
+    A.String
+      . encode @Hexadecimal
+      . fromByteString @Hexadecimal
+      . toByteString @(PrivateKey a)
 
 instance DSIGNAlgorithm a => FromJSON (KeyPair a) where
   parseJSON (Object v) =
@@ -114,6 +161,13 @@ instance DSIGNAlgorithm a => FromJSON (KeyPair a) where
       <$> v .: "secretSeed"
       <*> v .: "publicKey"
   parseJSON _ = fail "Expected an object"
+
+instance DSIGNAlgorithm a => ToJSON (KeyPair a) where
+  toJSON (KeyPair {signatureKey = sk, verificationKey = vk}) =
+    A.object
+      [ "secretSeed" .= sk
+      , "publicKey" .= vk
+      ]
 
 sign ::
   forall v.
@@ -176,7 +230,7 @@ instance DSIGNAlgorithm a => IsString (PublicKey a) where
   fromString =
     ( \case
         Just publicKey -> PublicKey publicKey
-        Nothing -> error "Failed to decode signature key from Hexadecimal format"
+        Nothing -> error "Failed to decode Public key from Hexadecimal format"
     )
       . rawDeserialiseVerKeyDSIGN @a
       . ( \case

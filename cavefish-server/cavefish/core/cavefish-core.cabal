@@ -76,6 +76,8 @@ library
     Core.Proof
     Core.SP.AskSubmission
     Core.SP.DemonstrateCommitment
+    Core.SP.FetchAccount
+    Core.SP.FetchAccounts
     Core.SP.Register
     Core.TxAbs
     Core.TxBuilder
@@ -90,14 +92,12 @@ library
     , cardano-ledger-alonzo
     , cardano-ledger-core
     , cborg
-    , clock
     , containers
     , contra-tracer
     , cooked-validators
     , crypton
     , data-default
     , exceptions
-    , lens
     , memory
     , monad-time
     , mtl
@@ -113,7 +113,6 @@ library
     , text
     , time
     , toml-parser
-    , uuid
     , wbps
 
   if flag(ide-stub)

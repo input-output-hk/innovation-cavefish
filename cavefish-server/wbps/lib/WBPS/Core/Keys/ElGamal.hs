@@ -6,7 +6,7 @@ module WBPS.Core.Keys.ElGamal (
   KeyPair (..),
   EncryptionKey (..),
   DecryptionKey (..),
-  generateKeypair,
+  generateKeyPair,
 ) where
 
 import Cardano.Crypto.DSIGN (Ed25519DSIGN, seedSizeDSIGN)
@@ -81,8 +81,8 @@ instance FromJSON KeyPair where
 --   * feed them to Crypto.PubKey.Ed25519.secretKey
 --   * derive the public key with toPublic
 --   * store both as raw bytes, hex-encoded in JSON via HexBytes
-generateKeypair :: forall m. MonadIO m => m KeyPair
-generateKeypair = liftIO $ do
+generateKeyPair :: forall m. MonadIO m => m KeyPair
+generateKeyPair = liftIO $ do
   -- How many bytes of entropy does Ed25519DSIGN expect?
   let n :: Int
       n = fromIntegral (seedSizeDSIGN (Proxy :: Proxy Ed25519DSIGN))

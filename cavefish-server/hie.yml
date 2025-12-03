@@ -9,12 +9,6 @@ cradle:
     - path: "cavefish/client/test"
       component: "cavefish-client:test:test"
 
-    - path: "cavefish/client-backend/src"
-      component: "lib:cavefish-client-backend"
-
-    - path: "cavefish/client-backend/app/Main.hs"
-      component: "cavefish-client-backend:exe:cavefish-client-backend"
-
     - path: "cavefish/core/src"
       component: "lib:cavefish-core"
 

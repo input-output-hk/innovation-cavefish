@@ -8,25 +8,16 @@
 module Core.SP.DemonstrateCommitment (handle, Inputs (..), Outputs (..)) where
 
 import Cardano.Api qualified as Api
-import Control.Concurrent.STM (atomically, modifyTVar', readTVar)
+import Control.Concurrent.STM (atomically, modifyTVar')
 import Control.Monad (unless)
 import Control.Monad.Except (liftEither)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (ask), runReaderT)
 import Core.Api.AppContext (
   AppM,
-  Env (
-    Env,
-    build,
-    clientRegistration,
-    pending,
-    pkePublic,
-    ttl,
-    wbpsScheme
-  ),
+  Env (..),
  )
 import Core.Api.State (
-  ClientId,
   Pending (
     Pending,
     auxNonce,
@@ -58,6 +49,7 @@ import Core.Pke (
   encryptWithSeeds,
   renderError,
  )
+import Core.Pke qualified as ElGamal
 import Core.Proof (parseHex, renderHex)
 import Core.TxAbs (TxAbs)
 import Crypto.Random (getRandomBytes)
@@ -79,10 +71,8 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.Time.Clock (addUTCTime, getCurrentTime)
-import GHC.Base (when)
 import GHC.Generics (Generic)
 import Servant (
-  err403,
   err422,
   err500,
   errBody,
@@ -96,12 +86,13 @@ import WBPS.Core.BuildCommitment (
   computeComId,
   runBuildCommitment,
  )
+import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Primitives.Circom (BuildCommitmentParams (BuildCommitmentParams))
 
 data Inputs = Inputs
   { intent :: IntentW
   , observer :: Maybe ByteString
-  , clientId :: ClientId
+  , clientId :: UserWalletPublicKey
   }
   deriving (Eq, Show, Generic)
 
@@ -156,7 +147,7 @@ instance ToJSON Outputs where
 
 handle :: Inputs -> AppM Outputs
 handle Inputs {..} = do
-  Env {pending, clientRegistration, ttl, pkePublic, build, wbpsScheme} <- ask
+  Env {pending, ttl, build, wbpsScheme} <- ask
   internalIntent <- liftIO $ either (ioError . userError . T.unpack) pure (toInternalIntent intent)
 
   -- clientKnown <- liftIO . atomically $ do
@@ -172,6 +163,7 @@ handle Inputs {..} = do
   -- when (observer /= expectedObserverBytes) $
   --   throwError err422{errBody = "observer script does not match intent"}
 
+  (ek, dk) <- liftIO ElGamal.generateKeyPair -- N.H to fix
   BuildTxResult {tx = tx, txAbs = txAbs, mockState = builtState, changeDelta = cd} <-
     liftIO $ build internalIntent observer
 
@@ -183,7 +175,7 @@ handle Inputs {..} = do
       toPkeErr err = err500 {errBody = BL.fromStrict (TE.encodeUtf8 ("pke encryption failed: " <> renderError err))}
   -- The part from the paper: C ← PKE.Enc(ek, m; ρ) with ek = pkePublic, m = serialiseTx tx <> auxNonceBytes
   (ciphertext, CommitmentSeeds {seedX, seedY}) <-
-    liftEither $ first toPkeErr (encryptWithSeeds pkePublic payload rhoBytes)
+    liftEither $ first toPkeErr (encryptWithSeeds ek payload rhoBytes)
   -- Run the BuildCommitment circuit to derive comTx. comTx is the list of out_masked_chunk values
   -- (each packed message limb plus its Poseidon-derived mask).
   -- Parameters cover max payload (16KB tx + 32B nonce): 131,328 bits.

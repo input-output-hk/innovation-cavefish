@@ -8,18 +8,17 @@
 --  for testing purposes and simulates client-server interactions.
 module Client.Mock (
   RunServer,
-  UnregisteredMockClient (..),
-  MockClient (..),
+  Provisionned (..),
+  Registered (..),
   initMockClient,
   mkDemonstrateCommitmentInputs,
-  mkPrepareReq,
   mkAskSubmissionInputs,
   mkFinaliseReq,
   verifyCommitProof,
   registerClient,
   register,
-  getClients,
-  getClientsWithClient,
+  fetchAccounts,
+  fetchAccountsWithClient,
   getPending,
   getPendingWithClient,
   demonstrateCommitment,
@@ -39,16 +38,13 @@ import Control.Monad (when)
 import Control.Monad.Error.Class (throwError)
 import Core.Api.AppContext (AppM)
 import Core.Api.Messages (
-  Accounts,
   CommitReq (CommitReq, bigR, txId),
   CommitResp (CommitResp, pi),
   PendingResp,
   clientSignatureMessage,
-  clientsH,
   commitH,
   pendingH,
  )
-import Core.Api.State (ClientId)
 import Core.Cbor (
   ClientWitnessBundle (ClientWitnessBundle, cwbAuxNonce, cwbCiphertext, cwbTxId),
   deserialiseClientWitnessBundle,
@@ -58,8 +54,8 @@ import Core.Observers.Observer (intentStakeValidatorBytes)
 import Core.PaymentProof (hashTxAbs, verifyPaymentProof)
 import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
+import Core.SP.FetchAccounts qualified as FetchAccounts
 import Core.SP.Register qualified as Register
-import Crypto.PubKey.Ed25519 qualified as Ed
 import Data.Aeson (Value)
 import Data.Bifunctor (first)
 import Data.ByteArray qualified as BA
@@ -70,51 +66,51 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as TE
 import Servant (Handler, ServerError, err422, errBody)
+import WBPS.Core.Keys.Ed25519 as Ed25519 (
+  KeyPair,
+  UserWalletPublicKey,
+  publicKey,
+  userWalletPK,
+ )
+import WBPS.Core.Keys.ElGamal qualified as ElGamal
 
 type RunServer = forall a. AppM a -> Handler a
 
-data UnregisteredMockClient = UnregisteredMockClient
-  { umcRun :: RunServer
-  , umcLcSk :: Ed.SecretKey
+data Provisionned = Provisionned
+  { server :: RunServer
+  , cardanoWalletKeyPair :: Ed25519.KeyPair
   }
 
-data MockClient = MockClient
-  { mcRun :: RunServer
-  , mcLcSk :: Ed.SecretKey
-  , mcSpPk :: Ed.PublicKey
-  , mcClientId :: ClientId
-  , mcVerificationContext :: Value
+data Registered = Registered
+  { provisionned :: Provisionned
+  , verificationContext :: Value
+  , encryptionKey :: ElGamal.EncryptionKey
   }
 
-initMockClient :: RunServer -> Ed.SecretKey -> UnregisteredMockClient
-initMockClient run lcSk =
-  UnregisteredMockClient
-    { umcRun = run
-    , umcLcSk = lcSk
-    }
+initMockClient :: RunServer -> Ed25519.KeyPair -> Provisionned
+initMockClient server cardanoWalletKeyPair = Provisionned {..}
 
 -- | Create a PrepareReq from the given client ID and intent.
-mkDemonstrateCommitmentInputs :: ClientId -> IntentW -> Either Text DemonstrateCommitment.Inputs
+mkDemonstrateCommitmentInputs ::
+  UserWalletPublicKey -> IntentW -> Either Text DemonstrateCommitment.Inputs
 mkDemonstrateCommitmentInputs clientId intentW = do
   internalIntent <- toInternalIntent intentW
   observerBytes <- intentStakeValidatorBytes internalIntent
   pure DemonstrateCommitment.Inputs {intent = intentW, observer = Just observerBytes, clientId}
 
-mkPrepareReq :: ClientId -> IntentW -> Either Text DemonstrateCommitment.Inputs
-mkPrepareReq = mkDemonstrateCommitmentInputs
-
 -- | Create a FinaliseReq from the given secret key, transaction ID, and transaction abstract hash.
-mkAskSubmissionInputs :: Ed.SecretKey -> Text -> ByteString -> AskSubmission.Inputs
-mkAskSubmissionInputs secretKey txId txAbsHash =
+mkAskSubmissionInputs :: Ed25519.KeyPair -> Text -> ByteString -> AskSubmission.Inputs
+mkAskSubmissionInputs _ txId txAbsHash =
   let message = clientSignatureMessage txAbsHash
-      signature = Ed.sign secretKey (Ed.toPublic secretKey) message
+      signature = message -- Ed.sign secretKey (Ed.toPublic secretKey) message
    in AskSubmission.Inputs {txId = txId, lcSig = BA.convert signature}
 
-mkFinaliseReq :: Ed.SecretKey -> Text -> ByteString -> AskSubmission.Inputs
+mkFinaliseReq :: Ed25519.KeyPair -> Text -> ByteString -> AskSubmission.Inputs
 mkFinaliseReq = mkAskSubmissionInputs
 
-verifyCommitProof :: Ed.PublicKey -> DemonstrateCommitment.Outputs -> CommitResp -> Either Text ()
-verifyCommitProof publicKey DemonstrateCommitment.Outputs {txId = txIdText, txAbs, witnessBundleHex} CommitResp {pi = piGiven} = do
+verifyCommitProof ::
+  Ed25519.KeyPair -> DemonstrateCommitment.Outputs -> CommitResp -> Either Text ()
+verifyCommitProof keypair DemonstrateCommitment.Outputs {txId = txIdText, txAbs, witnessBundleHex} CommitResp {pi = piGiven} = do
   witnessBytes <- decodeHex "witness bundle" witnessBundleHex
   ClientWitnessBundle {cwbCiphertext = ciphertext, cwbAuxNonce = auxNonceBytes, cwbTxId = bundleTxId} <-
     first (const "failed to decode witness bundle") (deserialiseClientWitnessBundle witnessBytes)
@@ -124,72 +120,72 @@ verifyCommitProof publicKey DemonstrateCommitment.Outputs {txId = txIdText, txAb
       Right v -> Right v
   let expectedTxIdBytes = Api.serialiseToRawBytes txId
   when (bundleTxId /= expectedTxIdBytes) $ Left "witness bundle tx id mismatch"
-  verifyPaymentProof publicKey piGiven txAbs txId ciphertext auxNonceBytes
+  verifyPaymentProof (Ed25519.publicKey keypair) piGiven txAbs txId ciphertext auxNonceBytes
 
 -- | Register the client with the server.
 registerClient :: RunServer -> Register.Inputs -> Handler Register.Outputs
 registerClient runServer inputs = runServer $ Register.handle inputs
 
 -- | Register the mock client with the server.
-register :: UnregisteredMockClient -> Handler MockClient
-register UnregisteredMockClient {..} = do
-  registerResp@Register.Outputs {ek, publicVerificationContext} <-
+register :: Provisionned -> Handler Registered
+register provisionned@Provisionned {..} = do
+  Register.Outputs {ek, publicVerificationContext} <-
     registerClient
-      umcRun
+      server
       Register.Inputs
-      -- userWalletPublicKey = UserWalletPublicKey . PublicKey $ Ed.toPublic umcLcSk
-        {
+        { userWalletPublicKey = userWalletPK cardanoWalletKeyPair
         }
   pure
-    MockClient
-      { mcRun = umcRun
-      , mcLcSk = umcLcSk
-      -- , mcSpPk = ek
-      -- , mcClientId = ClientId uuid
-      -- , mcVerificationContext = registerResp.verificationContext
+    Registered
+      { provisionned = provisionned
+      , verificationContext = publicVerificationContext
+      , encryptionKey = ek
       }
 
 -- | List clients from the server.
-getClients :: RunServer -> Handler Accounts
-getClients run = run clientsH
+fetchAccounts :: RunServer -> Handler FetchAccounts.Outputs
+fetchAccounts run = run FetchAccounts.handle
 
 -- | List clients using the given mock client.
-getClientsWithClient :: MockClient -> Handler Accounts
-getClientsWithClient mockClient = getClients (mcRun mockClient)
+fetchAccountsWithClient :: Registered -> Handler FetchAccounts.Outputs
+fetchAccountsWithClient Registered {provisionned = Provisionned {..}} =
+  fetchAccounts server
 
 -- | List pending transactions from the server.
 getPending :: RunServer -> Handler PendingResp
 getPending run = run pendingH
 
 -- | List pending transactions using the given mock client.
-getPendingWithClient :: MockClient -> Handler PendingResp
-getPendingWithClient mockClient = getPending (mcRun mockClient)
+getPendingWithClient :: Registered -> Handler PendingResp
+getPendingWithClient Registered {provisionned = Provisionned {..}} =
+  getPending server
 
 -- | Prepare an intent with the server.
-demonstrateCommitment :: RunServer -> ClientId -> IntentW -> Handler DemonstrateCommitment.Outputs
+demonstrateCommitment ::
+  RunServer -> UserWalletPublicKey -> IntentW -> Handler DemonstrateCommitment.Outputs
 demonstrateCommitment run clientId intentW =
   case mkDemonstrateCommitmentInputs clientId intentW of
     Left err -> throwError (as422 err)
     Right req -> run (DemonstrateCommitment.handle req)
 
 -- | Prepare an intent using the given mock client.
-demonstrateCommitmentWithClient :: MockClient -> IntentW -> Handler DemonstrateCommitment.Outputs
-demonstrateCommitmentWithClient mockClient intentW = do
-  demonstrateCommitment (mcRun mockClient) mockClient.mcClientId intentW
+demonstrateCommitmentWithClient :: Registered -> IntentW -> Handler DemonstrateCommitment.Outputs
+demonstrateCommitmentWithClient Registered {provisionned = Provisionned {..}} intentW = do
+  demonstrateCommitment server (userWalletPK cardanoWalletKeyPair) intentW
 
 -- | Submit a commit message (big R) for the given transaction.
-runCommit :: RunServer -> Text -> Ed.PublicKey -> Handler CommitResp
-runCommit run txId bigR = run (commitH CommitReq {txId, bigR})
+runCommit :: RunServer -> Text -> Ed25519.KeyPair -> Handler CommitResp
+runCommit run txId keyPair = run (commitH CommitReq {txId, bigR = Ed25519.publicKey keyPair})
 
 -- | Prepare an intent and verify the proof using the given mock client.
 demonstrateCommitmentWithClientAndVerifyWithClient ::
-  MockClient -> IntentW -> Handler DemonstrateCommitment.Outputs
+  Registered -> IntentW -> Handler DemonstrateCommitment.Outputs
 demonstrateCommitmentWithClientAndVerifyWithClient mockClient intentW = do
   demonstrateCommitmentWithClient mockClient intentW
 
 -- | Finalise a prepared transaction with the server.
 askSubmission ::
-  RunServer -> Ed.SecretKey -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
+  RunServer -> Ed25519.KeyPair -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
 askSubmission run secretKey DemonstrateCommitment.Outputs {txId, txAbs} =
   let txAbsHash = hashTxAbs txAbs
       req = mkAskSubmissionInputs secretKey txId txAbsHash
@@ -197,13 +193,13 @@ askSubmission run secretKey DemonstrateCommitment.Outputs {txId, txAbs} =
 
 -- | Finalise a prepared transaction using the given mock client.
 askSubmissionWithClient ::
-  MockClient -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
-askSubmissionWithClient mockClient = askSubmission (mcRun mockClient) (mcLcSk mockClient)
+  Registered -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
+askSubmissionWithClient Registered {provisionned = Provisionned {..}} = askSubmission server cardanoWalletKeyPair
 
 -- | Verify that the prepared transaction proof is valid with the given client.
 verifyCommitProofWithClient ::
-  MockClient -> DemonstrateCommitment.Outputs -> CommitResp -> Either Text ()
-verifyCommitProofWithClient mockClient = verifyCommitProof (mcSpPk mockClient)
+  Registered -> DemonstrateCommitment.Outputs -> CommitResp -> Either Text ()
+verifyCommitProofWithClient Registered {provisionned = Provisionned {..}} = verifyCommitProof cardanoWalletKeyPair
 
 -- | Verify that the prepared transaction satisfies the intent.
 verifySatisfies :: IntentW -> DemonstrateCommitment.Outputs -> Either Text Bool

@@ -8,8 +8,6 @@ import Cooked (MockChainState)
 import Cooked.Wallet (Wallet, knownWallets)
 import Core.Api.State (CompleteStore, PendingStore)
 import Core.Intent (BuildTxResult, Intent)
-import Core.Pke (PkePublicKey, PkeSecretKey)
-import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.ByteString (ByteString)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
@@ -21,15 +19,11 @@ import Servant.Server.Internal.ServerError (ServerError)
 import WBPS.Core.FileScheme (FileScheme)
 
 data Env = Env
-  { spSk :: SecretKey
-  , pending :: PendingStore
+  { pending :: PendingStore
   , complete :: CompleteStore
   , ttl :: NominalDiffTime
-  , spWallet :: Wallet
   , resolveWallet :: Api.AddressInEra Api.ConwayEra -> Maybe Wallet
   , spFee :: Integer
-  , pkeSecret :: PkeSecretKey
-  , pkePublic :: PkePublicKey
   , wbpsScheme :: FileScheme
   , build ::
       Intent ->

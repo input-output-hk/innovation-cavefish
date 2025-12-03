@@ -1,9 +1,8 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Core.SP.Register (
   handle,
@@ -14,14 +13,7 @@ module Core.SP.Register (
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (ask))
 import Core.Api.AppContext (AppM, Env (Env, wbpsScheme))
-import Data.Aeson (
-  FromJSON (parseJSON),
-  KeyValue ((.=)),
-  ToJSON (toJSON),
-  object,
-  withObject,
-  (.:),
- )
+import Data.Aeson (FromJSON, ToJSON, Value)
 import Data.ByteString.Lazy.Char8 qualified as BL8
 import GHC.Generics (Generic)
 import Servant (
@@ -34,9 +26,7 @@ import WBPS (
   AccountCreated (
     AccountCreated,
     encryptionKeys,
-    provingKey,
-    publicVerificationContext,
-    userWalletPublicKey
+    publicVerificationContext
   ),
   PublicVerificationContext (PublicVerificationContext, asJson),
   RegistrationFailed (AccountAlreadyRegistered),
@@ -52,13 +42,13 @@ import WBPS.Core.Keys.ElGamal qualified as ElGamal
 newtype Inputs = Inputs
   { userWalletPublicKey :: UserWalletPublicKey
   }
-  deriving (Eq, Show, Generic)
+  deriving newtype (Eq, Show, ToJSON, FromJSON)
 
 data Outputs = Outputs
   { ek :: EncryptionKey
-  , publicVerificationContext :: PublicVerificationContext
+  , publicVerificationContext :: Value
   }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 handle :: Inputs -> AppM Outputs
 handle Inputs {userWalletPublicKey} = do
@@ -67,16 +57,10 @@ handle Inputs {userWalletPublicKey} = do
     >>= \case
       (Left [AccountAlreadyRegistered _]) -> throwError err422 {errBody = BL8.pack "Account Already Registered"}
       (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
-      (Right AccountCreated {encryptionKeys = ElGamal.KeyPair {..}, ..}) -> pure Outputs {..}
-
-instance FromJSON Inputs where
-  parseJSON = withObject "Inputs" $ \o -> do
-    userWalletPublicKey <- o .: "userPublicKey"
-    pure Inputs {userWalletPublicKey}
-
-instance ToJSON Outputs where
-  toJSON Outputs {ek, publicVerificationContext = PublicVerificationContext {asJson}} =
-    object
-      [ "ek" .= toJSON ek
-      , "verificationContext" .= asJson
-      ]
+      ( Right
+          AccountCreated
+            { publicVerificationContext = PublicVerificationContext {asJson = publicVerificationContext}
+            , encryptionKeys = ElGamal.KeyPair {..}
+            }
+        ) ->
+          pure Outputs {..}

@@ -18,6 +18,7 @@ import WBPS.Core.FileScheme (
   mkFileSchemeFromRoot,
  )
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Specs.Core.Keys.Ed25519 qualified as Ed25519Spec
 
 main :: IO ()
 main = defaultMain tests
@@ -26,4 +27,4 @@ tests :: TestTree
 tests =
   testGroup
     "WBPS unit tests"
-    []
+    [Ed25519Spec.specs]

@@ -114,8 +114,7 @@ cabal test all
 
 ``` bash
 nix build .#cavefish-server
-nix build .#cavefish-client-backend
 ```
 
 ## Runtime environment
-The nix shell adds the [cardano-nod](https://github.com/IntersectMBO/cardano-node/releases/tag/10.5.1) binary to the PATH. There is also the [node-runner.sh](./scripts/node-runner.sh) script that can be used to start a cardano node with the appropriate parameters for local testing. The [share](./share/) folder contains the correponding cardano-node 1.5.1 
+The nix shell adds the [cardano-nod](https://github.com/IntersectMBO/cardano-node/releases/tag/10.5.1) binary to the PATH. There is also the [node-runner.sh](./scripts/node-runner.sh) script that can be used to start a cardano node with the appropriate parameters for local testing. The [share](./share/) folder contains the correponding cardano-node 1.5.1

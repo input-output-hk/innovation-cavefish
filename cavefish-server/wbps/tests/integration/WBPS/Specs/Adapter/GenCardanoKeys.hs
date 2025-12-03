@@ -36,7 +36,7 @@ genEd25519KeyPair = do
   (x, y) <- genEd25519Keypair
   return
     ( Ed25519.KeyPair
-        (Adapter.KeyPair {signatureKey = PrivateKey x, verificationKey = Adapter.PublicKey y})
+        (Adapter.KeyPair {signatureKey = Adapter.PrivateKey x, verificationKey = Adapter.PublicKey y})
     )
 
 genEd25519KeyPairs :: Int -> Gen (NonEmpty Ed25519.KeyPair)

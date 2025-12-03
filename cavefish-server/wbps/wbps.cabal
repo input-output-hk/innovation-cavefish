@@ -57,7 +57,8 @@ library
     WBPS
     WBPS.Adapter.CardanoCryptoClass.Crypto
     WBPS.Adapter.Data
-    WBPS.Core
+    WBPS.Adapter.Monad.Control
+    WBPS.Adapter.Path
     WBPS.Core.BuildCommitment
     WBPS.Core.FileScheme
     WBPS.Core.Keys.Ed25519
@@ -76,9 +77,9 @@ library
     , hex-text
     , memory
     , mtl
-    , path                  >=0.9.0   && <0.10
-    , path-io               >=1.8.0   && <1.9
-    , shh                   >=0.7.0   && <0.8
+    , path                  >=0.9.0 && <0.10
+    , path-io               >=1.8.0 && <1.9
+    , shh                   >=0.7.0 && <0.8
     , text
     , transformers
     , validation
@@ -89,7 +90,7 @@ test-suite wbps-unit-tests
   type:           exitcode-stdio-1.0
   hs-source-dirs: tests/unit
   main-is:        Main.hs
-  other-modules:
+  other-modules:  WBPS.Specs.Core.Keys.Ed25519
   build-depends:
     , aeson
     , bytestring
@@ -98,6 +99,7 @@ test-suite wbps-unit-tests
     , mtl
     , path
     , path-io
+    , QuickCheck        ^>=2.15.0.1
     , tasty
     , tasty-hunit
     , tasty-quickcheck

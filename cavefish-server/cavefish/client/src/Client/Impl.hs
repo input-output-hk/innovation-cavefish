@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-missing-import-lists #-}
+
 -- | Client implementation using a mock client to interact with the server.
 --
 --  This module defines the `ClientM` monad and associated functions to perform
@@ -19,16 +21,16 @@ module Client.Impl (
   askSubmission,
   runIntent,
   listPending,
-  listClients,
+  fetchAccounts,
 ) where
 
 import Client.Mock (
-  MockClient (mcRun),
+  Provisionned (Provisionned, cardanoWalletKeyPair, server),
+  Registered (Registered, provisionned),
   RunServer,
   as422,
   askSubmissionWithClient,
   demonstrateCommitmentWithClient,
-  getClients,
   getPending,
   initMockClient,
   register,
@@ -36,30 +38,39 @@ import Client.Mock (
   verifyCommitProofWithClient,
   verifySatisfies,
  )
+import Client.Mock qualified as ClientMock
 import Control.Monad.Except (MonadError, liftEither, throwError)
-import Control.Monad.Reader (MonadIO (liftIO), MonadReader, ReaderT, ask, runReaderT)
-import Control.Monad.State (MonadState, StateT, modify)
-import Control.Monad.Trans.Class (lift)
+import Control.Monad.Reader (
+  MonadIO,
+  MonadReader (ask),
+  MonadTrans (lift),
+  ReaderT (..),
+ )
+import Control.Monad.State (MonadState, StateT)
 import Control.Monad.Trans.State (evalStateT)
-import Core.Api.Messages (Accounts, CommitResp, PendingResp)
+import Core.Api.Messages (CommitResp, PendingResp)
 import Core.Intent (IntentW)
 import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
-import Crypto.Error (CryptoFailable (CryptoFailed, CryptoPassed))
+import Core.SP.FetchAccounts qualified as FetchAccounts
 import Crypto.PubKey.Ed25519 (SecretKey)
-import Crypto.PubKey.Ed25519 qualified as Ed
-import Crypto.Random (MonadRandom (getRandomBytes))
 import Data.Bifunctor (first)
-import Data.ByteString (ByteString)
 import Data.Map (Map)
-import Data.Map qualified as Map
 import Data.Text (Text)
 import Servant (Handler, ServerError)
+import WBPS.Core.Keys.Ed25519 qualified as Ed25519
 
 -- | Monad for client operations against the server.
-newtype ClientM a = ClientM (ReaderT ClientEnv (StateT ClientState Handler) a)
+newtype ClientM a = ClientM (Control.Monad.Reader.ReaderT ClientEnv (StateT ClientState Handler) a)
   deriving newtype
-    (Functor, Applicative, Monad, MonadReader ClientEnv, MonadState ClientState, MonadError ServerError)
+    ( Control.Monad.Reader.MonadIO
+    , Functor
+    , Applicative
+    , Monad
+    , Control.Monad.Reader.MonadReader ClientEnv
+    , MonadState ClientState
+    , MonadError ServerError
+    )
 
 newtype ClientState = ClientState
   { littleRs :: Map Text SecretKey
@@ -67,13 +78,13 @@ newtype ClientState = ClientState
 
 -- | Environment required to run client operations against the server.
 data ClientEnv = ClientEnv
-  { run :: RunServer
-  , lcSk :: SecretKey
+  { server :: RunServer
+  , cardanoWalletKeyPair :: Ed25519.KeyPair
   }
 
 -- | Represents a client session with the server.
 newtype ClientSession = ClientSession
-  { client :: MockClient
+  { client :: Registered
   }
 
 -- | Run a ClientM action with the given ClientEnv.
@@ -92,8 +103,8 @@ withSession env action = runClient env (startSession >>= action)
 
 startSession :: ClientM ClientSession
 startSession = do
-  ClientEnv {run, lcSk} <- ask
-  let unregistered = initMockClient run lcSk
+  ClientEnv {server, cardanoWalletKeyPair} <- ask
+  let unregistered = initMockClient server cardanoWalletKeyPair
   client <- liftHandler (register unregistered)
   pure (ClientSession client)
 
@@ -111,21 +122,20 @@ demonstrateCommitmentAndValidate ::
   ClientSession -> IntentW -> ClientM DemonstrateCommitment.Outputs
 demonstrateCommitmentAndValidate session intent = do
   resp <- demonstrateCommitment session intent
-  commitResp <- commit (mcRun session.client) resp.txId
+  commitResp <- commit (getServer session) resp.txId
   eitherAs422 $
     (verifySatisfies intent resp >>= ensure "Satisfies failed")
       >> verifyCommitProofWithClient (client session) resp commitResp
   pure resp
 
+getServer :: ClientSession -> RunServer
+getServer ClientSession {client = Registered {provisionned = Provisionned {..}}} = server
+
 commit :: RunServer -> Text -> ClientM CommitResp
 commit run txId = do
-  randomBytes :: ByteString <- liftHandler $ liftIO $ getRandomBytes 32
-  r <- case Ed.secretKey randomBytes of
-    CryptoPassed c -> pure c
-    CryptoFailed _ -> throwError (as422 "couldn't generate secret key during commit")
-  modify (\ClientState {littleRs} -> ClientState $ Map.insert txId r littleRs)
-  let bigR = Ed.toPublic r
-  liftHandler (runCommit run txId bigR)
+  -- TODO
+  keyPair <- Ed25519.generateKeyPair
+  liftHandler (runCommit run txId keyPair)
 
 askSubmission :: ClientSession -> DemonstrateCommitment.Outputs -> ClientM AskSubmission.Outputs
 askSubmission ClientSession {client} resp = liftHandler (askSubmissionWithClient client resp)
@@ -137,13 +147,13 @@ runIntent session intent = do
 
 listPending :: ClientM PendingResp
 listPending = do
-  ClientEnv {run} <- ask
-  liftHandler (getPending run)
+  ClientEnv {server} <- ask
+  liftHandler (getPending server)
 
-listClients :: ClientM Accounts
-listClients = do
-  ClientEnv {run} <- ask
-  liftHandler (getClients run)
+fetchAccounts :: ClientM FetchAccounts.Outputs
+fetchAccounts = do
+  ClientEnv {server} <- ask
+  liftHandler (ClientMock.fetchAccounts server)
 
 ensure :: Text -> Bool -> Either Text ()
 ensure msg ok = if ok then Right () else Left msg
