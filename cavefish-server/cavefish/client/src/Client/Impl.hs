@@ -45,8 +45,10 @@ import Control.Monad.Reader (
   MonadReader (ask),
   MonadTrans (lift),
   ReaderT (..),
+  ask,
+  runReaderT,
  )
-import Control.Monad.State (MonadState, StateT)
+import Control.Monad.State (MonadState, StateT, modify)
 import Control.Monad.Trans.State (evalStateT)
 import Core.Api.Messages (CommitResp, PendingResp)
 import Core.Intent (IntentW)
@@ -55,7 +57,9 @@ import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.FetchAccounts qualified as FetchAccounts
 import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.Bifunctor (first)
+import Data.ByteString (ByteString)
 import Data.Map (Map)
+import Data.Map qualified as Map
 import Data.Text (Text)
 import Servant (Handler, ServerError)
 import WBPS.Core.Keys.Ed25519 qualified as Ed25519
@@ -72,8 +76,11 @@ newtype ClientM a = ClientM (Control.Monad.Reader.ReaderT ClientEnv (StateT Clie
     , MonadError ServerError
     )
 
-newtype ClientState = ClientState
+data ClientState = ClientState
   { littleRs :: Map Text SecretKey
+  , comIds :: Map Text ByteString
+  , comTxs :: Map Text [Integer]
+  , commitResps :: Map Text CommitResp
   }
 
 -- | Environment required to run client operations against the server.
@@ -90,7 +97,7 @@ newtype ClientSession = ClientSession
 -- | Run a ClientM action with the given ClientEnv.
 runClient :: ClientEnv -> ClientM a -> Handler a
 runClient env (ClientM m) = do
-  flip evalStateT (ClientState mempty) $ runReaderT m env
+  flip evalStateT (ClientState mempty mempty mempty mempty) $ runReaderT m env
 
 -- | Create a client session and run the given action within that session.
 withSession ::
@@ -122,6 +129,12 @@ demonstrateCommitmentAndValidate ::
   ClientSession -> IntentW -> ClientM DemonstrateCommitment.Outputs
 demonstrateCommitmentAndValidate session intent = do
   resp <- demonstrateCommitment session intent
+  let txIdText = DemonstrateCommitment.txId resp
+  modify $ \st@ClientState {comIds, comTxs} ->
+    st
+      { comIds = Map.insert txIdText (DemonstrateCommitment.comId resp) comIds
+      , comTxs = Map.insert txIdText (DemonstrateCommitment.comTx resp) comTxs
+      }
   commitResp <- commit (getServer session) resp.txId
   eitherAs422 $
     (verifySatisfies intent resp >>= ensure "Satisfies failed")
@@ -135,7 +148,10 @@ commit :: RunServer -> Text -> ClientM CommitResp
 commit run txId = do
   -- TODO
   keyPair <- Ed25519.generateKeyPair
-  liftHandler (runCommit run txId keyPair)
+  resp <- liftHandler (runCommit run txId keyPair)
+  modify $ \st@ClientState {commitResps} ->
+    st {commitResps = Map.insert txId resp commitResps}
+  pure resp
 
 askSubmission :: ClientSession -> DemonstrateCommitment.Outputs -> ClientM AskSubmission.Outputs
 askSubmission ClientSession {client} resp = liftHandler (askSubmissionWithClient client resp)

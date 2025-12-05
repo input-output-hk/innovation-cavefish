@@ -37,6 +37,22 @@ data BuildCommitmentCompileScheme = BuildCommitmentCompileScheme
 
 compileBuildCommitment :: BuildCommitmentCompileScheme -> Proc ()
 compileBuildCommitment BuildCommitmentCompileScheme {..} =
+  compileCircom circuitPath outputDir includeDir
+
+compileBuildCommitmentForFileScheme ::
+  MonadReader FileScheme m =>
+  m (Proc ())
+compileBuildCommitmentForFileScheme =
+  asks (compileBuildCommitment . toCompileScheme)
+
+toCompileScheme ::
+  FileScheme ->
+  BuildCommitmentCompileScheme
+toCompileScheme =
+  toCompileSchemeWith BuildCommitmentCompileScheme
+
+compileCircom :: FilePath -> FilePath -> FilePath -> Proc ()
+compileCircom circuitPath outputDir includeDir =
   let includeDirClean = dropTrailingPathSeparator includeDir
       includeRoot = takeDirectory includeDirClean
       includeRootRoot = takeDirectory includeRoot
@@ -68,19 +84,13 @@ compileBuildCommitment BuildCommitmentCompileScheme {..} =
         "-l"
         circomlibDirNode
 
-compileBuildCommitmentForFileScheme ::
-  MonadReader FileScheme m =>
-  m (Proc ())
-compileBuildCommitmentForFileScheme =
-  asks (compileBuildCommitment . toCompileScheme)
-
-toCompileScheme ::
+toCompileSchemeWith ::
+  (FilePath -> FilePath -> FilePath -> a) ->
   FileScheme ->
-  BuildCommitmentCompileScheme
-toCompileScheme FileScheme {relationCircom} =
+  a
+toCompileSchemeWith mkScheme FileScheme {relationCircom} =
   let outputDir = parent relationCircom
-   in BuildCommitmentCompileScheme
-        { circuitPath = Path.toFilePath relationCircom
-        , outputDir = Path.toFilePath outputDir
-        , includeDir = Path.toFilePath (parent outputDir)
-        }
+   in mkScheme
+        (Path.toFilePath relationCircom)
+        (Path.toFilePath outputDir)
+        (Path.toFilePath (parent outputDir))

@@ -59,6 +59,7 @@ library
     WBPS.Adapter.Data
     WBPS.Adapter.Monad.Control
     WBPS.Adapter.Path
+    WBPS.Core.BuildChallenge
     WBPS.Core.BuildCommitment
     WBPS.Core.FileScheme
     WBPS.Core.Keys.Ed25519

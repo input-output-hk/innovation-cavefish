@@ -23,6 +23,7 @@ import Core.Api.State (
   Pending (
     Pending,
     auxNonce,
+    challenge,
     ciphertext,
     commitment,
     creator,
@@ -31,7 +32,7 @@ import Core.Api.State (
     txAbsHash
   ),
  )
-import Core.Cbor (serialiseTx)
+import Core.Cbor (serialiseTxBody)
 import Core.PaymentProof (ProofResult (ProofEd25519))
 import Core.Pke (
   PkeSecretKey,
@@ -40,7 +41,7 @@ import Core.Pke (
   renderError,
  )
 import Core.Pke qualified as PKE
-import Core.Proof (mkProof, renderHex)
+import Core.Proof (mkProof, parseHex, renderHex)
 import Data.Aeson (
   FromJSON (parseJSON),
   ToJSON (toJSON),
@@ -50,12 +51,14 @@ import Data.Aeson (
   (.:),
   (.=),
  )
+import Data.ByteArray qualified as BA
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
 import Data.Map (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import GHC.Generics (Generic)
@@ -63,7 +66,6 @@ import Ledger.Tx.CardanoAPI (CardanoTx, pattern CardanoEmulatorEraTx)
 import Servant (
   ServerError,
   err400,
-  err403,
   err404,
   err409,
   err410,
@@ -71,6 +73,8 @@ import Servant (
   errBody,
   throwError,
  )
+import WBPS.Adapter.CardanoCryptoClass.Crypto qualified as Adapter
+import WBPS.Core.BuildChallenge (buildChallenge)
 import WBPS.Core.Keys.Ed25519 qualified as Ed25519
 
 -- | Cavefish API a
@@ -154,11 +158,21 @@ instance FromJSON CommitReq
 
 instance ToJSON CommitReq
 
-data CommitResp = CommitResp {pi :: ProofResult, c :: Int} deriving (Eq, Show, Generic)
+data CommitResp = CommitResp {pi :: ProofResult, c :: ByteString} deriving (Eq, Show, Generic)
 
-instance FromJSON CommitResp
+instance ToJSON CommitResp where
+  toJSON CommitResp {pi, c} =
+    object
+      [ "pi" .= pi
+      , "c" .= renderHex c
+      ]
 
-instance ToJSON CommitResp
+instance FromJSON CommitResp where
+  parseJSON = withObject "CommitResp" $ \o -> do
+    pi' <- o .: "pi"
+    cHex :: Text <- o .: "c"
+    cBytes <- parseHex cHex
+    pure CommitResp {pi = pi', c = cBytes}
 
 -- TODO WG: Once the crypto machinery lands, we can generate the pair `(c, π)`
 --          and plug this handler into the middle of the demonstrateCommitment/finalise flow.
@@ -176,27 +190,40 @@ commitH CommitReq {..} = do
       case mp of
         Nothing ->
           throwError err404 {errBody = "unknown or expired tx"}
-        Just pendingEntry@Pending {expiry, commitment, ciphertext, txAbsHash, tx} -> do
-          when (now > expiry) $ do
-            removePendingEntry pending wantedTxId
-            throwError err410 {errBody = "pending expired"}
-          _ <- either throwError pure (decryptPendingPayload dk pendingEntry)
-          -- mClient <- lookupClientRegistration clientRegistration creator
-          let mClient = Nothing
-          case mClient of
-            Nothing ->
-              throwError err403 {errBody = "unknown client"}
-            Just _ ->
-              case commitment of
-                Just _ ->
-                  throwError err409 {errBody = "commitment already recorded"}
-                Nothing -> do
-                  liftIO . atomically $
-                    modifyTVar' pending (Map.adjust (\p -> p {commitment = Just bigR}) wantedTxId)
-                  let txIdVal = Api.getTxId (Api.getTxBody tx)
-                      commitmentBytes = ciphertextDigest ciphertext
-                      proof = ProofEd25519 (mkProof (Ed25519.privateKey keypair) txIdVal txAbsHash commitmentBytes)
-                  pure CommitResp {pi = proof, c = 0}
+        Just
+          pendingEntry@Pending {expiry, creator = userWalletPublicKey, commitment, ciphertext, txAbsHash, tx} -> do
+            when (now > expiry) $ do
+              removePendingEntry pending wantedTxId
+              throwError err410 {errBody = "pending expired"}
+            _ <- either throwError pure (decryptPendingPayload dk pendingEntry)
+            case commitment of
+              Just _ ->
+                throwError err409 {errBody = "commitment already recorded"}
+              Nothing -> do
+                let Ed25519.UserWalletPublicKey (Ed25519.PublicKey adapterPk) = userWalletPublicKey
+                    xBytes = Adapter.toByteString adapterPk
+                    -- Using tx body bytes so c/pi/signature are all derived from the same thing (TxBody),
+                    -- since the full TX will change when witnesses are added later
+                    txIdBytes = Api.serialiseToRawBytes (Api.getTxId (Api.getTxBody tx))
+                    Ed25519.PublicKey adapterR = bigR
+                    rBytes = Adapter.toByteString adapterR
+                challengeDigest <-
+                  either
+                    ( \err ->
+                        let msg = "buildChallenge failed: " <> err
+                         in throwError err500 {errBody = BL.fromStrict (TE.encodeUtf8 (T.pack msg))}
+                    )
+                    pure
+                    (buildChallenge rBytes xBytes txIdBytes)
+                let challengeBytes = BA.convert challengeDigest
+                liftIO . atomically $
+                  modifyTVar'
+                    pending
+                    (Map.adjust (\p -> p {commitment = Just bigR, challenge = Just challengeBytes}) wantedTxId)
+                let txIdVal = Api.getTxId (Api.getTxBody tx)
+                    commitmentBytes = ciphertextDigest ciphertext
+                    proof = ProofEd25519 (mkProof (Ed25519.privateKey keypair) txIdVal txAbsHash commitmentBytes)
+                pure CommitResp {pi = proof, c = challengeBytes}
 
 pendingH :: AppM PendingResp
 pendingH = do
@@ -244,7 +271,7 @@ decryptPendingPayload pkeSecret Pending {ciphertext = pendingCiphertext, auxNonc
       let msg = "pke decrypt failed: " <> renderError err
        in Left err500 {errBody = BL.fromStrict (TE.encodeUtf8 msg)}
     Right payload ->
-      let txBytes = serialiseTx tx
+      let txBytes = serialiseTxBody tx
           (payloadTxBytes, payloadNonce) = BS.splitAt (BS.length txBytes) payload
        in if payloadTxBytes /= txBytes
             then

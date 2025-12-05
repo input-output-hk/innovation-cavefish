@@ -35,7 +35,7 @@ import Core.Api.State (
     txAbsHash
   ),
  )
-import Core.Cbor (mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
+import Core.Cbor (mkWitnessBundle, serialiseClientWitnessBundle, serialiseTxBody)
 import Core.Intent (
   BuildTxResult (BuildTxResult, changeDelta, mockState, tx, txAbs),
   ChangeDelta,
@@ -170,7 +170,11 @@ handle Inputs {..} = do
   auxNonceBytes :: ByteString <- liftIO $ getRandomBytes 32
   rhoBytes :: ByteString <- liftIO $ getRandomBytes 32
 
-  let payload = serialiseTx tx <> auxNonceBytes
+  -- We can't commit to the full tx, because we'll be adding witnesses to it later,
+  -- meaning the bytes we've committed to will change. So, we commit to the tx body, which
+  -- will remain the same.
+  let txBodyBytes = serialiseTxBody tx
+      payload = txBodyBytes <> auxNonceBytes
       toServerErr msg = err500 {errBody = BL.fromStrict (TE.encodeUtf8 msg)}
       toPkeErr err = err500 {errBody = BL.fromStrict (TE.encodeUtf8 ("pke encryption failed: " <> renderError err))}
   -- The part from the paper: C ← PKE.Enc(ek, m; ρ) with ek = pkePublic, m = serialiseTx tx <> auxNonceBytes
