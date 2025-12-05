@@ -126,6 +126,7 @@ We encourage contributions! This project follows standard GitHub workflows.
 - Architecture: See the academic paper for protocol details.
 - Coding Conventions: Follow Haskell style (brittany), Circom best practices; use descriptive commits.
 - Testing: Run `make` in wbps/ for circuit tests; add unit tests for Haskell.
+- Cavefish on the [IOG Blog](https://iohk.io/en/blog/posts/2025/12/03/presenting-cavefish/)
 
 ### Making Changes
 1. Fork the repo and create a branch.
