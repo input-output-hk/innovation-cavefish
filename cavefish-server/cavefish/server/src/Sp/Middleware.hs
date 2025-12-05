@@ -2,8 +2,11 @@
 
 module Sp.Middleware (
   cavefishMiddleware,
+  timingTraceMiddleware,
+  errStatusTraceMiddleware,
 ) where
 
+import Control.Monad (when)
 import Core.CavefishLogEvent (
   CavefishLogEvent (LogHttpRoundTrip, LogHttpServerError),
   HttpRoundTrip (HttpRoundTrip, duration, method, path),
@@ -28,7 +31,7 @@ import System.Clock qualified as Clock
 
 timingTraceMiddleware :: Middleware
 timingTraceMiddleware app req respond =
-  (withTracer $ Verbose "SP.Http.Roundtrip") $ \tr -> do
+  withTracer (Verbose "SP.Http.Roundtrip") $ \tr -> do
     begin <- getTime
     -- Call the next application in the stack
     app req $ \resp -> do
@@ -46,25 +49,23 @@ timingTraceMiddleware app req respond =
 
 errStatusTraceMiddleware :: Middleware
 errStatusTraceMiddleware app req respond = do
-  (withTracer $ Verbose "SP.Http.Erro-Status") $ \tr -> do
+  withTracer (Verbose "SP.Http.Erro-Status") $ \tr -> do
     begin <- getTime
     app req $ \resp -> do
       duration <- RequestDuration . toMilliseconds . subtract begin <$> getTime
-      if (getStatusCode resp >= 400)
-        then
-          let (method, path) = requestDetails req
-              statusCode :: Int = getStatusCode resp
-              message = decodeUtf8 . statusMessage . responseStatus $ resp
-           in traceWith tr $
-                LogHttpServerError $
-                  HttpServerError
-                    { path
-                    , method
-                    , status = statusCode
-                    , errorMessage = message
-                    , duration
-                    }
-        else pure ()
+      when (getStatusCode resp >= 400) $
+        let (method, path) = requestDetails req
+            statusCode :: Int = getStatusCode resp
+            message = decodeUtf8 . statusMessage . responseStatus $ resp
+         in traceWith tr $
+              LogHttpServerError $
+                HttpServerError
+                  { path
+                  , method
+                  , status = statusCode
+                  , errorMessage = message
+                  , duration
+                  }
       respond resp
 
 getStatusCode :: Response -> Int

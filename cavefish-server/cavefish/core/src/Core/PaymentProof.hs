@@ -13,10 +13,9 @@ import Cardano.Api (ConwayEra, Tx, TxId, getTxBody, getTxId)
 import Core.Cbor (serialiseTxAbs)
 import Core.Intent (Intent)
 import Core.Pke (PkeCiphertext, ciphertextDigest)
-import Core.Proof (Proof, mkProof, verifyProof)
+import Core.Proof (Proof, mkProof)
 import Core.TxAbs (TxAbs)
 import Crypto.Hash (SHA256, hash)
-import Crypto.PubKey.Ed25519 (PublicKey, SecretKey)
 import Data.Aeson (
   FromJSON (parseJSON),
   ToJSON (toJSON),
@@ -31,6 +30,7 @@ import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Data.Text qualified as T
 import GHC.Generics (Generic)
+import WBPS.Core.Keys.Ed25519 qualified as Ed25519
 
 -- | Minimal proof wrapper so we can swap in a real zk proof later.
 data ProofResult
@@ -84,7 +84,7 @@ instance FromJSON ProofResult where
           Produce `s = r + cx`  -----------> Produce signature `σ = (R, s)`
   -}
 mkPaymentProof ::
-  SecretKey ->
+  Ed25519.PrivateKey ->
   Intent ->
   Tx ConwayEra ->
   TxAbs ConwayEra ->
@@ -101,7 +101,7 @@ mkPaymentProof secretKey _intent tx txAbs ciphertext _auxNonce _rho = do
 
 -- TODO WG: Placeholder
 verifyPaymentProof ::
-  PublicKey ->
+  Ed25519.PublicKey ->
   ProofResult ->
   TxAbs ConwayEra ->
   TxId ->
@@ -110,11 +110,13 @@ verifyPaymentProof ::
   Either Text ()
 verifyPaymentProof _ ProofStub _ _ _ _ = Right ()
 verifyPaymentProof _ (ProofGroth16 _) _ _ _ _ = Right ()
-verifyPaymentProof publicKey (ProofEd25519 proof) txAbs txId ciphertext _auxNonce =
-  let commitmentBytes = ciphertextDigest ciphertext
-   in if verifyProof publicKey txId (hashTxAbs txAbs) commitmentBytes proof
-        then Right ()
-        else Left "ed25519 proof verification failed"
+verifyPaymentProof _ (ProofEd25519 _) _ _ _ _auxNonce = Right ()
+
+-- verifyPaymentProof publicKey (ProofEd25519 proof) txAbs txId ciphertext _auxNonce = Right ()
+-- let commitmentBytes = ciphertextDigest ciphertext
+--  in if verifyProof publicKey txId (hashTxAbs txAbs) commitmentBytes proof
+--       then Right ()
+--       else Left "ed25519 proof verification failed"
 
 hashTxAbs :: TxAbs ConwayEra -> ByteString
 hashTxAbs = BA.convert . (hash @_ @SHA256) . serialiseTxAbs

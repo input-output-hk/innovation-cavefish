@@ -57,9 +57,12 @@ library
     WBPS
     WBPS.Adapter.CardanoCryptoClass.Crypto
     WBPS.Adapter.Data
-    WBPS.Core
+    WBPS.Adapter.Monad.Control
+    WBPS.Adapter.Path
     WBPS.Core.BuildCommitment
     WBPS.Core.FileScheme
+    WBPS.Core.Keys.Ed25519
+    WBPS.Core.Keys.ElGamal
     WBPS.Core.Primitives.Circom
     WBPS.Core.Primitives.Snarkjs
     WBPS.Core.Primitives.SnarkjsOverFileScheme
@@ -87,7 +90,7 @@ test-suite wbps-unit-tests
   type:           exitcode-stdio-1.0
   hs-source-dirs: tests/unit
   main-is:        Main.hs
-  other-modules:
+  other-modules:  WBPS.Specs.Core.Keys.Ed25519
   build-depends:
     , aeson
     , bytestring
@@ -96,6 +99,7 @@ test-suite wbps-unit-tests
     , mtl
     , path
     , path-io
+    , QuickCheck        ^>=2.15.0.1
     , tasty
     , tasty-hunit
     , tasty-quickcheck
@@ -115,6 +119,7 @@ test-suite wbps-integration-tests
   build-depends:
     , bytestring
     , cardano-crypto-class
+    , containers            ^>=0.6.7
     , path                  ^>=0.9.6
     , path-io               ^>=1.8.2
     , QuickCheck

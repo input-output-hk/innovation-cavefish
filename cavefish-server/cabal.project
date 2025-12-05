@@ -2,7 +2,6 @@ packages:
   wbps/wbps.cabal
   cavefish/core/cavefish-core.cabal
   cavefish/client/cavefish-client.cabal
-  cavefish/client-backend/cavefish-client-backend.cabal
   cavefish/server/cavefish-server.cabal
   cavefish/tests/cavefish-tests.cabal
 

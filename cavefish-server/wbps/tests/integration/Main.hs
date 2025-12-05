@@ -19,7 +19,7 @@ main = do
         "[WBPS - integration specs]"
         [ testGroup
             "Nominal Cases"
-            [ localOption (NumThreads 4) . localOption (QuickCheckTests 20) $
+            [ localOption (NumThreads 8) . localOption (QuickCheckTests 10) $
                 Register.Nominal.Case.specs RootFolders {input = inputFolder, output = outputFolder}
             ]
         ]

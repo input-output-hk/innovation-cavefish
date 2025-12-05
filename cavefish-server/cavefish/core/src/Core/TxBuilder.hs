@@ -1,8 +1,12 @@
+{-# OPTIONS_GHC -Wno-missing-import-lists #-}
+
 -- | Module for building Cardano transactions based on high-level intents.
 --     This module provides functionality to construct transactions using the Cooked
 --     library, interpreting intents that specify spending sources, payment outputs,
 --     validity intervals, and change addresses.
-module Core.TxBuilder where
+module Core.TxBuilder (
+  buildTx,
+) where
 
 import Cardano.Api qualified as Api
 import Control.Monad (foldM, unless, when)
@@ -27,7 +31,8 @@ import Cooked (
   txSkelTemplate,
  )
 import Cooked.Skeleton.Payable qualified as Payable
-import Core.Api.AppContext (Env (Env, resolveWallet, spFee, spWallet))
+import Cooked.Wallet (wallet)
+import Core.Api.AppContext (Env (..))
 import Core.Intent (Intent (irChangeTo, irMaxInterval, irMustMint, irPayTo, irSpendFrom), source)
 import Core.Observers.Observer (stakeValidatorFromBytes)
 import Data.ByteString (ByteString)
@@ -49,7 +54,7 @@ buildTx intent observerBytes env@Env {..} = do
       <$> mapM
         ( \addr -> case getWallet addr of
             Left err -> fail (T.unpack err)
-            Right wallet -> pure wallet
+            Right w -> pure w
         )
         (source <$> intent.irSpendFrom)
   let skelWithSigners =
@@ -81,14 +86,14 @@ buildTx intent observerBytes env@Env {..} = do
   skel3 <- case irChangeTo intent of
     Nothing -> pure skel2
     Just addr -> do
-      wallet <- either (fail . T.unpack) pure (getWallet addr)
+      w <- either (fail . T.unpack) pure (getWallet addr)
       let opts =
             (txSkelOpts skel2)
-              { txOptBalancingPolicy = BalanceWith wallet
+              { txOptBalancingPolicy = BalanceWith w
               , txOptBalanceOutputPolicy = DontAdjustExistingOutput
               }
           signers = txSkelSigners skel2
-          signers' = if wallet `elem` signers then signers else signers ++ [wallet]
+          signers' = if w `elem` signers then signers else signers ++ [w]
       pure skel2 {txSkelOpts = opts, txSkelSigners = signers'}
   -- MaxFee is a post-condition only; no builder action required
   validateTxSkel skel3
@@ -101,7 +106,7 @@ buildTx intent observerBytes env@Env {..} = do
         }
 
     spFeeOutputs =
-      [spWallet `receives` Payable.Value (PSV.lovelace spFee) | spFee > 0]
+      [wallet 1 `receives` Payable.Value (PSV.lovelace spFee) | spFee > 0]
 
     addPay :: MonadBlockChain m => TxSkel -> (Api.Value, Api.AddressInEra Api.ConwayEra) -> m TxSkel
     addPay skel (v, addr) = do
@@ -118,9 +123,9 @@ buildTx intent observerBytes env@Env {..} = do
 mkPayTo ::
   Api.Value ->
   Api.AddressInEra Api.ConwayEra ->
-  Env ->
+  Core.Api.AppContext.Env ->
   Either Text [TxSkelOut]
-mkPayTo value addr Env {..} = do
+mkPayTo value addr Core.Api.AppContext.Env {..} = do
   payee <- case resolveWallet addr of
     Nothing -> Left "TxBuilder: address not recognised (resolveWallet failed)"
     Just w -> Right w
