@@ -12,14 +12,13 @@ module Client.Impl (
   ClientM,
   runClient,
   withSession,
-  commit,
   startSession,
   throw422,
   eitherAs422,
   demonstrateCommitment,
-  demonstrateCommitmentAndValidate,
-  askSubmission,
-  runIntent,
+  -- demonstrateCommitmentAndValidate,
+  -- askSubmission,
+  -- runIntent,
   listPending,
   fetchAccounts,
 ) where
@@ -29,14 +28,10 @@ import Client.Mock (
   Registered (Registered, provisionned),
   RunServer,
   as422,
-  askSubmissionWithClient,
   demonstrateCommitmentWithClient,
   getPending,
   initMockClient,
   register,
-  runCommit,
-  verifyCommitProofWithClient,
-  verifySatisfies,
  )
 import Client.Mock qualified as ClientMock
 import Control.Monad.Except (MonadError, liftEither, throwError)
@@ -48,8 +43,8 @@ import Control.Monad.Reader (
  )
 import Control.Monad.State (MonadState, StateT)
 import Control.Monad.Trans.State (evalStateT)
-import Core.Api.Messages (CommitResp, PendingResp)
-import Core.Intent (IntentW)
+import Core.Api.Messages (PendingResp)
+import Core.Intent (IntentDSL)
 import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.FetchAccounts qualified as FetchAccounts
@@ -115,35 +110,29 @@ eitherAs422 :: Either Text a -> ClientM a
 eitherAs422 = liftEither . first as422
 
 -- | Prepare an intent with the server.
-demonstrateCommitment :: ClientSession -> IntentW -> ClientM DemonstrateCommitment.Outputs
+demonstrateCommitment :: ClientSession -> IntentDSL -> ClientM DemonstrateCommitment.Outputs
 demonstrateCommitment ClientSession {client} intent = liftHandler (demonstrateCommitmentWithClient client intent)
 
-demonstrateCommitmentAndValidate ::
-  ClientSession -> IntentW -> ClientM DemonstrateCommitment.Outputs
-demonstrateCommitmentAndValidate session intent = do
-  resp <- demonstrateCommitment session intent
-  commitResp <- commit (getServer session) resp.txId
-  eitherAs422 $
-    (verifySatisfies intent resp >>= ensure "Satisfies failed")
-      >> verifyCommitProofWithClient (client session) resp commitResp
-  pure resp
+-- demonstrateCommitmentAndValidate ::
+--   ClientSession -> IntentDSL -> ClientM DemonstrateCommitment.Outputs
+-- demonstrateCommitmentAndValidate session intent = do
+--   resp <- demonstrateCommitment session intent
+--   commitResp <- commit (getServer session) resp.txId
+--   eitherAs422 $
+--     (verifySatisfies intent resp >>= ensure "Satisfies failed")
+--       >> verifyCommitProofWithClient (client session) resp commitResp
+--   pure resp
 
 getServer :: ClientSession -> RunServer
 getServer ClientSession {client = Registered {provisionned = Provisionned {..}}} = server
 
-commit :: RunServer -> Text -> ClientM CommitResp
-commit run txId = do
-  -- TODO
-  keyPair <- Ed25519.generateKeyPair
-  liftHandler (runCommit run txId keyPair)
+-- askSubmission :: ClientSession -> DemonstrateCommitment.Outputs -> ClientM AskSubmission.Outputs
+-- askSubmission ClientSession {client} resp = liftHandler (askSubmissionWithClient client resp)
 
-askSubmission :: ClientSession -> DemonstrateCommitment.Outputs -> ClientM AskSubmission.Outputs
-askSubmission ClientSession {client} resp = liftHandler (askSubmissionWithClient client resp)
-
-runIntent :: ClientSession -> IntentW -> ClientM AskSubmission.Outputs
-runIntent session intent = do
-  resp <- demonstrateCommitmentAndValidate session intent
-  askSubmission session resp
+-- runIntent :: ClientSession -> IntentDSL -> ClientM AskSubmission.Outputs
+-- runIntent session intent = do
+--   resp <- demonstrateCommitmentAndValidate session intent
+--   askSubmission session resp
 
 listPending :: ClientM PendingResp
 listPending = do

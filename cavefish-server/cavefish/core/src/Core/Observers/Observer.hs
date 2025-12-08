@@ -14,7 +14,7 @@ module Core.Observers.Observer where
 import Cardano.Api qualified as Api
 import Cardano.Api.Shelley (PlutusScript (PlutusScriptSerialised))
 import Core.Intent (
-  Intent (Intent, irChangeTo, irMaxFee, irMaxInterval, irMustMint, irPayTo, irSpendFrom),
+  CanonicalIntent (..),
   source,
  )
 import Data.Bifunctor (bimap)
@@ -65,13 +65,13 @@ slotLengthMillis = 1000
 
 PlutusTx.unstableMakeIsData ''ObserverIntent
 
-intentObserverScript :: Intent -> Either Text ObserverScript
+intentObserverScript :: CanonicalIntent -> Either Text ObserverScript
 intentObserverScript intent = mkObserverScript <$> toObserverIntent intent
 
 mkObserverScript :: ObserverIntent -> ObserverScript
 mkObserverScript = ObserverScript . mkStakeValidator
 
-intentStakeValidatorBytes :: Intent -> Either Text ByteString
+intentStakeValidatorBytes :: CanonicalIntent -> Either Text ByteString
 intentStakeValidatorBytes intent = observerScriptBytes <$> intentObserverScript intent
 
 instance ToVersioned Script StakeValidator where
@@ -265,8 +265,8 @@ foldrList f z xs = case xs of
   [] -> z
   y : ys -> f y (foldrList f z ys)
 
-toObserverIntent :: Intent -> Either Text ObserverIntent
-toObserverIntent Intent {..} = do
+toObserverIntent :: CanonicalIntent -> Either Text ObserverIntent
+toObserverIntent CanonicalIntent {..} = do
   let mustMint = foldMap LedgerValue.fromCardanoValue irMustMint
       spendFrom = LedgerAddr.cardanoAddressCredential . source <$> irSpendFrom
       payTo =

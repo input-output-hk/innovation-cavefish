@@ -54,11 +54,11 @@ library
   import:          base, project-config
   hs-source-dirs:  lib
   exposed-modules:
-    WBPS
     WBPS.Adapter.CardanoCryptoClass.Crypto
     WBPS.Adapter.Data
     WBPS.Adapter.Monad.Control
     WBPS.Adapter.Path
+    WBPS.Commitment
     WBPS.Core.BuildCommitment
     WBPS.Core.FileScheme
     WBPS.Core.Keys.Ed25519
@@ -66,20 +66,24 @@ library
     WBPS.Core.Primitives.Circom
     WBPS.Core.Primitives.Snarkjs
     WBPS.Core.Primitives.SnarkjsOverFileScheme
+    WBPS.Registration
 
   build-depends:
     , aeson
     , base16-bytestring
     , bytestring
+    , cardano-api           ^>=10.16.1.0
     , cardano-crypto-class
     , cryptonite
     , filepath
     , hex-text
     , memory
     , mtl
-    , path                  >=0.9.0 && <0.10
-    , path-io               >=1.8.0 && <1.9
-    , shh                   >=0.7.0 && <0.8
+    , path                  >=0.9.0      && <0.10
+    , path-io               >=1.8.0      && <1.9
+    , process
+    , scientific            ^>=0.3.8.0
+    , shh                   >=0.7.0      && <0.8
     , text
     , transformers
     , validation

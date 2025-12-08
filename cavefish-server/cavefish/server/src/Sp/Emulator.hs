@@ -88,7 +88,7 @@ mkCookedEnv
 buildWithCooked ::
   TVar MockChainState ->
   Env ->
-  Intent ->
+  CanonicalIntent ->
   Maybe ByteString ->
   IO BuildTxResult
 buildWithCooked mockState env intent observerBytes = do

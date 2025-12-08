@@ -4,8 +4,8 @@ import Path.IO (getCurrentDir, getTempDir, withTempDir)
 import Test.Tasty (defaultMain, localOption, testGroup)
 import Test.Tasty.QuickCheck (QuickCheckTests (..))
 import Test.Tasty.Runners (NumThreads (..))
-import WBPS
 import WBPS.Core.FileScheme (RootFolders (..))
+import WBPS.Registration
 import WBPS.Specs.Adapter.Test (findInputsDir)
 import WBPS.Specs.NominalCase qualified as Register.Nominal.Case
 

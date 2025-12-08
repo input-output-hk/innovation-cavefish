@@ -12,12 +12,12 @@ import System.Directory (createDirectoryIfMissing)
 import System.IO.Temp (withSystemTempDirectory)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (assertEqual, assertFailure, testCase)
-import WBPS (withFileSchemeIO)
 import WBPS.Core.FileScheme (
   FileScheme (accounts, verificationContext),
   mkFileSchemeFromRoot,
  )
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Registration (withFileSchemeIO)
 import WBPS.Specs.Core.Keys.Ed25519 qualified as Ed25519Spec
 
 main :: IO ()

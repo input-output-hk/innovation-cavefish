@@ -3,7 +3,20 @@
 --     This module defines the data structures and functions related to transaction
 --     intents, including their representation, normalization, and satisfaction checks
 --     against built transactions.
-module Core.Intent where
+module Core.Intent (
+  BuildTxResult (..),
+  CanonicalIntent (..),
+  IntentDSL (..),
+  AddressW (..),
+  ChangeDelta,
+  source,
+  emptyIntent,
+  normalizeIntent,
+  toIntentExpr,
+  toCanonicalIntent,
+  satisfies,
+  outExactly,
+) where
 
 import Cardano.Api (ConwayEra, FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
@@ -38,8 +51,6 @@ newtype Spend = Spend {source :: Api.AddressInEra Api.ConwayEra}
 data BuildTxResult = BuildTxResult
   { tx :: Api.Tx Api.ConwayEra
   -- ^ Built transaction
-  , changeDelta :: ChangeDelta
-  -- ^ Change delta
   , txAbs :: TxAbs Api.ConwayEra
   -- ^ Abstract representation of the transaction
   , mockState :: MockChainState
@@ -53,7 +64,7 @@ newtype AddressW = AddressW Text
   deriving anyclass (ToJSON, FromJSON)
 
 -- Intent as represented in the API
-data IntentW
+data IntentDSL
   = -- | Must mint this value
     MustMintW Value
   | -- | Spend from this wallet address
@@ -66,7 +77,7 @@ data IntentW
     ChangeToW AddressW
   | -- | Maximum fee
     MaxFeeW Integer
-  | AndExpsW (NonEmpty IntentW)
+  | AndExpsW (NonEmpty IntentDSL)
   deriving (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
 
@@ -88,7 +99,7 @@ data IntentW
 
     We don't really need this type anymore, but I'm keeping it around for parity with the paper.
  -}
-data IntentExpr
+data InternalIntentDSL
   = -- | Must mint this value
     MustMint Value
   | -- | Spend from this source
@@ -101,10 +112,10 @@ data IntentExpr
     ChangeTo (Api.AddressInEra ConwayEra)
   | -- | Maximum fee
     MaxFee Integer
-  | AndExps (NonEmpty IntentExpr)
+  | AndExps (NonEmpty InternalIntentDSL)
   deriving (Eq, Show, Generic)
 
-data Intent = Intent
+data CanonicalIntent = CanonicalIntent
   { irSpendFrom :: [Spend]
   -- ^ Spend from these sources
   , irPayTo :: [(Api.Value, Api.AddressInEra Api.ConwayEra)]
@@ -120,9 +131,9 @@ data Intent = Intent
   }
   deriving (Show)
 
-emptyIntent :: Intent
+emptyIntent :: CanonicalIntent
 emptyIntent =
-  Intent
+  CanonicalIntent
     { irSpendFrom = []
     , irPayTo = []
     , irMustMint = []
@@ -131,8 +142,8 @@ emptyIntent =
     , irMaxInterval = Nothing
     }
 
--- | Normalize an IntentExpr into an Intent
-normalizeIntent :: IntentExpr -> Intent
+-- | Normalize an InternalIntentDSL into a Canonical Intent
+normalizeIntent :: InternalIntentDSL -> CanonicalIntent
 normalizeIntent = go emptyIntent
   where
     go acc = \case
@@ -144,7 +155,7 @@ normalizeIntent = go emptyIntent
       MaxFee f -> acc {irMaxFee = Just (maybe f (min f) (irMaxFee acc))}
       AndExps xs -> Data.Foldable.foldl go acc xs
 
-toIntentExpr :: IntentW -> Either Text IntentExpr
+toIntentExpr :: IntentDSL -> Either Text InternalIntentDSL
 toIntentExpr = \case
   MustMintW v -> Right (MustMint v)
   SpendFromW walletAddr -> fmap SpendFrom $ Spend <$> parseAddr walletAddr
@@ -160,7 +171,7 @@ toIntentExpr = \case
         (Left "invalid address")
         Right
         (Api.deserialiseAddress (Api.AsAddressInEra Api.AsConwayEra) addr)
-    toInt :: IntentW -> Either Text IntentExpr
+    toInt :: IntentDSL -> Either Text InternalIntentDSL
     toInt = \case
       MustMintW v -> Right (MustMint v)
       SpendFromW walletAddr -> fmap SpendFrom $ Spend <$> parseAddr walletAddr
@@ -170,12 +181,13 @@ toIntentExpr = \case
       MaxFeeW i -> Right (MaxFee i)
       AndExpsW ys -> AndExps <$> traverse toInt ys
 
-toInternalIntent :: IntentW -> Either Text Intent
-toInternalIntent = fmap normalizeIntent . toIntentExpr
+toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent
+toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent =
+  fmap normalizeIntent . toIntentExpr
 
 -- | Check whether a transaction satisfies an intent, given the change delta.
-satisfies :: ChangeDelta -> Intent -> TxAbs Api.ConwayEra -> Bool
-satisfies cd Intent {..} tx =
+satisfies :: CanonicalIntent -> TxAbs Api.ConwayEra -> Bool
+satisfies CanonicalIntent {..} tx =
   and
     [ -- MustMint: v ≤ tx.mint
       let need = Map.fromList . toList $ mconcat irMustMint
@@ -195,9 +207,9 @@ satisfies cd Intent {..} tx =
     , -- ChangeTo: (s,consumed − produced) ∈ tx.outputs
       case irChangeTo of
         Nothing -> True
-        Just addr ->
-          not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
-    , -- MaxFee (if any): tx.fee ≤ f
+        Just addr -> any (outMatchesChange addr) tx.outputs
+    , -- not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
+      -- MaxFee (if any): tx.fee ≤ f
       maybe True (\f -> tx.absFee <= f) irMaxFee
     ]
   where

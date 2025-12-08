@@ -6,6 +6,8 @@ module Adapter.Cavefish.Client (
 
 import Control.Concurrent.STM (newTVarIO)
 import Core.Api.Config (Config)
+import Core.SP.AskCommitmentProof qualified as AskCommitmentProof
+import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.FetchAccount qualified as FetchAccount
 import Core.SP.FetchAccounts qualified as FetchAccounts
 import Core.SP.Register qualified as Register
@@ -17,7 +19,7 @@ import Servant.Client (BaseUrl (BaseUrl))
 import Servant.Client qualified as SC
 import Sp.Emulator (initialMockState, mkCookedEnv)
 import Sp.Middleware (errStatusTraceMiddleware)
-import Sp.Server (CavefishApi, mkApp)
+import Sp.Server (Cavefish, mkApp)
 import Test.Hspec (expectationFailure)
 import WBPS.Core.FileScheme (FileScheme)
 
@@ -25,19 +27,20 @@ getServiceProviderAPI :: Int -> IO ServiceProviderAPI
 getServiceProviderAPI port = do
   manager <- newManager defaultManagerSettings
   let baseUrl = BaseUrl SC.Http "127.0.0.1" port ""
-
       ( register
-          :<|> _
-          :<|> _
+          :<|> demonstrateCommitment
+          :<|> askCommitmentProof
           :<|> _
           :<|> fetchAccount
           :<|> fetchAccounts
           :<|> _
           :<|> _
-        ) = SC.client (Proxy @CavefishApi)
+        ) = SC.client (Proxy @Cavefish)
   return
     ServiceProviderAPI
       { register = runClientOrFail (SC.mkClientEnv manager baseUrl) . register
+      , demonstrateCommitment = runClientOrFail (SC.mkClientEnv manager baseUrl) . demonstrateCommitment
+      , askCommitmentProof = runClientOrFail (SC.mkClientEnv manager baseUrl) . askCommitmentProof
       , fetchAccount = runClientOrFail (SC.mkClientEnv manager baseUrl) . fetchAccount
       , fetchAccounts = runClientOrFail (SC.mkClientEnv manager baseUrl) fetchAccounts
       }
@@ -45,6 +48,8 @@ getServiceProviderAPI port = do
 data ServiceProviderAPI
   = ServiceProviderAPI
   { register :: Register.Inputs -> IO Register.Outputs
+  , demonstrateCommitment :: DemonstrateCommitment.Inputs -> IO DemonstrateCommitment.Outputs
+  , askCommitmentProof :: AskCommitmentProof.Inputs -> IO AskCommitmentProof.Outputs
   , fetchAccount :: FetchAccount.Inputs -> IO FetchAccount.Outputs
   , fetchAccounts :: IO FetchAccounts.Outputs
   }

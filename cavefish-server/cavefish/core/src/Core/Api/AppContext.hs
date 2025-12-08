@@ -7,8 +7,7 @@ import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
 import Cooked (MockChainState)
 import Cooked.Wallet (Wallet, knownWallets)
 import Core.Api.State (CompleteStore, PendingStore)
-import Core.Intent (BuildTxResult, Intent)
-import Data.ByteString (ByteString)
+import Core.Intent (BuildTxResult, IntentDSL)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime)
@@ -25,10 +24,7 @@ data Env = Env
   , resolveWallet :: Api.AddressInEra Api.ConwayEra -> Maybe Wallet
   , spFee :: Integer
   , wbpsScheme :: FileScheme
-  , build ::
-      Intent ->
-      Maybe ByteString ->
-      IO BuildTxResult
+  , build :: forall m. (MonadIO m, MonadError ServerError m) => IntentDSL -> m BuildTxResult
   , submit ::
       Api.Tx Api.ConwayEra ->
       MockChainState ->

@@ -3,6 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module WBPS.Core.Primitives.Circom (
+  defCommitmentParams,
   BuildCommitmentParams (..),
   BuildCommitmentCompileScheme (..),
   compileBuildCommitment,
@@ -28,6 +29,9 @@ data BuildCommitmentParams = BuildCommitmentParams
   , commitmentLimbSize :: Int
   , nbCommitmentLimbs :: Int
   }
+
+defCommitmentParams :: BuildCommitmentParams
+defCommitmentParams = BuildCommitmentParams 131544 252 522
 
 data BuildCommitmentCompileScheme = BuildCommitmentCompileScheme
   { circuitPath :: FilePath

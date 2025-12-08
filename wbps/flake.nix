@@ -7,10 +7,10 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
+    { self
+    , nixpkgs
+    , flake-utils
+    ,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -59,6 +59,13 @@
               npm install snarkjs@0.7.0 --save-dev
             fi
             export PATH=$PWD/node_modules/.bin:$PATH
+            if [ -x "$PWD/babyjubjub-keygen" ]; then
+              export PATH=$PWD:$PATH
+            elif [ -x "$PWD/../cavefish-server/wbps/inputs/babyjubjub-keygen" ]; then
+              export PATH=$PWD/../cavefish-server/wbps/inputs:$PATH
+            else
+              echo "babyjubjub-keygen not found; run wbps/tooling/gen_babyjubjub_keys.sh to build it" >&2
+            fi
             echo "WBPS dev shell" | figlet -f cybermedium
           '';
         };

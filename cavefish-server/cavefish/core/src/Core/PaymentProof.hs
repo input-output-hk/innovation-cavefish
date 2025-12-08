@@ -11,7 +11,7 @@ module Core.PaymentProof (
 
 import Cardano.Api (ConwayEra, Tx, TxId, getTxBody, getTxId)
 import Core.Cbor (serialiseTxAbs)
-import Core.Intent (Intent)
+import Core.Intent (CanonicalIntent)
 import Core.Pke (PkeCiphertext, ciphertextDigest)
 import Core.Proof (Proof, mkProof)
 import Core.TxAbs (TxAbs)
@@ -85,7 +85,7 @@ instance FromJSON ProofResult where
   -}
 mkPaymentProof ::
   Ed25519.PrivateKey ->
-  Intent ->
+  CanonicalIntent ->
   Tx ConwayEra ->
   TxAbs ConwayEra ->
   PkeCiphertext ->

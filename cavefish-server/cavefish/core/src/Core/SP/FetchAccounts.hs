@@ -19,22 +19,21 @@ import Servant (
   errBody,
   throwError,
  )
-import WBPS (AccountCreated (..), asJson)
-import WBPS qualified
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
+import WBPS.Registration
 
 handle :: AppM Outputs
 handle = do
   Env {wbpsScheme} <- ask
-  liftIO (WBPS.withFileSchemeIO wbpsScheme WBPS.loadAccounts)
+  liftIO (withFileSchemeIO wbpsScheme loadAccounts)
     >>= \case
       (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
       (Right accountsCreated) ->
         return
           . Outputs
           . map
-            ( \WBPS.AccountCreated {encryptionKeys = ElGamal.KeyPair {..}, ..} ->
+            ( \AccountCreated {encryptionKeys = ElGamal.KeyPair {..}, ..} ->
                 Account {publicVerificationContext = asJson publicVerificationContext, ..}
             )
           $ accountsCreated

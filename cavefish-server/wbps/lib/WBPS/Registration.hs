@@ -1,7 +1,7 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE RankNTypes #-}
 
-module WBPS (
+module WBPS.Registration (
   register,
   withFileSchemeIO,
   loadAccount,
@@ -166,6 +166,8 @@ data RegistrationFailed
   | VerificationNotFound UserWalletPublicKey
   | EncryptionKeysNotFound UserWalletPublicKey
   | AccountAlreadyRegistered UserWalletPublicKey
+  | AccountNotFound UserWalletPublicKey
+  | BuildCommitmentFailed String
   deriving (Show, Eq)
 
 accountId :: UserWalletPublicKey -> AccountId

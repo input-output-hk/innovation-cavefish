@@ -22,7 +22,12 @@ import Servant (
   errBody,
   throwError,
  )
-import WBPS (
+import WBPS.Core.Keys.Ed25519 (
+  UserWalletPublicKey,
+ )
+import WBPS.Core.Keys.ElGamal (EncryptionKey)
+import WBPS.Core.Keys.ElGamal qualified as ElGamal
+import WBPS.Registration (
   AccountCreated (
     AccountCreated,
     encryptionKeys,
@@ -33,11 +38,6 @@ import WBPS (
   register,
   withFileSchemeIO,
  )
-import WBPS.Core.Keys.Ed25519 (
-  UserWalletPublicKey,
- )
-import WBPS.Core.Keys.ElGamal (EncryptionKey)
-import WBPS.Core.Keys.ElGamal qualified as ElGamal
 
 newtype Inputs = Inputs
   { userWalletPublicKey :: UserWalletPublicKey
@@ -53,7 +53,7 @@ data Outputs = Outputs
 handle :: Inputs -> AppM Outputs
 handle Inputs {userWalletPublicKey} = do
   Env {wbpsScheme} <- ask
-  liftIO (WBPS.withFileSchemeIO wbpsScheme (WBPS.register userWalletPublicKey))
+  liftIO (withFileSchemeIO wbpsScheme (register userWalletPublicKey))
     >>= \case
       (Left [AccountAlreadyRegistered _]) -> throwError err422 {errBody = BL8.pack "Account Already Registered"}
       (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}

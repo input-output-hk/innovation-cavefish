@@ -3,21 +3,19 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Sp.Server (
-  CavefishApi,
-  RegisterAPI,
+  Cavefish,
+  Register,
   mkApp,
 ) where
 
 import Core.Api.AppContext (AppM, Env, runApp)
 import Core.Api.Messages (
-  CommitReq,
-  CommitResp,
   PendingResp,
   TransactionResp,
-  commitH,
   pendingH,
   transactionH,
  )
+import Core.SP.AskCommitmentProof qualified as AskCommitmentProof
 import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.FetchAccount qualified as FetchAccount
@@ -43,26 +41,34 @@ import Servant (
  )
 import Servant.API ((:<|>) ((:<|>)), (:>))
 
-type CavefishApi =
-  RegisterAPI
-    :<|> "demonstrateCommitment"
-      :> ReqBody '[JSON] DemonstrateCommitment.Inputs
-      :> Post '[JSON] DemonstrateCommitment.Outputs
+type Cavefish =
+  Register
+    :<|> DemonstrateCommitment
+    :<|> AskCommitmentProof
     :<|> "askSubmission" :> ReqBody '[JSON] AskSubmission.Inputs :> Post '[JSON] AskSubmission.Outputs
-    :<|> "commit" :> ReqBody '[JSON] CommitReq :> Post '[JSON] CommitResp
     :<|> FetchAccount
     :<|> FetchAccounts
     :<|> "pending" :> Get '[JSON] PendingResp
     :<|> "transaction" :> Capture "id" Text :> Get '[JSON] TransactionResp
 
-type RegisterAPI = "register" :> ReqBody '[JSON] Register.Inputs :> Post '[JSON] Register.Outputs
+type Register = "register" :> ReqBody '[JSON] Register.Inputs :> Post '[JSON] Register.Outputs
+
+type DemonstrateCommitment =
+  "demonstrateCommitment"
+    :> ReqBody '[JSON] DemonstrateCommitment.Inputs
+    :> Post '[JSON] DemonstrateCommitment.Outputs
+
+type AskCommitmentProof =
+  "askCommitmentProof"
+    :> ReqBody '[JSON] AskCommitmentProof.Inputs
+    :> Post '[JSON] AskCommitmentProof.Outputs
 
 type FetchAccount =
   "fetchAccount" :> ReqBody '[JSON] FetchAccount.Inputs :> Post '[JSON] FetchAccount.Outputs
 
 type FetchAccounts = "fetchAccounts" :> Get '[JSON] FetchAccounts.Outputs
 
-cavefishApi :: Proxy CavefishApi
+cavefishApi :: Proxy Cavefish
 cavefishApi = Proxy
 
 mkApp :: Middleware -> Env -> Application
@@ -79,12 +85,12 @@ mkApp cavefishMiddleware env =
         serve cavefishApi $
           hoistServer cavefishApi (runApp env) server
 
-server :: ServerT CavefishApi AppM
+server :: ServerT Cavefish AppM
 server =
   Register.handle
     :<|> DemonstrateCommitment.handle
+    :<|> AskCommitmentProof.handle
     :<|> AskSubmission.handle
-    :<|> commitH
     :<|> FetchAccount.handle
     :<|> FetchAccounts.handle
     :<|> pendingH

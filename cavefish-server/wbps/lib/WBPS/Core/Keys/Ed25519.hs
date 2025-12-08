@@ -8,6 +8,7 @@ module WBPS.Core.Keys.Ed25519 (
   privateKey,
   userWalletPK,
   generateKeyPair,
+  generateKeyTuple,
 ) where
 
 import Cardano.Crypto.DSIGN.Ed25519 (Ed25519DSIGN)
@@ -49,3 +50,8 @@ userWalletPK (KeyPair (Adapter.KeyPair {..})) = UserWalletPublicKey . PublicKey 
 
 generateKeyPair :: forall m. MonadIO m => m KeyPair
 generateKeyPair = KeyPair <$> Adapter.generateKeyPair @Ed25519DSIGN
+
+generateKeyTuple :: forall m. MonadIO m => m (PrivateKey, PublicKey)
+generateKeyTuple = do
+  k <- generateKeyPair
+  return (privateKey k, publicKey k)

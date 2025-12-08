@@ -74,6 +74,7 @@ library
     Core.PaymentProof
     Core.Pke
     Core.Proof
+    Core.SP.AskCommitmentProof
     Core.SP.AskSubmission
     Core.SP.DemonstrateCommitment
     Core.SP.FetchAccount

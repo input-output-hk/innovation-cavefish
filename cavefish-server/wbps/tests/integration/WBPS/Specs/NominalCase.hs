@@ -7,7 +7,13 @@ import Data.Set qualified as Sets
 import Test.QuickCheck (Gen, counterexample, forAll, ioProperty, property, (.&&.), (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
-import WBPS (
+import WBPS.Core.FileScheme (
+  FileScheme,
+  RootFolders,
+  defaultFileScheme,
+ )
+import WBPS.Core.Keys.Ed25519 as Ed25519
+import WBPS.Registration (
   AccountCreated (AccountCreated),
   loadAccount,
   loadAccounts,
@@ -15,12 +21,6 @@ import WBPS (
   userWalletPublicKey,
   withFileSchemeIO,
  )
-import WBPS.Core.FileScheme (
-  FileScheme,
-  RootFolders,
-  defaultFileScheme,
- )
-import WBPS.Core.Keys.Ed25519 as Ed25519
 import WBPS.Specs.Adapter.GenCardanoKeys (genEd25519KeyPair, genEd25519KeyPairs)
 
 data FixtureNominalCase = FixtureNominalCase

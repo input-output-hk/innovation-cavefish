@@ -173,6 +173,8 @@ let
       fi
       echo "cavefish" | figlet -f cybermedium
 
+      # Make repo-local tooling available in the shell.
+      export PATH=$(pwd)/wbps/inputs:$PATH
       export PATH=$(pwd)/node_modules/.bin:$PATH
     '';
   };

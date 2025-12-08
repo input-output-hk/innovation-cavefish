@@ -19,10 +19,10 @@ import Servant (
   errBody,
   throwError,
  )
-import WBPS (AccountCreated (..), asJson)
-import WBPS qualified
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
+import WBPS.Registration (AccountCreated (..), asJson)
+import WBPS.Registration qualified as WBPS
 
 handle :: Inputs -> AppM Outputs
 handle Inputs {userWalletPublicKey} = do

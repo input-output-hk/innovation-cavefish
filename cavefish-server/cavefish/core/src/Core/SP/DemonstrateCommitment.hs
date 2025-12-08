@@ -1,11 +1,4 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
-
-module Core.SP.DemonstrateCommitment (handle, Inputs (..), Outputs (..)) where
+module Core.SP.DemonstrateCommitment (handle, Inputs (..), Outputs (..), Commitment (..)) where
 
 import Cardano.Api qualified as Api
 import Control.Concurrent.STM (atomically, modifyTVar')
@@ -35,13 +28,11 @@ import Core.Api.State (
     txAbsHash
   ),
  )
-import Core.Cbor (mkWitnessBundle, serialiseClientWitnessBundle, serialiseTx)
+import Core.Cbor (serialiseTx)
 import Core.Intent (
-  BuildTxResult (BuildTxResult, changeDelta, mockState, tx, txAbs),
-  ChangeDelta,
-  IntentW,
+  BuildTxResult (BuildTxResult, mockState, tx, txAbs),
+  IntentDSL,
   satisfies,
-  toInternalIntent,
  )
 import Core.PaymentProof (hashTxAbs)
 import Core.Pke (
@@ -49,7 +40,6 @@ import Core.Pke (
   encryptWithSeeds,
   renderError,
  )
-import Core.Pke qualified as ElGamal
 import Core.Proof (parseHex, renderHex)
 import Core.TxAbs (TxAbs)
 import Crypto.Random (getRandomBytes)
@@ -66,6 +56,7 @@ import Data.Bits (testBit)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
+import Data.ByteString.Lazy.Char8 qualified as BL8
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -73,6 +64,7 @@ import Data.Text.Encoding qualified as TE
 import Data.Time.Clock (addUTCTime, getCurrentTime)
 import GHC.Generics (Generic)
 import Servant (
+  err400,
   err422,
   err500,
   errBody,
@@ -82,166 +74,108 @@ import WBPS.Core.BuildCommitment (
   BuildCommitmentInput (BuildCommitmentInput),
   BuildCommitmentOutput (maskedChunks),
   ComId (unComId),
-  Commitment (Commitment),
   computeComId,
   runBuildCommitment,
  )
+import WBPS.Core.BuildCommitment qualified as BuildCommitment
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Primitives.Circom (BuildCommitmentParams (BuildCommitmentParams))
+import WBPS.Core.Keys.ElGamal qualified as ElGamal
+import WBPS.Core.Primitives.Circom (
+  BuildCommitmentParams (BuildCommitmentParams),
+  defCommitmentParams,
+ )
+import WBPS.Registration (AccountCreated (..))
+import WBPS.Registration qualified as WBPS
 
 data Inputs = Inputs
-  { intent :: IntentW
-  , observer :: Maybe ByteString
-  , clientId :: UserWalletPublicKey
+  { userWalletPublicKey :: UserWalletPublicKey
+  , intent :: IntentDSL
   }
+  deriving (Eq, Show, Generic, FromJSON, ToJSON)
+
+newtype CommitmentId = CommitmentId ByteString
   deriving (Eq, Show, Generic)
 
-instance FromJSON Inputs where
-  parseJSON = withObject "Inputs" $ \o -> do
-    intent <- o .: "intent"
-    obsHex :: Maybe Text <- o .: "observer"
-    observer <- traverse parseHex obsHex
-    clientId <- o .: "clientId"
-    pure Inputs {..}
+data Commitment
+  = Commitment {id :: ByteString, payload :: [Integer]}
+  deriving (Eq, Show, Generic)
 
-instance ToJSON Inputs where
-  toJSON Inputs {..} =
+instance ToJSON Commitment where
+  toJSON Commitment {..} =
     object
-      [ "intent" .= intent
-      , "observer" .= fmap renderHex observer
-      , "clientId" .= clientId
+      [ "id" .= renderHex id
+      , "payload" .= payload
       ]
+
+instance FromJSON Commitment where
+  parseJSON = withObject "Commitment" $ \o -> do
+    idHex :: Text <- o .: "id"
+    payload <- o .: "payload"
+    id <- parseHex idHex
+    pure Commitment {..}
 
 data Outputs = Outputs
-  { txId :: Text
+  { commitment :: Commitment
   , txAbs :: TxAbs Api.ConwayEra
-  , -- We need to include a `consumed - produced` here, otherwise the client can't run `satisfies` for `ChangeTo`
-    changeDelta :: ChangeDelta
-  , comId :: ByteString
-  , comTx :: [Integer]
-  , witnessBundleHex :: Text
   }
-  deriving (Eq, Show, Generic)
-
-instance FromJSON Outputs where
-  parseJSON = withObject "Outputs" $ \o -> do
-    txId <- o .: "txId"
-    txAbs <- o .: "txAbs"
-    changeDelta <- o .: "changeDelta"
-    comIdHex :: Text <- o .: "comId"
-    comId <- parseHex comIdHex
-    comTx <- o .: "comTx"
-    witnessBundleHex <- o .: "witnessBundleHex"
-    pure Outputs {..}
-
-instance ToJSON Outputs where
-  toJSON Outputs {..} =
-    object
-      [ "txId" .= txId
-      , "txAbs" .= txAbs
-      , "changeDelta" .= changeDelta
-      , "comId" .= renderHex comId
-      , "comTx" .= comTx
-      , "witnessBundleHex" .= witnessBundleHex
-      ]
+  deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
 handle :: Inputs -> AppM Outputs
-handle Inputs {..} = do
-  Env {pending, ttl, build, wbpsScheme} <- ask
-  internalIntent <- liftIO $ either (ioError . userError . T.unpack) pure (toInternalIntent intent)
+handle Inputs {userWalletPublicKey, intent} = do
+  Env {ttl, build, wbpsScheme} <- ask
+  BuildTxResult {tx = tx, txAbs = txAbs, mockState = builtState} <- build intent
 
-  -- clientKnown <- liftIO . atomically $ do
-  --   -- registry <- readTVar clientRegistration
-  --   -- pure (Map.member clientId registry)
-  -- unless clientKnown $
-  --   throwError err403 {errBody = "unknown client"}
+  liftIO (WBPS.withFileSchemeIO wbpsScheme (WBPS.loadAccount userWalletPublicKey))
+    >>= \case
+      (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
+      (Right Nothing) -> throwError err400 {errBody = BL8.pack "Account Not registered"}
+      (Right (Just AccountCreated {encryptionKeys = ElGamal.KeyPair {ek}})) -> do
 
-  -- TODO WG: We can't do this exactly, but it'd be nice to say at this point whether or not the observer is coherent with the intent
-  -- expectedObserverBytes <-
-  --   liftIO $ either (ioError . userError . T.unpack) pure (intentStakeValidatorBytes intent)
+-- auxNonceBytes :: ByteString <- liftIO $ getRandomBytes 32
+-- rhoBytes :: ByteString <- liftIO $ getRandomBytes 32
 
-  -- when (observer /= expectedObserverBytes) $
-  --   throwError err422{errBody = "observer script does not match intent"}
+-- let message = Message . serialiseTx $ tx
+--     toServerErr msg = err500 {errBody = BL.fromStrict (TE.encodeUtf8 msg)}
+--     toPkeErr err = err500 {errBody = BL.fromStrict (TE.encodeUtf8 ("pke encryption failed: " <> renderError err))}
+-- -- The part from the paper: C ← PKE.Enc(ek, m; ρ) with ek = pkePublic, m = serialiseTx tx <> auxNonceBytes
+-- (ciphertext, CommitmentSeeds {seedX, seedY}) <-
+--   liftEither $ first toPkeErr (encryptWithSeeds ek message rhoBytes)
+-- -- Run the BuildCommitment circuit to derive comTx. comTx is the list of out_masked_chunk values
+-- -- (each packed message limb plus its Poseidon-derived mask).
+-- -- Parameters cover max payload (16KB tx + 32B nonce): 131,328 bits.
+-- -- We use 252-bit limbs to avoid mod-p aliasing and stay aligned with the wbps_cardano verifier circuit.
+-- let commitmentParams@(BuildCommitmentParams msgSize _ _) = defCommitmentParams
+--     messageBits =
+--       take msgSize (payloadBits message ++ repeat 0)
+-- let bcInput =
+--       BuildCommitmentInput seedX seedY messageBits
+-- comTx <-
+--   liftIO $
+--     runReaderT
+--       (runBuildCommitment commitmentParams bcInput)
+--       wbpsScheme
+--       >>= either (ioError . userError) (pure . maskedChunks)
+-- let comIdVal = computeComId (BuildCommitment.Commitment comTx)
 
-  (ek, dk) <- liftIO ElGamal.generateKeyPair -- N.H to fix
-  BuildTxResult {tx = tx, txAbs = txAbs, mockState = builtState, changeDelta = cd} <-
-    liftIO $ build internalIntent observer
+-- let txBody = Api.getTxBody tx
+--     txId = Api.getTxId txBody
 
-  auxNonceBytes :: ByteString <- liftIO $ getRandomBytes 32
-  rhoBytes :: ByteString <- liftIO $ getRandomBytes 32
+-- pure
+--   Outputs
+--     { txAbs
+--     , commitment = Commitment (unComId comIdVal) comTx
+--     }
 
-  let payload = serialiseTx tx <> auxNonceBytes
-      toServerErr msg = err500 {errBody = BL.fromStrict (TE.encodeUtf8 msg)}
-      toPkeErr err = err500 {errBody = BL.fromStrict (TE.encodeUtf8 ("pke encryption failed: " <> renderError err))}
-  -- The part from the paper: C ← PKE.Enc(ek, m; ρ) with ek = pkePublic, m = serialiseTx tx <> auxNonceBytes
-  (ciphertext, CommitmentSeeds {seedX, seedY}) <-
-    liftEither $ first toPkeErr (encryptWithSeeds ek payload rhoBytes)
-  -- Run the BuildCommitment circuit to derive comTx. comTx is the list of out_masked_chunk values
-  -- (each packed message limb plus its Poseidon-derived mask).
-  -- Parameters cover max payload (16KB tx + 32B nonce): 131,328 bits.
-  -- We use 252-bit limbs to avoid mod-p aliasing and stay aligned with the wbps_cardano verifier circuit.
-  let commitmentParams@(BuildCommitmentParams msgSize _ _) = BuildCommitmentParams 131544 252 522
-      messageBits =
-        take msgSize (payloadBits payload ++ repeat 0)
-  let bcInput =
-        BuildCommitmentInput seedX seedY messageBits
-  comTx <-
-    liftIO $
-      runReaderT
-        (runBuildCommitment commitmentParams bcInput)
-        wbpsScheme
-        >>= either (ioError . userError) (pure . maskedChunks)
-  let comIdVal = computeComId (Commitment comTx)
-  witnessBundle <-
-    liftEither $ first toServerErr $ mkWitnessBundle tx txAbs observer auxNonceBytes ciphertext
-  let witnessBundleHex = renderHex (serialiseClientWitnessBundle witnessBundle)
+newtype Message = Message ByteString
 
-  unless (satisfies cd internalIntent txAbs) $
-    throwError err422 {errBody = "transaction does not satisfy intent"}
+buildCommitment :: UserWalletPublicKey -> Message -> Commitment
+buildCommitment userWalletPublicKey (Message message) = do
 
-  let txBody = Api.getTxBody tx
-      txId = Api.getTxId txBody
-      txIdTxt = Api.serialiseToRawBytesHexText txId
-      txAbsHash :: ByteString
-      txAbsHash = hashTxAbs txAbs
-  now <- liftIO getCurrentTime
-  let expiry = addUTCTime ttl now
-      pendingEntry =
-        Pending
-          { tx
-          , txAbsHash
-          , expiry
-          , mockState = builtState
-          , creator = clientId
-          , ciphertext
-          , auxNonce = auxNonceBytes
-          , rho = rhoBytes
-          , message = payload
-          , comId = comIdVal
-          , comTx
-          , commitment = Nothing
-          , challenge = Nothing
-          }
-  liftIO . atomically $
-    modifyTVar' pending $
-      Map.insert txId pendingEntry
-
-  pure
-    Outputs
-      { txId = txIdTxt
-      , txAbs
-      , changeDelta = cd
-      , comId = unComId comIdVal
-      , comTx
-      , witnessBundleHex
-      }
-
--- Convert a bytestring to a little-endian bit vector.
-payloadBits :: ByteString -> [Int]
-payloadBits bs =
-  concatMap byteToBits (BS.unpack bs)
-  where
-    byteToBits b =
-      [ if testBit b i then 1 else 0
-      | i <- [0 .. 7]
-      ]
+-- -- Convert a bytestring to a little-endian bit vector.
+-- payloadBits :: ByteString -> [Int]
+-- payloadBits bs = concatMap byteToBits (BS.unpack bs)
+--   where
+--     byteToBits b =
+--       [ if testBit b i then 1 else 0
+--       | i <- [0 .. 7]
+--       ]

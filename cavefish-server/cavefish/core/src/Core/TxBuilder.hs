@@ -33,7 +33,10 @@ import Cooked (
 import Cooked.Skeleton.Payable qualified as Payable
 import Cooked.Wallet (wallet)
 import Core.Api.AppContext (Env (..))
-import Core.Intent (Intent (irChangeTo, irMaxInterval, irMustMint, irPayTo, irSpendFrom), source)
+import Core.Intent (
+  CanonicalIntent (irChangeTo, irMaxInterval, irMustMint, irPayTo, irSpendFrom),
+  source,
+ )
 import Core.Observers.Observer (stakeValidatorFromBytes)
 import Data.ByteString (ByteString)
 import Data.List (nub)
@@ -45,7 +48,7 @@ import Plutus.Script.Utils.Value qualified as PSV
 import PlutusLedgerApi.V1.Interval qualified as Interval
 
 -- | Build a Cardano transaction based on the provided intent and observer
-buildTx :: MonadBlockChain m => Intent -> Maybe ByteString -> Env -> m CardanoTx
+buildTx :: MonadBlockChain m => CanonicalIntent -> Maybe ByteString -> Env -> m CardanoTx
 buildTx intent observerBytes env@Env {..} = do
   let stakeValidator = fmap stakeValidatorFromBytes observerBytes
       skel0 = base stakeValidator

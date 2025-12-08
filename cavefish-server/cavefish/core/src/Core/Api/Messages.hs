@@ -11,7 +11,6 @@ module Core.Api.Messages where
 
 import Cardano.Api qualified as Api
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, readTVarIO)
-import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (ask))
 import Core.Api.AppContext (
@@ -24,7 +23,6 @@ import Core.Api.State (
     Pending,
     auxNonce,
     ciphertext,
-    commitment,
     creator,
     expiry,
     tx,
@@ -32,15 +30,12 @@ import Core.Api.State (
   ),
  )
 import Core.Cbor (serialiseTx)
-import Core.PaymentProof (ProofResult (ProofEd25519))
 import Core.Pke (
   PkeSecretKey,
-  ciphertextDigest,
   decrypt,
   renderError,
  )
-import Core.Pke qualified as PKE
-import Core.Proof (mkProof, renderHex)
+import Core.Proof (renderHex)
 import Data.Aeson (
   FromJSON (parseJSON),
   ToJSON (toJSON),
@@ -57,16 +52,12 @@ import Data.Map (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text.Encoding qualified as TE
-import Data.Time.Clock (UTCTime, getCurrentTime)
+import Data.Time.Clock (UTCTime)
 import GHC.Generics (Generic)
 import Ledger.Tx.CardanoAPI (CardanoTx, pattern CardanoEmulatorEraTx)
 import Servant (
   ServerError,
   err400,
-  err403,
-  err404,
-  err409,
-  err410,
   err500,
   errBody,
   throwError,
@@ -147,56 +138,6 @@ data PendingItem = PendingItem
 instance ToJSON PendingItem
 
 instance FromJSON PendingItem
-
-data CommitReq = CommitReq {txId :: Text, bigR :: Ed25519.PublicKey} deriving (Eq, Show, Generic)
-
-instance FromJSON CommitReq
-
-instance ToJSON CommitReq
-
-data CommitResp = CommitResp {pi :: ProofResult, c :: Int} deriving (Eq, Show, Generic)
-
-instance FromJSON CommitResp
-
-instance ToJSON CommitResp
-
--- TODO WG: Once the crypto machinery lands, we can generate the pair `(c, π)`
---          and plug this handler into the middle of the demonstrateCommitment/finalise flow.
-commitH :: CommitReq -> AppM CommitResp
-commitH CommitReq {..} = do
-  Env {..} <- ask
-  now <- liftIO getCurrentTime
-  keypair <- Ed25519.generateKeyPair -- N.H to fix
-  (_, dk) <- liftIO PKE.generateKeyPair
-  case parseTxIdHex txId of
-    Nothing ->
-      throwError err400 {errBody = "malformed tx id"}
-    Just wantedTxId -> do
-      mp <- lookupPendingEntry pending wantedTxId
-      case mp of
-        Nothing ->
-          throwError err404 {errBody = "unknown or expired tx"}
-        Just pendingEntry@Pending {expiry, commitment, ciphertext, txAbsHash, tx} -> do
-          when (now > expiry) $ do
-            removePendingEntry pending wantedTxId
-            throwError err410 {errBody = "pending expired"}
-          _ <- either throwError pure (decryptPendingPayload dk pendingEntry)
-          -- mClient <- lookupClientRegistration clientRegistration creator
-          let mClient = Nothing
-          case mClient of
-            Nothing ->
-              throwError err403 {errBody = "unknown client"}
-            Just _ ->
-              case commitment of
-                Just _ ->
-                  throwError err409 {errBody = "commitment already recorded"}
-                Nothing -> do
-                  liftIO . atomically $
-                    modifyTVar' pending (Map.adjust (\p -> p {commitment = Just bigR}) wantedTxId)
-                  let txIdVal = Api.getTxId (Api.getTxBody tx)
-                      commitmentBytes = ciphertextDigest ciphertext
-                      proof = ProofEd25519 (mkProof (Ed25519.privateKey keypair) txIdVal txAbsHash commitmentBytes)
-                  pure CommitResp {pi = proof, c = 0}
 
 pendingH :: AppM PendingResp
 pendingH = do

@@ -48,8 +48,8 @@ import Servant (
   errBody,
   throwError,
  )
-import WBPS (AccountCreated (..))
-import WBPS qualified
+import WBPS.Registration (AccountCreated (..))
+import WBPS.Registration qualified as WBPS
 
 handle :: Inputs -> AppM Outputs
 handle Inputs {..} = do

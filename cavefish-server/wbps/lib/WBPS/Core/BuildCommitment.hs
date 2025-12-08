@@ -4,7 +4,7 @@
 module WBPS.Core.BuildCommitment (
   BuildCommitmentInput (..),
   BuildCommitmentOutput (..),
-  Commitment (..),
+  CommitmentPayload (..),
   ComId (..),
   computeComId,
   runBuildCommitment,
@@ -32,13 +32,13 @@ import Shh (Stream (StdOut), (&!>))
 import System.FilePath qualified as FP
 import Text.Read (readMaybe)
 import WBPS.Core.FileScheme
+import WBPS.Core.Keys.ElGamal (AffinePoint (..))
 import WBPS.Core.Primitives.Circom (BuildCommitmentParams (..), compileBuildCommitmentForFileScheme)
 import WBPS.Core.Primitives.Snarkjs (exportStatementAsJSON)
 import WBPS.Core.Primitives.SnarkjsOverFileScheme (getGenerateBuildCommitmentWitnessProcess)
 
 data BuildCommitmentInput = BuildCommitmentInput
-  { seedX :: Integer
-  , seedY :: Integer
+  { ekPowRho :: AffinePoint
   , messageBits :: [Int]
   }
 
@@ -55,12 +55,12 @@ instance {-# OVERLAPPING #-} Aeson.FromJSON [String] where
 newtype ComId = ComId {unComId :: BS.ByteString}
   deriving (Eq, Show)
 
-newtype Commitment = Commitment
+newtype CommitmentPayload = CommitmentPayload
   { payload :: [Integer]
   }
 
-computeComId :: Commitment -> ComId
-computeComId Commitment {payload} =
+computeComId :: CommitmentPayload -> ComId
+computeComId CommitmentPayload {payload} =
   let
     -- Encode each limb as big-endian bytes with length prefix
     -- It takes the [Integer] payload limbs and encodes each as big-endian
@@ -95,12 +95,12 @@ runBuildCommitment ::
   BuildCommitmentParams ->
   BuildCommitmentInput ->
   m (Either String BuildCommitmentOutput)
-runBuildCommitment params BuildCommitmentInput {..} = do
+runBuildCommitment params BuildCommitmentInput {ekPowRho = AffinePoint {x, y}, ..} = do
   scheme <- compileAndScheme params
   let inputJson =
         Aeson.object
-          [ "in_seed_x" Aeson..= seedX
-          , "in_seed_y" Aeson..= seedY
+          [ "in_seed_x" Aeson..= x
+          , "in_seed_y" Aeson..= y
           , "in_message" Aeson..= messageBits
           ]
   let accountsDir = accounts scheme
