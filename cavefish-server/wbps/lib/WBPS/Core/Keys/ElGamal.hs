@@ -37,6 +37,7 @@ import System.Process (readProcess)
 import Text.Read (readMaybe)
 
 newtype Rho = Rho Integer
+  deriving newtype (Eq, Show, FromJSON, ToJSON)
 
 generateElGamalExponent :: MonadIO m => m Rho
 generateElGamalExponent = liftIO (Rho . bsToInteger <$> getRandomBytes 16)

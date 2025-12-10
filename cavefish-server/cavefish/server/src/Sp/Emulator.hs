@@ -11,8 +11,10 @@ module Sp.Emulator (
   mkCookedEnv,
   buildWithCooked,
   initialMockState,
+  producedTotal,
 ) where
 
+import Cardano.Api (MonadIO (..))
 import Cardano.Api qualified as Api
 import Control.Concurrent.STM (TVar, atomically, readTVarIO, writeTVar)
 import Control.Monad.Identity (runIdentity)
@@ -31,26 +33,16 @@ import Core.Api.AppContext (
  )
 import Core.Api.Config qualified as Cfg
 import Core.Api.State (CompleteStore, PendingStore)
-import Core.Intent (
-  BuildTxResult (BuildTxResult, changeDelta, mockState, tx, txAbs),
-  ChangeDelta,
-  Intent,
- )
+import Core.Intent
 import Core.Observers.Observer (stakeValidatorFromBytes)
-import Core.TxAbs (TxAbs (outputs), cardanoTxToTxAbs)
 import Core.TxBuilder (buildTx)
-import Data.ByteString (ByteString)
 import Data.Default (def)
 import Data.Foldable (traverse_)
 import Data.Text (Text)
-import Ledger (
-  getCardanoTxOutputs,
- )
 import Ledger.Scripts (StakeValidator (getStakeValidator))
 import Ledger.Tx (
   pattern CardanoEmulatorEraTx,
  )
-import Ledger.Tx qualified as LedgerTx
 import Plutus.Script.Utils.Address qualified as ScriptAddr
 import Plutus.Script.Utils.Scripts (Language (PlutusV2), Versioned (Versioned))
 import WBPS.Core.FileScheme (FileScheme)
@@ -86,42 +78,45 @@ mkCookedEnv
 
 -- | Build a transaction using the Cooked mock chain.
 buildWithCooked ::
+  MonadIO m =>
   TVar MockChainState ->
   Env ->
-  CanonicalIntent ->
-  Maybe ByteString ->
-  IO BuildTxResult
-buildWithCooked mockState env intent observerBytes = do
-  st0 <- readTVarIO mockState
-  let (result, st1) =
-        runMockChainPure st0 $ do
-          let stakeValidator = fmap stakeValidatorFromBytes observerBytes
-              cred =
-                fmap
-                  ( \sv ->
-                      ScriptAddr.toCredential
-                        (Versioned (getStakeValidator sv) PlutusV2)
-                  )
-                  stakeValidator
-          traverse_ (\c -> registerStakingCred c 0 0) cred
-          buildTx intent observerBytes env
-  case result of
-    Left err -> fail ("buildTx failed: " <> show err)
-    Right cardanoTx@(CardanoEmulatorEraTx tx) -> do
-      let rawOutputs = [out | LedgerTx.TxOut out <- getCardanoTxOutputs cardanoTx]
-          txAbs = cardanoTxToTxAbs cardanoTx
-          producedMasked = producedTotal (outputs txAbs)
-          producedRaw = producedTotal rawOutputs
-          -- The masked TxAbs zeroes the change output, so we recover the hidden
-          -- amount by subtracting masked outputs from their raw counterparts.
-          changeDelta = producedRaw <> Api.negateValue producedMasked
-      pure
-        BuildTxResult
-          { tx
-          , changeDelta
-          , txAbs
-          , mockState = st1
-          }
+  IntentDSL ->
+  m BuildTxResult
+buildWithCooked mockState env intentDSL = do
+  case toCanonicalIntent intentDSL of
+    Left err -> liftIO $ fail ("buildTx failed: " <> show err)
+    Right canonicalIntent -> do
+      st0 <- liftIO $ readTVarIO mockState
+      let (result, st1) =
+            runMockChainPure st0 $ do
+              let stakeValidator = fmap stakeValidatorFromBytes Nothing
+                  cred =
+                    fmap
+                      ( \sv ->
+                          ScriptAddr.toCredential
+                            (Versioned (getStakeValidator sv) PlutusV2)
+                      )
+                      stakeValidator
+              traverse_ (\c -> registerStakingCred c 0 0) cred
+              buildTx canonicalIntent Nothing env
+      case result of
+        Left err -> liftIO $ fail ("buildTx failed: " <> show err)
+        Right (CardanoEmulatorEraTx tx) -> do
+          -- let rawOutputs = [out | LedgerTx.TxOut out <- getCardanoTxOutputs cardanoTx]
+          --     -- txAbs = cardanoTxToTxAbs cardanoTx
+          --     producedMasked = producedTotal (outputs txAbs)
+          --     producedRaw = producedTotal rawOutputs
+          --     -- The masked TxAbs zeroes the change output, so we recover the hidden
+          --     -- amount by subtracting masked outputs from their raw counterparts.
+          --     changeDelta = producedRaw <> Api.negateValue producedMasked
+          pure
+            BuildTxResult
+              { tx
+              , -- , changeDelta
+                -- , txAbs
+                mockState = st1
+              }
 
 -- | Submit a transaction to the mock chain by updating the mock chain state.
 submitWithCooked ::

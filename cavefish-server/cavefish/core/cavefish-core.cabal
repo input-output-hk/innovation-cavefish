@@ -67,7 +67,6 @@ library
     Core.Api.Messages
     Core.Api.State
     Core.CavefishLogEvent
-    Core.Cbor
     Core.Intent
     Core.Logging
     Core.Observers.Observer
@@ -80,7 +79,6 @@ library
     Core.SP.FetchAccount
     Core.SP.FetchAccounts
     Core.SP.Register
-    Core.TxAbs
     Core.TxBuilder
 
   build-depends:

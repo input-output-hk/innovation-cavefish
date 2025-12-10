@@ -10,11 +10,9 @@ module Core.PaymentProof (
 ) where
 
 import Cardano.Api (ConwayEra, Tx, TxId, getTxBody, getTxId)
-import Core.Cbor (serialiseTxAbs)
 import Core.Intent (CanonicalIntent)
 import Core.Pke (PkeCiphertext, ciphertextDigest)
 import Core.Proof (Proof, mkProof)
-import Core.TxAbs (TxAbs)
 import Crypto.Hash (SHA256, hash)
 import Data.Aeson (
   FromJSON (parseJSON),
@@ -30,6 +28,8 @@ import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Data.Text qualified as T
 import GHC.Generics (Generic)
+import WBPS.Core.Cardano.Cbor (serialiseTxAbs)
+import WBPS.Core.Cardano.TxAbs (TxAbs)
 import WBPS.Core.Keys.Ed25519 qualified as Ed25519
 
 -- | Minimal proof wrapper so we can swap in a real zk proof later.

@@ -4,33 +4,38 @@
 module WBPS.Core.BuildCommitment (
   BuildCommitmentInput (..),
   BuildCommitmentOutput (..),
+  Commitment (..),
   CommitmentPayload (..),
   ComId (..),
-  computeComId,
+  mkCommitment,
   runBuildCommitment,
 ) where
 
+import Cardano.Crypto.Hash (ByteString)
 import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ask, runReader)
 import Crypto.Hash (SHA256, hash)
-import Data.Aeson ((.:))
+import Data.Aeson (FromJSON, ToJSON, (.:))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types qualified as AesonTypes
 import Data.ByteArray qualified as BA
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
+import Data.Coerce (coerce)
 import Data.List (sort, unfoldr)
 import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Vector qualified as V
 import Data.Word (Word8)
+import GHC.Generics
 import Path
 import Path.IO
 import Shh (Stream (StdOut), (&!>))
 import System.FilePath qualified as FP
 import Text.Read (readMaybe)
+import WBPS.Adapter.CardanoCryptoClass.Crypto (FromByteString (fromByteString), Hexadecimal)
 import WBPS.Core.FileScheme
 import WBPS.Core.Keys.ElGamal (AffinePoint (..))
 import WBPS.Core.Primitives.Circom (BuildCommitmentParams (..), compileBuildCommitmentForFileScheme)
@@ -52,15 +57,20 @@ instance {-# OVERLAPPING #-} Aeson.FromJSON [String] where
   parseJSON (Aeson.Array arr) = traverse Aeson.parseJSON (V.toList arr)
   parseJSON v = AesonTypes.typeMismatch "Array or witness object" v
 
-newtype ComId = ComId {unComId :: BS.ByteString}
-  deriving (Eq, Show)
+newtype ComId = ComId {unComId :: Hexadecimal}
+  deriving newtype (Eq, Show, FromJSON, ToJSON)
 
 newtype CommitmentPayload = CommitmentPayload
   { payload :: [Integer]
   }
+  deriving newtype (Eq, Show, FromJSON, ToJSON)
 
-computeComId :: CommitmentPayload -> ComId
-computeComId CommitmentPayload {payload} =
+data Commitment
+  = Commitment {id :: ComId, payload :: CommitmentPayload}
+  deriving (Eq, Show, Generic, FromJSON, ToJSON)
+
+mkCommitment :: CommitmentPayload -> Commitment
+mkCommitment payload =
   let
     -- Encode each limb as big-endian bytes with length prefix
     -- It takes the [Integer] payload limbs and encodes each as big-endian
@@ -71,10 +81,11 @@ computeComId CommitmentPayload {payload} =
     encodeLimb n =
       let bs = integerToBytes n
        in BS.cons (fromIntegral (length bs)) (BS.pack bs)
-    flat = BS.concat (map encodeLimb payload)
+    flat = BS.concat (map encodeLimb (coerce payload))
     digest = hash @_ @SHA256 flat
+    id = ComId . fromByteString @Hexadecimal $ (BA.convert digest :: ByteString)
    in
-    ComId (BA.convert digest :: BS.ByteString)
+    Commitment {id, payload}
 
 integerToBytes :: Integer -> [Word8]
 integerToBytes 0 = [0]

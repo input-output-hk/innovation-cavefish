@@ -190,7 +190,15 @@ class Codec a where
     )
       . decode
 
-newtype Hexadecimal = Hexadecimal ByteString
+newtype Hexadecimal = Hexadecimal {unHexadecimal :: ByteString}
+  deriving (Show, Eq)
+
+instance ToJSON Hexadecimal where
+  toJSON = A.String . encode @Hexadecimal
+
+instance FromJSON Hexadecimal where
+  parseJSON (A.String s) = pure . decode' @Hexadecimal $ s
+  parseJSON _ = fail "Expected a string"
 
 instance Codec Hexadecimal where
   encode = encodeHex . coerce

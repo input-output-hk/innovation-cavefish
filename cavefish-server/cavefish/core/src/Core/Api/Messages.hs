@@ -29,7 +29,6 @@ import Core.Api.State (
     txAbsHash
   ),
  )
-import Core.Cbor (serialiseTx)
 import Core.Pke (
   PkeSecretKey,
   decrypt,
@@ -62,6 +61,7 @@ import Servant (
   errBody,
   throwError,
  )
+import WBPS.Core.Cardano.Cbor
 import WBPS.Core.Keys.Ed25519 qualified as Ed25519
 
 -- | Cavefish API a

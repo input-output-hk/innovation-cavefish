@@ -16,12 +16,12 @@ module Core.Intent (
   toCanonicalIntent,
   satisfies,
   outExactly,
+  valuePositive,
 ) where
 
 import Cardano.Api (ConwayEra, FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
 import Cooked (MockChainState)
-import Core.TxAbs (TxAbs (absFee, absMint, outputs, sigKeys, validityInterval))
 import Data.Foldable (foldl)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map qualified as Map
@@ -39,6 +39,7 @@ import Ledger (
   cardanoPubKeyHash,
   pubKeyHash,
  )
+import WBPS.Core.Cardano.TxAbs (TxAbs (absFee, absMint, outputs, sigKeys, validityInterval))
 
 type ChangeDelta = Api.Value
 
@@ -51,7 +52,7 @@ newtype Spend = Spend {source :: Api.AddressInEra Api.ConwayEra}
 data BuildTxResult = BuildTxResult
   { tx :: Api.Tx Api.ConwayEra
   -- ^ Built transaction
-  , txAbs :: TxAbs Api.ConwayEra
+  -- , txAbs :: TxAbs Api.ConwayEra
   -- ^ Abstract representation of the transaction
   , mockState :: MockChainState
   -- ^ Updated mock chain state

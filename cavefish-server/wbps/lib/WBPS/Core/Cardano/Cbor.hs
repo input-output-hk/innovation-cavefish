@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Core.Cbor (
+module WBPS.Core.Cardano.Cbor (
   serialiseTx,
   serialiseTxBody,
   serialiseTxBodyMasked,
@@ -26,8 +26,6 @@ import Codec.CBOR.Term (
   encodeTerm,
  )
 import Codec.CBOR.Write qualified as Write
-import Core.Pke (PkeCiphertext, deserialiseCiphertext, serialiseCiphertext)
-import Core.TxAbs (TxAbs (TxAbs, absFee, absMint, outputs, sigKeys, validityInterval))
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
@@ -41,6 +39,7 @@ import Ledger.Crypto (PubKey (PubKey))
 import PlutusLedgerApi.V1 (fromBuiltin)
 import PlutusLedgerApi.V1.Bytes (LedgerBytes (LedgerBytes))
 import PlutusLedgerApi.V1.Interval qualified as Interval
+import WBPS.Core.Cardano.TxAbs (TxAbs (TxAbs, absFee, absMint, outputs, sigKeys, validityInterval))
 
 serialiseTxAbs :: TxAbs Api.ConwayEra -> ByteString
 serialiseTxAbs = Write.toStrictByteString . encodeTxAbs
@@ -129,7 +128,7 @@ data WitnessBundle = WitnessBundle
   , txBodyMasked :: ByteString
   , observer :: Maybe ByteString
   , auxNonce :: ByteString
-  , encryptedTx :: PkeCiphertext
+  -- , encryptedTx :: PkeCiphertext
   }
 
 mkWitnessBundle ::
@@ -137,9 +136,9 @@ mkWitnessBundle ::
   TxAbs Api.ConwayEra ->
   Maybe ByteString ->
   ByteString ->
-  PkeCiphertext ->
+  -- PkeCiphertext ->
   Either Text WitnessBundle
-mkWitnessBundle tx txAbs observer aux encrypted = do
+mkWitnessBundle tx txAbs observer aux = do
   let rawBody = serialiseTxBody tx
   maskedBody <- maskTxBody rawBody
   pure
@@ -150,11 +149,11 @@ mkWitnessBundle tx txAbs observer aux encrypted = do
       , txBodyMasked = maskedBody
       , observer
       , auxNonce = aux
-      , encryptedTx = encrypted
+      -- , encryptedTx = encrypted
       }
 
 encodeWitnessBundle :: WitnessBundle -> E.Encoding
-encodeWitnessBundle WitnessBundle {txId, txAbs, txBody, txBodyMasked, observer, auxNonce, encryptedTx} =
+encodeWitnessBundle WitnessBundle {txId, txAbs, txBody, txBodyMasked, observer, auxNonce} =
   E.encodeListLen 7
     <> E.encodeBytes txId
     <> E.encodeBytes txAbs
@@ -162,28 +161,30 @@ encodeWitnessBundle WitnessBundle {txId, txAbs, txBody, txBodyMasked, observer, 
     <> E.encodeBytes txBodyMasked
     <> maybe E.encodeNull E.encodeBytes observer
     <> E.encodeBytes auxNonce
-    <> E.encodeBytes (serialiseCiphertext encryptedTx)
+
+-- <> E.encodeBytes (serialiseCiphertext encryptedTx)
 
 serialiseWitnessBundle :: WitnessBundle -> ByteString
 serialiseWitnessBundle =
   Write.toStrictByteString . encodeWitnessBundle
 
 serialiseClientWitnessBundle :: WitnessBundle -> ByteString
-serialiseClientWitnessBundle WitnessBundle {txId, txAbs, txBodyMasked, auxNonce, encryptedTx} =
+serialiseClientWitnessBundle WitnessBundle {txId, txAbs, txBodyMasked, auxNonce} =
   Write.toStrictByteString $
     E.encodeListLen 5
       <> E.encodeBytes txId
       <> E.encodeBytes txAbs
       <> E.encodeBytes txBodyMasked
       <> E.encodeBytes auxNonce
-      <> E.encodeBytes (serialiseCiphertext encryptedTx)
+
+-- <> E.encodeBytes (serialiseCiphertext encryptedTx)
 
 data ClientWitnessBundle = ClientWitnessBundle
   { cwbTxId :: ByteString
   , cwbTxAbs :: ByteString
   , cwbTxBodyMasked :: ByteString
   , cwbAuxNonce :: ByteString
-  , cwbCiphertext :: PkeCiphertext -- This is `comTx`
+  -- , cwbCiphertext :: PkeCiphertext -- This is `comTx`
   }
 
 deserialiseClientWitnessBundle :: ByteString -> Either Text ClientWitnessBundle
@@ -205,14 +206,14 @@ deserialiseClientWitnessBundle bytes = do
       maskedBody <- expectBytes "masked tx body" maskedBodyTerm
       auxBytes <- expectBytes "aux nonce" auxTerm
       cipherBytes <- expectBytes "ciphertext" cipherTerm
-      ciphertext <- deserialiseCiphertext cipherBytes
+      -- ciphertext <- deserialiseCiphertext cipherBytes
       pure
         ClientWitnessBundle
           { cwbTxId = txIdBytes
           , cwbTxAbs = txAbsBytes
           , cwbTxBodyMasked = maskedBody
           , cwbAuxNonce = auxBytes
-          , cwbCiphertext = ciphertext
+          -- , cwbCiphertext = ciphertext
           }
     decodeElems _ = Left "witness bundle: invalid element count"
 
