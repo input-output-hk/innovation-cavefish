@@ -34,12 +34,12 @@ module Client.Mock (
 ) where
 
 import Control.Monad.Error.Class (throwError)
-import Core.Api.AppContext (AppM)
 import Core.Api.Messages (
   PendingResp,
   clientSignatureMessage,
   pendingH,
  )
+import Core.Api.ServerContext (ServerM)
 import Core.Intent (IntentDSL)
 import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
@@ -61,7 +61,7 @@ import WBPS.Core.Keys.Ed25519 as Ed25519 (
  )
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
 
-type RunServer = forall a. AppM a -> Handler a
+type RunServer = forall a. ServerM a -> Handler a
 
 data Provisionned = Provisionned
   { server :: RunServer

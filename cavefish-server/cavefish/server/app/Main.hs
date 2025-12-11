@@ -15,9 +15,9 @@ import Core.CavefishLogEvent (CavefishLogEvent (LogSPConfigLoaded))
 import Core.Logging (Verbosity (Verbose), traceWith, withTracer)
 import Network.Wai.Handler.Warp qualified as Warp
 import Paths_cavefish_server (getDataFileName)
-import Sp.Emulator (initialMockState, mkCookedEnv)
+import Sp.Emulator (initialMockState, mkServerContext)
 import Sp.Middleware (cavefishMiddleware)
-import Sp.Server (mkApp)
+import Sp.Server (mkServer)
 import System.IO (hPutStrLn, stderr)
 import WBPS.Core.FileScheme (mkFileSchemeFromRoot)
 
@@ -38,21 +38,17 @@ main = withTracer (Verbose "SP.Server") $ \tr -> do
   config <- loadConfig configFilePath
   traceWith tr $ LogSPConfigLoaded config
   mockState <- liftIO $ newTVarIO initialMockState
-  pendingStore <- liftIO $ newTVarIO mempty
-  completeStore <- liftIO $ newTVarIO mempty
 
   let (Wbps path) = wbps config
   wbpsScheme <- liftIO $ mkFileSchemeFromRoot path
   let HttpServer {port} = httpServer config
       env =
-        mkCookedEnv
+        mkServerContext
           mockState
-          pendingStore
-          completeStore
           wbpsScheme
           config
 
   liftIO $
     Warp.run
       port
-      (mkApp cavefishMiddleware env)
+      (mkServer cavefishMiddleware env)

@@ -2,41 +2,38 @@
 
 module Core.SP.FetchAccounts (handle, Outputs (..), Account (..)) where
 
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (ask))
-import Core.Api.AppContext (
-  AppM,
-  Env (
-    Env,
-    wbpsScheme
-  ),
+import Core.Api.ServerContext (
+  ServerContext (..),
+  ServerM,
+  WBPSServices (..),
  )
-import Data.Aeson
-import Data.ByteString.Lazy.Char8 qualified as BL8
+import Data.Aeson (FromJSON, ToJSON, Value)
 import GHC.Generics (Generic)
-import Servant (
-  err500,
-  errBody,
-  throwError,
- )
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
-import WBPS.Registration
+import WBPS.Registration (
+  AccountCreated (
+    AccountCreated,
+    encryptionKeys,
+    provingKey,
+    publicVerificationContext,
+    userWalletPublicKey
+  ),
+  PublicVerificationContext (asJson),
+ )
 
-handle :: AppM Outputs
+handle :: ServerM Outputs
 handle = do
-  Env {wbpsScheme} <- ask
-  liftIO (withFileSchemeIO wbpsScheme loadAccounts)
-    >>= \case
-      (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
-      (Right accountsCreated) ->
-        return
-          . Outputs
-          . map
-            ( \AccountCreated {encryptionKeys = ElGamal.KeyPair {..}, ..} ->
-                Account {publicVerificationContext = asJson publicVerificationContext, ..}
-            )
-          $ accountsCreated
+  ServerContext {wbpsServices = WBPSServices {loadAccounts}} <- ask
+  accountsCreated <- loadAccounts
+  return
+    . Outputs
+    . map
+      ( \AccountCreated {encryptionKeys = ElGamal.KeyPair {..}, ..} ->
+          Account {publicVerificationContext = asJson publicVerificationContext, ..}
+      )
+    $ accountsCreated
 
 newtype Outputs = Outputs
   { accounts :: [Account]

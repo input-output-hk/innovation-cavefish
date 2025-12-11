@@ -8,7 +8,7 @@
 --    and submit them to the mock chain. It also includes utilities to manage the
 --    mock chain state.
 module Sp.Emulator (
-  mkCookedEnv,
+  mkServerContext,
   buildWithCooked,
   initialMockState,
   producedTotal,
@@ -16,7 +16,7 @@ module Sp.Emulator (
 
 import Cardano.Api (MonadIO (..))
 import Cardano.Api qualified as Api
-import Control.Concurrent.STM (TVar, atomically, readTVarIO, writeTVar)
+import Control.Concurrent.STM (TVar, readTVarIO)
 import Control.Monad.Identity (runIdentity)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.State.Strict (runStateT)
@@ -27,62 +27,78 @@ import Cooked.MockChain.MockChainState (
   MockChainState,
   mockChainState0,
  )
-import Core.Api.AppContext (
-  Env (..),
-  defaultWalletResolver,
- )
 import Core.Api.Config qualified as Cfg
-import Core.Api.State (CompleteStore, PendingStore)
+import Core.Api.ServerContext
 import Core.Intent
 import Core.Observers.Observer (stakeValidatorFromBytes)
 import Core.TxBuilder (buildTx)
+import Data.ByteString.Lazy.Char8 qualified as BL8
 import Data.Default (def)
 import Data.Foldable (traverse_)
-import Data.Text (Text)
 import Ledger.Scripts (StakeValidator (getStakeValidator))
 import Ledger.Tx (
   pattern CardanoEmulatorEraTx,
  )
 import Plutus.Script.Utils.Address qualified as ScriptAddr
 import Plutus.Script.Utils.Scripts (Language (PlutusV2), Versioned (Versioned))
+import Servant (
+  err422,
+  err500,
+  errBody,
+  throwError,
+ )
 import WBPS.Core.FileScheme (FileScheme)
+import WBPS.Registration (RegistrationFailed (AccountAlreadyRegistered), withFileSchemeIO)
+import WBPS.Registration qualified as WBPS
 
--- | Create a Cooked environment for the Cavefish server using the provided
--- parameters.
-mkCookedEnv ::
+mkServerContext ::
   TVar MockChainState ->
-  PendingStore ->
-  CompleteStore ->
   FileScheme ->
   Cfg.Config ->
-  Env
-mkCookedEnv
-  mockState
-  pendingStore
-  completeStore
-  wbpsSchemeValue
+  ServerContext
+mkServerContext
+  mockChainState
+  wbpsScheme
   config =
     env
     where
       env =
-        Env
-          { pending = pendingStore
-          , complete = completeStore
-          , ttl = fromInteger $ Cfg.seconds $ Cfg.transactionExpiry config
-          , resolveWallet = defaultWalletResolver
-          , spFee = Cfg.amount (Cfg.serviceProviderFee config)
-          , wbpsScheme = wbpsSchemeValue
-          , build = buildWithCooked mockState env
-          , submit = submitWithCooked mockState env
+        ServerContext
+          { txBuildingServices =
+              TxBuildingServices
+                { serviceFeeAmount = Cfg.amount (Cfg.serviceProviderFee config)
+                , build = buildWithCooked mockChainState env
+                , submit = submitWithCooked mockChainState env
+                }
+          , wbpsServices =
+              WBPSServices
+                { register = \userWalletPublicKey ->
+                    liftIO (withFileSchemeIO wbpsScheme (WBPS.register userWalletPublicKey))
+                      >>= \case
+                        Left [AccountAlreadyRegistered _] -> throwError err422 {errBody = BL8.pack "Account Already Registered"}
+                        Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
+                        Right x -> pure x
+                , loadAccount = \userWalletPublicKey ->
+                    liftIO (WBPS.withFileSchemeIO wbpsScheme (WBPS.loadAccount userWalletPublicKey))
+                      >>= \case
+                        (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
+                        Right x -> pure x
+                , loadAccounts =
+                    liftIO (withFileSchemeIO wbpsScheme WBPS.loadAccounts)
+                      >>= \case
+                        (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
+                        Right x -> pure x
+                }
+          , wbpsScheme
           }
 
 -- | Build a transaction using the Cooked mock chain.
 buildWithCooked ::
   MonadIO m =>
   TVar MockChainState ->
-  Env ->
+  ServerContext ->
   IntentDSL ->
-  m BuildTxResult
+  m TxUnsigned
 buildWithCooked mockState env intentDSL = do
   case toCanonicalIntent intentDSL of
     Left err -> liftIO $ fail ("buildTx failed: " <> show err)
@@ -110,24 +126,18 @@ buildWithCooked mockState env intentDSL = do
           --     -- The masked TxAbs zeroes the change output, so we recover the hidden
           --     -- amount by subtracting masked outputs from their raw counterparts.
           --     changeDelta = producedRaw <> Api.negateValue producedMasked
-          pure
-            BuildTxResult
-              { tx
-              , -- , changeDelta
-                -- , txAbs
-                mockState = st1
-              }
+          pure . TxUnsigned $ tx
 
 -- | Submit a transaction to the mock chain by updating the mock chain state.
 submitWithCooked ::
+  MonadIO m =>
   TVar MockChainState ->
-  Env ->
+  ServerContext ->
   Api.Tx Api.ConwayEra ->
-  MockChainState ->
-  IO (Either Text ())
-submitWithCooked mockState _env _tx newState = do
-  atomically $ writeTVar mockState newState
-  pure (Right ())
+  m ()
+submitWithCooked _ _env _tx = do
+  -- atomically $ writeTVar mockState newState
+  pure ()
 
 -- | Run a 'MockChain' action purely, returning the result and the new state.
 runMockChainPure ::

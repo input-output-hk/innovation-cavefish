@@ -62,9 +62,9 @@ library
   import:          base, project-config
   hs-source-dirs:  src
   exposed-modules:
-    Core.Api.AppContext
     Core.Api.Config
     Core.Api.Messages
+    Core.Api.ServerContext
     Core.Api.State
     Core.CavefishLogEvent
     Core.Intent

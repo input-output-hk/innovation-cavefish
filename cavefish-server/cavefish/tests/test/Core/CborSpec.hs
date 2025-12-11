@@ -22,7 +22,7 @@ module Core.CborSpec () where
 -- import Data.Text qualified as T
 -- import Ledger.Tx.CardanoAPI (toCardanoAddressInEra)
 -- import Plutus.Script.Utils.Address qualified as ScriptAddr
--- import Sp.Emulator (buildWithCooked, initialMockState, mkCookedEnv)
+-- import Sp.Emulator (buildWithCooked, initialMockState, mkServerContext)
 -- import Test.Hspec (Spec, describe, expectationFailure, it)
 -- import WBPS.Core.FileScheme (mkFileSchemeFromRoot)
 -- import WBPS.Core.Keys.Ed25519 (userWalletPK)
@@ -76,7 +76,7 @@ module Core.CborSpec () where
 --       wbpsScheme <- mkFileSchemeFromRoot "../../wbps"
 --       let config :: Config = def
 --       let env =
---             mkCookedEnv
+--             mkServerContext
 --               mockState
 --               pendingStore
 --               completeStore

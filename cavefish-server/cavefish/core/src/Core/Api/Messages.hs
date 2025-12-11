@@ -10,12 +10,10 @@
 module Core.Api.Messages where
 
 import Cardano.Api qualified as Api
-import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, readTVarIO)
+import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (MonadReader (ask))
-import Core.Api.AppContext (
-  AppM,
-  Env (..),
+import Core.Api.ServerContext (
+  ServerM,
  )
 import Core.Api.State (
   Completed (Completed, creator, submittedAt, tx),
@@ -139,11 +137,11 @@ instance ToJSON PendingItem
 
 instance FromJSON PendingItem
 
-pendingH :: AppM PendingResp
+pendingH :: ServerM PendingResp
 pendingH = do
-  Env {pending} <- ask
-  pendings <- liftIO . atomically $ Map.toAscList <$> readTVar pending
-  pure . PendingResp $ fmap (uncurry mkPendingItem) pendings
+  -- ServerContext {pending} <- ask
+  -- pendings <- liftIO . atomically $ Map.toAscList <$> readTVar pending
+  pure . PendingResp $ fmap (uncurry mkPendingItem) mempty
   where
     mkPendingItem :: Api.TxId -> Pending -> PendingItem
     mkPendingItem txId Pending {creator, txAbsHash, expiry} =
@@ -154,20 +152,20 @@ pendingH = do
         , clientId = creator
         }
 
-transactionH :: Text -> AppM TransactionResp
+transactionH :: Text -> ServerM TransactionResp
 transactionH txIdText = do
-  Env {complete, pending} <- ask
+  -- ServerContext {complete, pending} <- ask
   case parseTxIdHex txIdText of
     Nothing -> throwError err400 {errBody = "malformed tx id"}
     Just txId -> do
-      completes <- Map.lookup txId <$> liftIO (readTVarIO complete)
-      pendings <- lookupPendingEntry pending txId
+      -- completes <- Map.lookup txId <$> liftIO (readTVarIO complete)
+      -- pendings <- lookupPendingEntry pending txId
       let toSubmitted Completed {tx, submittedAt, creator = creatorId} =
             TransactionSubmitted (SubmittedSummary (CardanoEmulatorEraTx tx) submittedAt creatorId)
           toPending Pending {expiry, creator = creatorId} =
             TransactionPending (PendingSummary expiry creatorId)
-      let fallback = maybe TransactionMissing toPending pendings
-      pure $ maybe fallback toSubmitted completes
+      let fallback = maybe TransactionMissing toPending Nothing
+      pure $ maybe fallback toSubmitted Nothing
 
 finaliseSigTag :: ByteString
 finaliseSigTag = "cavefish/finalise/v1"
@@ -210,12 +208,12 @@ parseTxIdHex =
     . Api.deserialiseFromRawBytesHex @Api.TxId
     . TE.encodeUtf8
 
-lookupPendingEntry :: TVar (Map Api.TxId Pending) -> Api.TxId -> AppM (Maybe Pending)
+lookupPendingEntry :: TVar (Map Api.TxId Pending) -> Api.TxId -> ServerM (Maybe Pending)
 lookupPendingEntry store txId =
   liftIO . atomically $ do
     entries <- readTVar store
     pure (Map.lookup txId entries)
 
-removePendingEntry :: TVar (Map Api.TxId Pending) -> Api.TxId -> AppM ()
+removePendingEntry :: TVar (Map Api.TxId Pending) -> Api.TxId -> ServerM ()
 removePendingEntry store txId =
   liftIO . atomically $ modifyTVar' store (Map.delete txId)

@@ -5,16 +5,16 @@
 module Sp.Server (
   Cavefish,
   Register,
-  mkApp,
+  mkServer,
 ) where
 
-import Core.Api.AppContext (AppM, Env, runApp)
 import Core.Api.Messages (
   PendingResp,
   TransactionResp,
   pendingH,
   transactionH,
  )
+import Core.Api.ServerContext (ServerContext, ServerM, runApp)
 import Core.SP.AskCommitmentProof qualified as AskCommitmentProof
 import Core.SP.AskSubmission qualified as AskSubmission
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
@@ -71,8 +71,8 @@ type FetchAccounts = "fetchAccounts" :> Get '[JSON] FetchAccounts.Outputs
 cavefishApi :: Proxy Cavefish
 cavefishApi = Proxy
 
-mkApp :: Middleware -> Env -> Application
-mkApp cavefishMiddleware env =
+mkServer :: Middleware -> ServerContext -> Application
+mkServer cavefishMiddleware env =
   let
     policy =
       simpleCorsResourcePolicy
@@ -85,7 +85,7 @@ mkApp cavefishMiddleware env =
         serve cavefishApi $
           hoistServer cavefishApi (runApp env) server
 
-server :: ServerT Cavefish AppM
+server :: ServerT Cavefish ServerM
 server =
   Register.handle
     :<|> DemonstrateCommitment.handle

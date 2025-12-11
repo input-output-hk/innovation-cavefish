@@ -32,7 +32,11 @@ import Cooked (
  )
 import Cooked.Skeleton.Payable qualified as Payable
 import Cooked.Wallet (wallet)
-import Core.Api.AppContext (Env (..))
+import Core.Api.ServerContext (
+  ServerContext (..),
+  TxBuildingServices (TxBuildingServices, serviceFeeAmount),
+  defaultWalletResolver,
+ )
 import Core.Intent (
   CanonicalIntent (irChangeTo, irMaxInterval, irMustMint, irPayTo, irSpendFrom),
   source,
@@ -48,8 +52,8 @@ import Plutus.Script.Utils.Value qualified as PSV
 import PlutusLedgerApi.V1.Interval qualified as Interval
 
 -- | Build a Cardano transaction based on the provided intent and observer
-buildTx :: MonadBlockChain m => CanonicalIntent -> Maybe ByteString -> Env -> m CardanoTx
-buildTx intent observerBytes env@Env {..} = do
+buildTx :: MonadBlockChain m => CanonicalIntent -> Maybe ByteString -> ServerContext -> m CardanoTx
+buildTx intent observerBytes env@ServerContext {txBuildingServices = TxBuildingServices {serviceFeeAmount}} = do
   let stakeValidator = fmap stakeValidatorFromBytes observerBytes
       skel0 = base stakeValidator
   signerWallets <-
@@ -109,7 +113,7 @@ buildTx intent observerBytes env@Env {..} = do
         }
 
     spFeeOutputs =
-      [wallet 1 `receives` Payable.Value (PSV.lovelace spFee) | spFee > 0]
+      [wallet 1 `receives` Payable.Value (PSV.lovelace serviceFeeAmount) | serviceFeeAmount > 0]
 
     addPay :: MonadBlockChain m => TxSkel -> (Api.Value, Api.AddressInEra Api.ConwayEra) -> m TxSkel
     addPay skel (v, addr) = do
@@ -119,18 +123,18 @@ buildTx intent observerBytes env@Env {..} = do
       Api.AddressInEra Api.ConwayEra ->
       Either Text Wallet
     getWallet addr' =
-      case resolveWallet addr' of
-        Nothing -> Left "TxBuilder: address not recognised (resolveWallet failed)"
+      case defaultWalletResolver addr' of
+        Nothing -> Left "TxBuilder: address not recognised (defaultWalletResolver failed)"
         Just w -> pure w
 
 mkPayTo ::
   Api.Value ->
   Api.AddressInEra Api.ConwayEra ->
-  Core.Api.AppContext.Env ->
+  Core.Api.ServerContext.ServerContext ->
   Either Text [TxSkelOut]
-mkPayTo value addr Core.Api.AppContext.Env {..} = do
-  payee <- case resolveWallet addr of
-    Nothing -> Left "TxBuilder: address not recognised (resolveWallet failed)"
+mkPayTo value addr Core.Api.ServerContext.ServerContext {..} = do
+  payee <- case defaultWalletResolver addr of
+    Nothing -> Left "TxBuilder: address not recognised (defaultWalletResolver failed)"
     Just w -> Right w
   lov <- toLovelace value
   pure [payee `receives` Payable.Value (PSV.lovelace lov)]

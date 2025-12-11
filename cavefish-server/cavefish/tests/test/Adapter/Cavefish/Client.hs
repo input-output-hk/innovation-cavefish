@@ -17,9 +17,9 @@ import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant (Application, Proxy (Proxy), type (:<|>) ((:<|>)))
 import Servant.Client (BaseUrl (BaseUrl))
 import Servant.Client qualified as SC
-import Sp.Emulator (initialMockState, mkCookedEnv)
+import Sp.Emulator (initialMockState, mkServerContext)
 import Sp.Middleware (errStatusTraceMiddleware)
-import Sp.Server (Cavefish, mkApp)
+import Sp.Server (Cavefish, mkServer)
 import Test.Hspec (expectationFailure)
 import WBPS.Core.FileScheme (FileScheme)
 
@@ -65,14 +65,10 @@ mkApplication ::
   FileScheme ->
   IO Application
 mkApplication wbpsScheme = do
-  pendingStore <- newTVarIO Map.empty
-  completeStore <- newTVarIO Map.empty
   mockStateVar <- newTVarIO initialMockState
   let config :: Config = def
-  pure . mkApp errStatusTraceMiddleware $
-    mkCookedEnv
+  pure . mkServer errStatusTraceMiddleware $
+    mkServerContext
       mockStateVar
-      pendingStore
-      completeStore
       wbpsScheme
       config

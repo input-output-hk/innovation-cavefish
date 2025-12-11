@@ -3,10 +3,14 @@ module Core.SP.DemonstrateCommitment (handle, Inputs (..), Outputs (..), Commitm
 import Cardano.Api qualified as Api
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (MonadReader (ask))
-import Core.Api.AppContext (AppM, Env (Env, build, wbpsScheme))
+import Core.Api.ServerContext (
+  ServerContext (ServerContext, txBuildingServices, wbpsScheme),
+  ServerM,
+  TxBuildingServices (TxBuildingServices, build),
+ )
 import Core.Intent (
-  BuildTxResult (BuildTxResult, tx),
   IntentDSL,
+  TxUnsigned (TxUnsigned),
  )
 import Data.Aeson (FromJSON, ToJSON)
 import Data.ByteString.Lazy.Char8 qualified as BL8
@@ -37,10 +41,10 @@ data Outputs = Outputs
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
-handle :: Inputs -> AppM Outputs
+handle :: Inputs -> ServerM Outputs
 handle Inputs {userWalletPublicKey, intent} = do
-  Env {build, wbpsScheme} <- ask
-  BuildTxResult {tx = tx} <- build intent
+  ServerContext {txBuildingServices = TxBuildingServices {build}, wbpsScheme} <- ask
+  TxUnsigned tx <- build intent
 
   liftIO (WBPS.withFileSchemeIO wbpsScheme (WBPS.createSession userWalletPublicKey tx))
     >>= \case

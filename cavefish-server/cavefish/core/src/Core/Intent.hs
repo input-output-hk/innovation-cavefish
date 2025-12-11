@@ -4,7 +4,7 @@
 --     intents, including their representation, normalization, and satisfaction checks
 --     against built transactions.
 module Core.Intent (
-  BuildTxResult (..),
+  TxUnsigned (..),
   CanonicalIntent (..),
   IntentDSL (..),
   AddressW (..),
@@ -21,7 +21,6 @@ module Core.Intent (
 
 import Cardano.Api (ConwayEra, FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
-import Cooked (MockChainState)
 import Data.Foldable (foldl)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map qualified as Map
@@ -49,15 +48,10 @@ newtype Spend = Spend {source :: Api.AddressInEra Api.ConwayEra}
   deriving anyclass (ToJSON, FromJSON)
 
 -- Result of building a transaction
-data BuildTxResult = BuildTxResult
-  { tx :: Api.Tx Api.ConwayEra
-  -- ^ Built transaction
-  -- , txAbs :: TxAbs Api.ConwayEra
-  -- ^ Abstract representation of the transaction
-  , mockState :: MockChainState
-  -- ^ Updated mock chain state
+newtype TxUnsigned = TxUnsigned
+  { txUnsigned :: Api.Tx Api.ConwayEra
   }
-  deriving (Show, Generic)
+  deriving newtype (Show, Eq, ToJSON, FromJSON)
 
 -- Wallet address as represented in the API
 newtype AddressW = AddressW Text

@@ -7,8 +7,8 @@
 
 module Core.SP.AskCommitmentProof (handle, Inputs (..), Outputs (..)) where
 
-import Core.Api.AppContext (
-  AppM,
+import Core.Api.ServerContext (
+  ServerM,
  )
 import Data.Aeson (
   FromJSON (parseJSON),
@@ -34,11 +34,11 @@ data Outputs = Outputs
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
-handle :: Inputs -> AppM Outputs
+handle :: Inputs -> ServerM Outputs
 handle Inputs {..} = do
   return Outputs {proof = "proof", challenge = 0}
 
--- Env {..} <- ask
+-- ServerContext {..} <- ask
 -- now <- liftIO getCurrentTime
 -- keypair <- Ed25519.generateKeyPair -- N.H to fix
 -- (_, dk) <- liftIO PKE.generateKeyPair
