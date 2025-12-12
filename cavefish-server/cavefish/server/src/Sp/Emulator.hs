@@ -47,6 +47,7 @@ import Servant (
   errBody,
   throwError,
  )
+import WBPS.Commitment qualified as WBPS
 import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Registration (RegistrationFailed (AccountAlreadyRegistered), withFileSchemeIO)
 import WBPS.Registration qualified as WBPS
@@ -78,6 +79,11 @@ mkServerContext
                         Left [AccountAlreadyRegistered _] -> throwError err422 {errBody = BL8.pack "Account Already Registered"}
                         Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                         Right x -> pure x
+                , createSession = \userWalletPublicKey tx ->
+                    liftIO (WBPS.withFileSchemeIO wbpsScheme (WBPS.createSession userWalletPublicKey tx))
+                      >>= \case
+                        (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
+                        (Right x) -> pure x
                 , loadAccount = \userWalletPublicKey ->
                     liftIO (WBPS.withFileSchemeIO wbpsScheme (WBPS.loadAccount userWalletPublicKey))
                       >>= \case
@@ -89,7 +95,6 @@ mkServerContext
                         (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                         Right x -> pure x
                 }
-          , wbpsScheme
           }
 
 -- | Build a transaction using the Cooked mock chain.

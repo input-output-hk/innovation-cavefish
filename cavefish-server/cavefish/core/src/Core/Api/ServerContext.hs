@@ -15,13 +15,12 @@ import Ledger.Address qualified as Ledger
 import Ledger.CardanoWallet qualified as CW
 import Servant.Server (Handler)
 import Servant.Server.Internal.ServerError (ServerError)
-import WBPS.Core.FileScheme (FileScheme)
+import WBPS.Commitment (Session)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Registration (AccountCreated)
 
 data ServerContext = ServerContext
-  { wbpsScheme :: FileScheme
-  , wbpsServices :: WBPSServices
+  { wbpsServices :: WBPSServices
   , txBuildingServices :: TxBuildingServices
   }
 
@@ -31,6 +30,10 @@ data WBPSServices = WBPSServices
       (MonadIO m, MonadError ServerError m) =>
       UserWalletPublicKey ->
       m AccountCreated
+  , createSession ::
+      forall m.
+      (MonadIO m, MonadError ServerError m) =>
+      UserWalletPublicKey -> Tx ConwayEra -> m Session
   , loadAccount ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>

@@ -48,6 +48,11 @@ jobs:
           # Quick sanity: show a few tracked files if present
           git lfs ls-files || true
 
+      - name: Add babyjubjub-keygen to PATH
+        run: |
+          chmod +x "$GITHUB_WORKSPACE/cavefish-server/wbps/inputs/babyjubjub-keygen"
+          echo "$GITHUB_WORKSPACE/cavefish-server/wbps/inputs" >> "$GITHUB_PATH"
+
       - name: Free up disk space
         run: |
           sudo rm -rf \

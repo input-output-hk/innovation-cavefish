@@ -173,9 +173,20 @@ let
       fi
       echo "cavefish" | figlet -f cybermedium
 
-      # Make repo-local tooling available in the shell.
-      export PATH=$(pwd)/wbps/inputs:$PATH
-      export PATH=$(pwd)/node_modules/.bin:$PATH
+      # Make repo-local tooling available in the shell (including babyjubjub-keygen).
+      repo_root=$PWD
+      if [ -d "$repo_root/cavefish-server" ]; then
+        repo_root="$repo_root/cavefish-server"
+      fi
+
+      if [ -d "$repo_root/wbps/inputs" ]; then
+        export PATH="$repo_root/wbps/inputs:$PATH"
+        export BABYJUBJUB_KEYGEN="$repo_root/wbps/inputs/babyjubjub-keygen"
+      fi
+
+      if [ -d "$repo_root/node_modules/.bin" ]; then
+        export PATH="$repo_root/node_modules/.bin:$PATH"
+      fi
     '';
   };
 
