@@ -4,7 +4,7 @@
 
 -- | A simple tracer implementation that logs messages as JSON to stdout,
 -- with support for verbosity levels and capturing logs on failure.
-module Core.Logging (
+module Adapter.Logging (
   -- * Tracer
   Tracer (..),
   natTracer,

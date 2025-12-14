@@ -6,6 +6,7 @@ module Sp.Middleware (
   errStatusTraceMiddleware,
 ) where
 
+import Adapter.Logging (Verbosity (Verbose), traceWith, withTracer)
 import Control.Monad (when)
 import Core.CavefishLogEvent (
   CavefishLogEvent (LogHttpRoundTrip, LogHttpServerError),
@@ -13,7 +14,6 @@ import Core.CavefishLogEvent (
   HttpServerError (HttpServerError, duration, errorMessage, method, path, status),
   RequestDuration (RequestDuration),
  )
-import Core.Logging (Verbosity (Verbose), traceWith, withTracer)
 import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8With)

@@ -3,6 +3,7 @@
 --  environment and configurations.
 module Main where
 
+import Adapter.Logging (Verbosity (Verbose), traceWith, withTracer)
 import Control.Concurrent.STM (newTVarIO)
 import Control.Monad.IO.Class (liftIO)
 import Core.Api.ServerConfiguration (
@@ -12,7 +13,6 @@ import Core.Api.ServerConfiguration (
   loadConfig,
  )
 import Core.CavefishLogEvent (CavefishLogEvent (LogSPConfigLoaded))
-import Core.Logging (Verbosity (Verbose), traceWith, withTracer)
 import Data.Default (Default (def))
 import Network.Wai.Handler.Warp qualified as Warp
 import Paths_cavefish_server (getDataFileName)

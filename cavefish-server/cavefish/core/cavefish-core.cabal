@@ -62,13 +62,13 @@ library
   import:          base, project-config
   hs-source-dirs:  src
   exposed-modules:
+    Adapter.Logging
     Core.Api.Messages
     Core.Api.ServerConfiguration
     Core.Api.ServerContext
     Core.Api.State
     Core.CavefishLogEvent
     Core.Intent
-    Core.Logging
     Core.PaymentProof
     Core.Pke
     Core.Proof
