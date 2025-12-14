@@ -54,7 +54,7 @@ newtype PaymentVerificationKey = PaymentVerificationKey (Api.VerificationKey Api
   deriving newtype (Show, Eq, IsString)
 
 newtype PaymentAddess = PaymentAddess {unPaymentAddess :: Text}
-  deriving newtype (Show, Eq, IsString)
+  deriving newtype (Show, Eq, IsString, ToJSON, FromJSON)
 
 paymentAddress' :: PaymentVerificationKey -> PaymentAddess
 paymentAddress' (PaymentVerificationKey paymentVKey) =

@@ -13,7 +13,7 @@ module Core.CavefishLogEvent (
   HttpServerError (..),
 ) where
 
-import Core.Api.Config (Config)
+import Core.Api.ServerConfiguration (ServerConfiguration)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Text (Text)
 import GHC.Generics (Generic)
@@ -41,7 +41,7 @@ instance FromJSON HttpRoundTrip
 
 -- | Represents the event of loading the application configuration.
 newtype ConfigurationLoaded = ConfigurationLoaded
-  { config :: Config
+  { config :: ServerConfiguration
   }
   deriving (Show, Generic)
 
@@ -78,7 +78,7 @@ data CavefishLogEvent
   | LogConfigurationLoaded ConfigurationLoaded
   | LogErrorOccurred ErrorOccurred
   | LogHttpServerError HttpServerError
-  | LogSPConfigLoaded Config
+  | LogSPConfigLoaded ServerConfiguration
   deriving (Show, Generic)
 
 instance ToJSON CavefishLogEvent

@@ -8,11 +8,12 @@ module Core.SP.DemonstrateCommitment (
 ) where
 
 import Cardano.Api (ConwayEra, Tx)
+import Cardano.Api qualified as Api
 import Control.Monad.Reader (MonadReader (ask))
 import Core.Api.ServerContext (
-  ServerContext (ServerContext, txBuildingServices, wbpsServices),
+  ServerContext (ServerContext, txBuildingService, wbpsServices),
   ServerM,
-  TxBuildingServices (TxBuildingServices, build),
+  TxBuildingService (TxBuildingService, build),
   WBPSServices (WBPSServices, createSession),
  )
 import Core.Intent (
@@ -43,13 +44,14 @@ data Outputs = Outputs
 handle :: Inputs -> ServerM Outputs
 handle Inputs {userWalletPublicKey, intent} = do
   ServerContext
-    { txBuildingServices = TxBuildingServices {build}
+    { txBuildingService = TxBuildingService {build}
     , wbpsServices = WBPSServices {createSession}
     } <-
     ask
 
   TxUnsigned tx <- build intent
 
+  let unsignedTx = Api.makeSignedTransaction [] tx
   SessionCreated {publicMessage = PublicMessage txAbs, commitment} <-
-    createSession userWalletPublicKey tx
+    createSession userWalletPublicKey unsignedTx
   return Outputs {txAbs, commitment}

@@ -5,7 +5,8 @@ module Adapter.Cavefish.Client (
 ) where
 
 import Control.Concurrent.STM (newTVarIO)
-import Core.Api.Config (Config)
+import Cooked (InitialDistribution)
+import Core.Api.ServerConfiguration (ServerConfiguration)
 import Core.SP.AskCommitmentProof qualified as AskCommitmentProof
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.FetchAccount qualified as FetchAccount
@@ -17,7 +18,7 @@ import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant (Application, Proxy (Proxy), type (:<|>) ((:<|>)))
 import Servant.Client (BaseUrl (BaseUrl))
 import Servant.Client qualified as SC
-import Sp.Emulator (initialMockState, mkServerContext)
+import Sp.Emulator (mkServerContext)
 import Sp.Middleware (errStatusTraceMiddleware)
 import Sp.Server (Cavefish, mkServer)
 import Test.Hspec (expectationFailure)
@@ -63,12 +64,12 @@ runClientOrFail clientEnv action = do
 
 mkApplication ::
   FileScheme ->
-  IO Application
-mkApplication wbpsScheme = do
-  mockStateVar <- newTVarIO initialMockState
-  let config :: Config = def
-  pure . mkServer errStatusTraceMiddleware $
-    mkServerContext
-      mockStateVar
-      wbpsScheme
-      config
+  InitialDistribution ->
+  Application
+mkApplication wbpsScheme initialDistribution =
+  let serverConfigurationByDefault :: ServerConfiguration = def
+   in mkServer errStatusTraceMiddleware $
+        mkServerContext
+          initialDistribution
+          wbpsScheme
+          serverConfigurationByDefault

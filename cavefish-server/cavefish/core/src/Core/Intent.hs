@@ -8,6 +8,7 @@ module Core.Intent (
   CanonicalIntent (..),
   IntentDSL (..),
   AddressW (..),
+  AdressConwayEra (..),
   ChangeDelta,
   source,
   emptyIntent,
@@ -19,8 +20,9 @@ module Core.Intent (
   valuePositive,
 ) where
 
-import Cardano.Api (ConwayEra, FromJSON, ToJSON, Value)
+import Cardano.Api (FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
+import Data.Aeson qualified as Aeson
 import Data.Foldable (foldl)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map qualified as Map
@@ -42,16 +44,29 @@ import WBPS.Core.Cardano.TxAbs (TxAbs (absFee, absMint, outputs, sigKeys, validi
 
 type ChangeDelta = Api.Value
 
--- Spend source address
-newtype Spend = Spend {source :: Api.AddressInEra Api.ConwayEra}
+newtype AdressConwayEra = AdressConwayEra {unAdressConwayEra :: Api.AddressInEra Api.ConwayEra}
   deriving (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
 
+source :: AdressConwayEra -> Api.AddressInEra Api.ConwayEra
+source = unAdressConwayEra
+
 -- Result of building a transaction
 newtype TxUnsigned = TxUnsigned
-  { txUnsigned :: Api.Tx Api.ConwayEra
+  { txUnsigned :: Api.TxBody Api.ConwayEra
   }
-  deriving newtype (Show, Eq, ToJSON, FromJSON)
+  deriving newtype (Show, Eq)
+
+instance ToJSON TxUnsigned where
+  toJSON (TxUnsigned body) =
+    Aeson.toJSON (Api.serialiseToTextEnvelope Nothing body)
+
+instance FromJSON TxUnsigned where
+  parseJSON v = do
+    envelope <- Aeson.parseJSON v
+    case Api.deserialiseFromTextEnvelope @(Api.TxBody Api.ConwayEra) envelope of
+      Left err -> fail (show err)
+      Right body -> pure (TxUnsigned body)
 
 -- Wallet address as represented in the API
 newtype AddressW = AddressW Text
@@ -98,30 +113,30 @@ data InternalIntentDSL
   = -- | Must mint this value
     MustMint Value
   | -- | Spend from this source
-    SpendFrom Spend
+    SpendFrom AdressConwayEra
   | -- | Maximum validity interval in slots
     MaxInterval Slot
   | -- | Pay this value to this address
-    PayTo Value (Api.AddressInEra ConwayEra)
+    PayTo Value AdressConwayEra
   | -- | Send change to this address
-    ChangeTo (Api.AddressInEra ConwayEra)
+    ChangeTo AdressConwayEra
   | -- | Maximum fee
     MaxFee Integer
   | AndExps (NonEmpty InternalIntentDSL)
   deriving (Eq, Show, Generic)
 
 data CanonicalIntent = CanonicalIntent
-  { irSpendFrom :: [Spend]
+  { spendFrom :: [AdressConwayEra]
   -- ^ Spend from these sources
-  , irPayTo :: [(Api.Value, Api.AddressInEra Api.ConwayEra)]
+  , payTo :: [(Api.Value, AdressConwayEra)]
   -- ^ Pay these values to these addresses
-  , irMustMint :: [Api.Value]
+  , mustMint :: [Api.Value]
   -- ^ Must mint these values
-  , irChangeTo :: Maybe (Api.AddressInEra Api.ConwayEra)
+  , changeTo :: Maybe AdressConwayEra
   -- ^ Send change to this address
-  , irMaxFee :: Maybe Integer
+  , maxFee :: Maybe Integer
   -- ^ Maximum fee
-  , irMaxInterval :: Maybe Slot
+  , maxInterval :: Maybe Slot
   -- ^ Maximum validity interval in slots
   }
   deriving (Show)
@@ -129,12 +144,12 @@ data CanonicalIntent = CanonicalIntent
 emptyIntent :: CanonicalIntent
 emptyIntent =
   CanonicalIntent
-    { irSpendFrom = []
-    , irPayTo = []
-    , irMustMint = []
-    , irChangeTo = Nothing
-    , irMaxFee = Nothing
-    , irMaxInterval = Nothing
+    { spendFrom = []
+    , payTo = []
+    , mustMint = []
+    , changeTo = Nothing
+    , maxFee = Nothing
+    , maxInterval = Nothing
     }
 
 -- | Normalize an InternalIntentDSL into a Canonical Intent
@@ -142,34 +157,34 @@ normalizeIntent :: InternalIntentDSL -> CanonicalIntent
 normalizeIntent = go emptyIntent
   where
     go acc = \case
-      MustMint v -> acc {irMustMint = v : irMustMint acc}
-      SpendFrom s -> acc {irSpendFrom = s : irSpendFrom acc}
-      MaxInterval i -> acc {irMaxInterval = Just (maybe i (min i) (irMaxInterval acc))}
-      PayTo v a -> acc {irPayTo = (v, a) : irPayTo acc}
-      ChangeTo a -> acc {irChangeTo = Just a}
-      MaxFee f -> acc {irMaxFee = Just (maybe f (min f) (irMaxFee acc))}
+      MustMint v -> acc {mustMint = v : mustMint acc}
+      SpendFrom s -> acc {spendFrom = s : spendFrom acc}
+      MaxInterval i -> acc {maxInterval = Just (maybe i (min i) (maxInterval acc))}
+      PayTo v a -> acc {payTo = (v, a) : payTo acc}
+      ChangeTo a -> acc {changeTo = Just a}
+      MaxFee f -> acc {maxFee = Just (maybe f (min f) (maxFee acc))}
       AndExps xs -> Data.Foldable.foldl go acc xs
 
 toIntentExpr :: IntentDSL -> Either Text InternalIntentDSL
 toIntentExpr = \case
   MustMintW v -> Right (MustMint v)
-  SpendFromW walletAddr -> fmap SpendFrom $ Spend <$> parseAddr walletAddr
+  SpendFromW walletAddr -> SpendFrom <$> parseAddr walletAddr
   MaxIntervalW w -> Right (MaxInterval (fromInteger w))
   PayToW v a -> PayTo v <$> parseAddr a
   ChangeToW a -> ChangeTo <$> parseAddr a
   MaxFeeW i -> Right (MaxFee i)
   AndExpsW xs -> AndExps <$> traverse toInt xs
   where
-    parseAddr :: AddressW -> Either Text (Api.AddressInEra Api.ConwayEra)
+    parseAddr :: AddressW -> Either Text AdressConwayEra
     parseAddr (AddressW addr) =
       maybe
         (Left ("invalid address : " <> addr))
-        Right
+        (Right . AdressConwayEra)
         (Api.deserialiseAddress (Api.AsAddressInEra Api.AsConwayEra) addr)
     toInt :: IntentDSL -> Either Text InternalIntentDSL
     toInt = \case
       MustMintW v -> Right (MustMint v)
-      SpendFromW walletAddr -> fmap SpendFrom $ Spend <$> parseAddr walletAddr
+      SpendFromW walletAddr -> SpendFrom <$> parseAddr walletAddr
       MaxIntervalW w -> Right (MaxInterval (fromInteger w))
       PayToW v a -> PayTo v <$> parseAddr a
       ChangeToW a -> ChangeTo <$> parseAddr a
@@ -185,27 +200,27 @@ satisfies :: CanonicalIntent -> TxAbs Api.ConwayEra -> Bool
 satisfies CanonicalIntent {..} tx =
   and
     [ -- MustMint: v ≤ tx.mint
-      let need = Map.fromList . toList $ mconcat irMustMint
+      let need = Map.fromList . toList $ mconcat mustMint
           have = Map.fromList (toList tx.absMint)
        in Map.isSubmapOfBy (<=) need have
     , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
       -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
-      all (hasSigner tx.sigKeys . source) irSpendFrom
+      all (hasSigner tx.sigKeys . source) spendFrom
     , -- MaxInterval (if any): (tx.validityInterval.snd - tx.validityInterval.fst) ≤ i
-      case irMaxInterval of
+      case maxInterval of
         Nothing -> True
         Just i -> case toClosedFinite tx.validityInterval of
           Nothing -> False
           Just (lo, hi) -> (hi - lo) <= i
     , -- PayTo: (s, v) ∈ tx.outputs
-      all (\(value, addr) -> any (outMatches addr value) tx.outputs) irPayTo
+      all (\(value, addr) -> any (outMatches addr value) tx.outputs) payTo
     , -- ChangeTo: (s,consumed − produced) ∈ tx.outputs
-      case irChangeTo of
+      case changeTo of
         Nothing -> True
         Just addr -> any (outMatchesChange addr) tx.outputs
     , -- not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
       -- MaxFee (if any): tx.fee ≤ f
-      maybe True (\f -> tx.absFee <= f) irMaxFee
+      maybe True (\f -> tx.absFee <= f) maxFee
     ]
   where
     hasSigner :: Set.Set PubKey -> Api.AddressInEra Api.ConwayEra -> Bool
@@ -228,27 +243,27 @@ valuePositive :: Api.Value -> Bool
 valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList
 
 outMatches ::
-  Api.AddressInEra Api.ConwayEra ->
+  AdressConwayEra ->
   Api.Value ->
   Api.TxOut Api.CtxTx Api.ConwayEra ->
   Bool
 outMatches addrReq vReq (Api.TxOut addr vOut _ _) =
-  addrReq == addr && valueLeq vReq (Api.txOutValueToValue vOut)
+  addrReq == AdressConwayEra addr && valueLeq vReq (Api.txOutValueToValue vOut)
 
 outExactly ::
-  Api.AddressInEra Api.ConwayEra ->
+  AdressConwayEra ->
   Api.Value ->
   Api.TxOut Api.CtxTx Api.ConwayEra ->
   Bool
 outExactly addrReq vReq (Api.TxOut addr vOut _ _) =
-  addrReq == addr && valueEq vReq (Api.txOutValueToValue vOut)
+  addrReq == AdressConwayEra addr && valueEq vReq (Api.txOutValueToValue vOut)
 
 outMatchesChange ::
-  Api.AddressInEra Api.ConwayEra ->
+  AdressConwayEra ->
   Api.TxOut Api.CtxTx Api.ConwayEra ->
   Bool
 outMatchesChange addrReq (Api.TxOut addr vOut _ _) =
-  addrReq == addr && valueIsPlaceholder (Api.txOutValueToValue vOut)
+  addrReq == AdressConwayEra addr && valueIsPlaceholder (Api.txOutValueToValue vOut)
 
 valueIsPlaceholder :: Api.Value -> Bool
 valueIsPlaceholder = valueEq mempty

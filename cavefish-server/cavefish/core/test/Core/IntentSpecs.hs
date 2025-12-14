@@ -6,8 +6,9 @@ import Cardano.Api (lovelaceToValue)
 import Cardano.Api qualified as Api
 import Core.Intent (
   AddressW (AddressW),
-  CanonicalIntent (irPayTo),
+  CanonicalIntent (payTo),
   IntentDSL (PayToW),
+  source,
   toCanonicalIntent,
  )
 import Data.Text qualified as Text
@@ -24,8 +25,8 @@ spec =
       case toCanonicalIntent (PayToW (lovelaceToValue 10_000_000) (AddressW expectedPaymentVerificationKey)) of
         Left err -> expectationFailure (Text.unpack err)
         Right canonicalIntent ->
-          case irPayTo canonicalIntent of
+          case payTo canonicalIntent of
             [(outValue, outAddr)] -> do
               outValue `shouldBe` lovelaceToValue 10_000_000
-              Api.serialiseAddress outAddr `shouldBe` expectedPaymentVerificationKey
+              Api.serialiseAddress (source outAddr) `shouldBe` expectedPaymentVerificationKey
             other -> expectationFailure ("unexpected payTo entries: " <> show other)

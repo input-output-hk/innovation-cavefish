@@ -2,9 +2,10 @@
 {-# LANGUAGE DerivingVia #-}
 
 -- | Module for loading and representing the application's configuration
-module Core.Api.Config where
+module Core.Api.ServerConfiguration where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Core.Api.ServerContext (ServiceFee)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Default (Default (def))
 import Data.Text.IO qualified
@@ -59,25 +60,6 @@ instance Default Wbps where
       { path = "wbps"
       }
 
--- | Representation of the Service Provider, SP, fee configuration
-newtype ServiceProviderFee = ServiceProviderFee
-  { amount :: Integer
-  }
-  deriving (Show, Generic)
-
-instance ToJSON ServiceProviderFee
-
-instance FromJSON ServiceProviderFee
-
-instance FromValue ServiceProviderFee where
-  fromValue = parseTableFromValue (ServiceProviderFee <$> reqKey "amount")
-
-instance Default ServiceProviderFee where
-  def =
-    ServiceProviderFee
-      { amount = def
-      }
-
 -- | Representation of the transaction expiry configuration
 newtype TransactionExpiry = TransactionExpiry
   { seconds :: Integer
@@ -98,22 +80,22 @@ instance Default TransactionExpiry where
       }
 
 -- | Representation of the overall application configuration
-data Config = Config
+data ServerConfiguration = ServerConfiguration
   { httpServer :: HttpServer
   , wbps :: Wbps
-  , serviceProviderFee :: ServiceProviderFee
+  , serviceProviderFee :: ServiceFee
   , transactionExpiry :: TransactionExpiry
   }
   deriving (Show, Generic)
-  deriving (FromValue) via GenericTomlTable Config
+  deriving (FromValue) via GenericTomlTable ServerConfiguration
 
-instance ToJSON Config
+instance ToJSON ServerConfiguration
 
-instance FromJSON Config
+instance FromJSON ServerConfiguration
 
-instance Default Config where
+instance Default ServerConfiguration where
   def =
-    Config
+    ServerConfiguration
       { httpServer = def
       , wbps = def
       , serviceProviderFee = def
@@ -121,7 +103,7 @@ instance Default Config where
       }
 
 -- | Load the configuration from a TOML file
-loadConfig :: MonadIO m => FilePath -> m Config
+loadConfig :: MonadIO m => FilePath -> m ServerConfiguration
 loadConfig filename = do
   txt <- liftIO $ Data.Text.IO.readFile filename
   case decode txt of

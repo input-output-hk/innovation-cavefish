@@ -99,6 +99,7 @@ executable cavefish-server
     , cavefish-core
     , cavefish-server
     , cooked-validators
+    , data-default
     , stm
     , warp
     , wbps

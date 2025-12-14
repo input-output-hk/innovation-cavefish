@@ -22,6 +22,7 @@ import Core.SP.AskCommitmentProof qualified as AskCommitmentProof
 import Core.SP.DemonstrateCommitment qualified as DemonstrateCommitment
 import Core.SP.FetchAccount qualified as FetchAccount
 import Core.SP.Register qualified as Register
+import Data.Default
 import Data.Text (pack)
 import Network.Wai.Handler.Warp qualified as Warp
 import Test.Hspec (Spec, describe, it, runIO, shouldBe)
@@ -36,7 +37,7 @@ spec = do
       it
         "a user can be registered to a service provider and retrieve (PublicVerificationContext,ek) from the SP"
         $ do
-          Warp.testWithApplication (mkApplication wbpsScheme) $
+          Warp.testWithApplication (pure $ mkApplication wbpsScheme def) $
             \port -> do
               ServiceProviderAPI {register, fetchAccount} <- getServiceProviderAPI port
 
@@ -53,7 +54,7 @@ spec = do
       it
         "a registered user can request to the SP to demonstrate a commitment for the intent submitted"
         $ do
-          Warp.testWithApplication (mkApplication wbpsScheme) $
+          Warp.testWithApplication (pure $ mkApplication wbpsScheme def) $
             \port -> do
               ServiceProviderAPI {register, demonstrateCommitment, askCommitmentProof, fetchAccount} <-
                 getServiceProviderAPI port

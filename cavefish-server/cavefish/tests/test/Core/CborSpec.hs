@@ -6,7 +6,7 @@ module Core.CborSpec () where
 -- import Client.Mock qualified as Mock
 -- import Control.Concurrent.STM (newTVarIO)
 -- import Cooked (Wallet, wallet)
--- import Core.Api.Config (Config)
+-- import Core.Api.ServerConfiguration (ServerConfiguration)
 -- import Core.Cbor (maskTxBody, serialiseTxBody)
 -- import Core.Intent (
 --   AddressW (AddressW),
@@ -74,7 +74,7 @@ module Core.CborSpec () where
 --       completeStore <- newTVarIO Map.empty
 --       keyPair <- Ed25519.generateKeyPair
 --       wbpsScheme <- mkFileSchemeFromRoot "../../wbps"
---       let config :: Config = def
+--       let config :: ServerConfiguration = def
 --       let env =
 --             mkServerContext
 --               mockState

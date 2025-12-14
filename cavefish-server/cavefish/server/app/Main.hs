@@ -5,17 +5,18 @@ module Main where
 
 import Control.Concurrent.STM (newTVarIO)
 import Control.Monad.IO.Class (liftIO)
-import Core.Api.Config (
-  Config (httpServer, wbps),
+import Core.Api.ServerConfiguration (
   HttpServer (HttpServer, port),
+  ServerConfiguration (httpServer, wbps),
   Wbps (Wbps),
   loadConfig,
  )
 import Core.CavefishLogEvent (CavefishLogEvent (LogSPConfigLoaded))
 import Core.Logging (Verbosity (Verbose), traceWith, withTracer)
+import Data.Default (Default (def))
 import Network.Wai.Handler.Warp qualified as Warp
 import Paths_cavefish_server (getDataFileName)
-import Sp.Emulator (initialMockState, mkServerContext)
+import Sp.Emulator (mkServerContext)
 import Sp.Middleware (cavefishMiddleware)
 import Sp.Server (mkServer)
 import System.IO (hPutStrLn, stderr)
@@ -37,14 +38,13 @@ main = withTracer (Verbose "SP.Server") $ \tr -> do
         liftIO $ hPutStrLn stderr ("Using config file: " <> configFile) >> pure configFile
   config <- loadConfig configFilePath
   traceWith tr $ LogSPConfigLoaded config
-  mockState <- liftIO $ newTVarIO initialMockState
 
   let (Wbps path) = wbps config
   wbpsScheme <- liftIO $ mkFileSchemeFromRoot path
   let HttpServer {port} = httpServer config
       env =
         mkServerContext
-          mockState
+          def
           wbpsScheme
           config
 
