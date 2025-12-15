@@ -8,7 +8,7 @@
 --  for testing purposes and simulates client-server interactions.
 module Client.Mock (
   RunServer,
-  Provisionned (..),
+  Provisioned (..),
   Registered (..),
   initMockClient,
   mkDemonstrateCommitmentInputs,
@@ -63,19 +63,19 @@ import WBPS.Core.Keys.ElGamal qualified as ElGamal
 
 type RunServer = forall a. CavefishServerM a -> Handler a
 
-data Provisionned = Provisionned
+data Provisioned = Provisioned
   { server :: RunServer
   , cardanoWalletKeyPair :: Ed25519.KeyPair
   }
 
 data Registered = Registered
-  { provisionned :: Provisionned
+  { provisioned :: Provisioned
   , verificationContext :: Value
   , encryptionKey :: ElGamal.EncryptionKey
   }
 
-initMockClient :: RunServer -> Ed25519.KeyPair -> Provisionned
-initMockClient server cardanoWalletKeyPair = Provisionned {..}
+initMockClient :: RunServer -> Ed25519.KeyPair -> Provisioned
+initMockClient server cardanoWalletKeyPair = Provisioned {..}
 
 -- | Create a PrepareReq from the given client ID and intent.
 mkDemonstrateCommitmentInputs ::
@@ -114,8 +114,8 @@ registerClient :: RunServer -> Register.Inputs -> Handler Register.Outputs
 registerClient runServer inputs = runServer $ Register.handle inputs
 
 -- | Register the mock client with the server.
-register :: Provisionned -> Handler Registered
-register provisionned@Provisionned {..} = do
+register :: Provisioned -> Handler Registered
+register provisioned@Provisioned {..} = do
   Register.Outputs {ek, publicVerificationContext} <-
     registerClient
       server
@@ -124,7 +124,7 @@ register provisionned@Provisionned {..} = do
         }
   pure
     Registered
-      { provisionned = provisionned
+      { provisioned = provisioned
       , verificationContext = publicVerificationContext
       , encryptionKey = ek
       }
@@ -135,7 +135,7 @@ fetchAccounts run = run FetchAccounts.handle
 
 -- | List clients using the given mock client.
 fetchAccountsWithClient :: Registered -> Handler FetchAccounts.Outputs
-fetchAccountsWithClient Registered {provisionned = Provisionned {..}} =
+fetchAccountsWithClient Registered {provisioned = Provisioned {..}} =
   fetchAccounts server
 
 -- | List pending transactions from the server.
@@ -144,7 +144,7 @@ getPending run = run pendingH
 
 -- | List pending transactions using the given mock client.
 getPendingWithClient :: Registered -> Handler PendingResp
-getPendingWithClient Registered {provisionned = Provisionned {..}} =
+getPendingWithClient Registered {provisioned = Provisioned {..}} =
   getPending server
 
 -- | Prepare an intent with the server.
@@ -157,7 +157,7 @@ demonstrateCommitment run clientId intentW =
 
 -- | Prepare an intent using the given mock client.
 demonstrateCommitmentWithClient :: Registered -> IntentDSL -> Handler DemonstrateCommitment.Outputs
-demonstrateCommitmentWithClient Registered {provisionned = Provisionned {..}} intentW = do
+demonstrateCommitmentWithClient Registered {provisioned = Provisioned {..}} intentW = do
   demonstrateCommitment server (userWalletPK cardanoWalletKeyPair) intentW
 
 -- -- | Submit a commit message (big R) for the given transaction.
@@ -181,13 +181,13 @@ demonstrateCommitmentWithClientAndVerifyWithClient mockClient intentW = do
 -- | Finalise a prepared transaction using the given mock client.
 -- askSubmissionWithClient ::
 --   Registered -> DemonstrateCommitment.Outputs -> Handler AskSubmission.Outputs
--- askSubmissionWithClient Registered {provisionned = Provisionned {..}}
+-- askSubmissionWithClient Registered {provisioned = Provisioned {..}}
 --   = askSubmission server cardanoWalletKeyPair
 
 -- | Verify that the prepared transaction proof is valid with the given client.
 -- verifyCommitProofWithClient ::
 --   Registered -> DemonstrateCommitment.Outputs -> CommitResp -> Either Text ()
--- verifyCommitProofWithClient Registered {provisionned = Provisionned {..}} = verifyCommitProof cardanoWalletKeyPair
+-- verifyCommitProofWithClient Registered {provisioned = Provisioned {..}} = verifyCommitProof cardanoWalletKeyPair
 
 -- -- | Verify that the prepared transaction satisfies the intent.
 -- verifySatisfies :: IntentDSL -> DemonstrateCommitment.Outputs -> Either Text Bool
