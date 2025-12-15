@@ -1,4 +1,4 @@
-module Core.Services.WBPS (
+module Cavefish.Services.WBPS (
   WBPS (..),
 ) where
 

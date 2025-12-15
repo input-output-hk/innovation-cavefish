@@ -17,9 +17,9 @@ import Adapter.Cavefish.Client (
   mkApplication,
  )
 import Cardano.Api (lovelaceToValue)
-import Core.Endpoints.Read.FetchAccount qualified as FetchAccount
-import Core.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
-import Core.Endpoints.Write.Register qualified as Register
+import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
+import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
+import Cavefish.Endpoints.Write.Register qualified as Register
 import Data.Default (def)
 import Intent.Example.DSL (AddressW (AddressW), IntentDSL (PayToW))
 import Network.Wai.Handler.Warp qualified as Warp

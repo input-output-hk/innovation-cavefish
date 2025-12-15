@@ -10,11 +10,11 @@
 module Prototype.Messages where
 
 import Cardano.Api qualified as Api
-import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar)
-import Control.Monad.IO.Class (liftIO)
-import Core.Api.ServerContext (
+import Cavefish (
   CavefishServerM,
  )
+import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar)
+import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (
   FromJSON (parseJSON),
   ToJSON (toJSON),

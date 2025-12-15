@@ -8,11 +8,11 @@ module Sp.Server (
   mkServer,
 ) where
 
-import Core.Api.ServerContext (CavefishServerM, CavefishServices, runCavefishMonad)
-import Core.Endpoints.Read.FetchAccount qualified as FetchAccount
-import Core.Endpoints.Read.FetchAccounts qualified as FetchAccounts
-import Core.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
-import Core.Endpoints.Write.Register qualified as Register
+import Cavefish (CavefishServerM, CavefishServices, runCavefishMonad)
+import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
+import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
+import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
+import Cavefish.Endpoints.Write.Register qualified as Register
 import Data.Text (Text)
 import Network.Wai (Application, Middleware)
 import Network.Wai.Middleware.Cors (

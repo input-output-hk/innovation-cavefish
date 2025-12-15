@@ -23,6 +23,8 @@ module Client.Impl (
   fetchAccounts,
 ) where
 
+import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
+import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 import Client.Mock (
   Registered,
   RunServer,
@@ -42,8 +44,6 @@ import Control.Monad.Reader (
  )
 import Control.Monad.State (MonadState, StateT)
 import Control.Monad.Trans.State (evalStateT)
-import Core.Endpoints.Read.FetchAccounts qualified as FetchAccounts
-import Core.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 import Crypto.PubKey.Ed25519 (SecretKey)
 import Data.Bifunctor (first)
 import Data.Map (Map)

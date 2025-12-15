@@ -63,15 +63,15 @@ library
   hs-source-dirs:  src
   exposed-modules:
     Adapter.Logging
-    Core.Api.ServerConfiguration
-    Core.Api.ServerContext
-    Core.Endpoints.Read.FetchAccount
-    Core.Endpoints.Read.FetchAccounts
-    Core.Endpoints.Write.DemonstrateCommitment
-    Core.Endpoints.Write.Register
-    Core.Performance.LogEvent
-    Core.Services.TxBuilding
-    Core.Services.WBPS
+    Cavefish
+    Cavefish.Api.ServerConfiguration
+    Cavefish.Endpoints.Read.FetchAccount
+    Cavefish.Endpoints.Read.FetchAccounts
+    Cavefish.Endpoints.Write.DemonstrateCommitment
+    Cavefish.Endpoints.Write.Register
+    Cavefish.Performance.LogEvent
+    Cavefish.Services.TxBuilding
+    Cavefish.Services.WBPS
     Intent.Example.DSL
     Intent.Example.TxBuilder
     Prototype.AskCommitmentProof

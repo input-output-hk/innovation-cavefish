@@ -4,14 +4,14 @@
 module Main where
 
 import Adapter.Logging (Verbosity (Verbose), traceWith, withTracer)
-import Control.Monad.IO.Class (liftIO)
-import Core.Api.ServerConfiguration (
+import Cavefish.Api.ServerConfiguration (
   HttpServer (HttpServer, port),
   ServerConfiguration (httpServer, wbps),
   Wbps (Wbps),
   loadConfig,
  )
-import Core.Performance.LogEvent (CavefishLogEvent (LogSPConfigLoaded))
+import Cavefish.Performance.LogEvent (CavefishLogEvent (LogSPConfigLoaded))
+import Control.Monad.IO.Class (liftIO)
 import Data.Default (Default (def))
 import Network.Wai.Handler.Warp qualified as Warp
 import Paths_cavefish_server (getDataFileName)

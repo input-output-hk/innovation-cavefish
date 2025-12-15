@@ -9,10 +9,10 @@
 
 module Prototype.AskSubmission (handle, Inputs (..), Outputs (..), FinaliseResult (..)) where
 
-import Control.Monad.IO.Class (liftIO)
-import Core.Api.ServerContext (
+import Cavefish (
   CavefishServerM,
  )
+import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (
   FromJSON (parseJSON),
   ToJSON (toJSON),

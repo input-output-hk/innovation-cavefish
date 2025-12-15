@@ -2,10 +2,10 @@
 {-# LANGUAGE DerivingVia #-}
 
 -- | Module for loading and representing the application's configuration
-module Core.Api.ServerConfiguration where
+module Cavefish.Api.ServerConfiguration where
 
+import Cavefish.Services.TxBuilding (ServiceFee)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Core.Services.TxBuilding (ServiceFee)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Default (Default (def))
 import Data.Text.IO qualified

@@ -3,18 +3,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-missing-import-lists #-}
 
-module Core.Endpoints.Write.Register (
+module Cavefish.Endpoints.Write.Register (
   handle,
   Inputs (..),
   Outputs (..),
 ) where
 
-import Control.Monad.Reader (MonadReader (ask))
-import Core.Api.ServerContext (
+import Cavefish (
   CavefishServerM,
   CavefishServices (CavefishServices, wbpsService),
  )
-import Core.Services.WBPS qualified as Service
+import Cavefish.Services.WBPS qualified as Service
+import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson (FromJSON, ToJSON, Value)
 import GHC.Generics (Generic)
 import WBPS.Core.Keys.Ed25519 (

@@ -7,13 +7,13 @@ module Sp.Middleware (
 ) where
 
 import Adapter.Logging (Verbosity (Verbose), traceWith, withTracer)
-import Control.Monad (when)
-import Core.Performance.LogEvent (
+import Cavefish.Performance.LogEvent (
   CavefishLogEvent (LogHttpRoundTrip, LogHttpServerError),
   HttpRoundTrip (HttpRoundTrip, duration, method, path),
   HttpServerError (HttpServerError, duration, errorMessage, method, path, status),
   RequestDuration (RequestDuration),
  )
+import Control.Monad (when)
 import Data.ByteString (ByteString)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8With)

@@ -1,4 +1,4 @@
-module Core.Api.ServerContext (
+module Cavefish (
   runCavefishMonad,
   CavefishServerM (..),
   CavefishServices (..),
@@ -8,9 +8,9 @@ import Cardano.Api (
   MonadError,
   MonadIO,
  )
+import Cavefish.Services.TxBuilding (TxBuilding)
+import Cavefish.Services.WBPS (WBPS)
 import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
-import Core.Services.TxBuilding (TxBuilding)
-import Core.Services.WBPS (WBPS)
 import Servant.Server (Handler)
 import Servant.Server.Internal.ServerError (ServerError)
 

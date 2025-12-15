@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -Wno-missing-import-lists #-}
 
-module Core.Endpoints.Read.FetchAccount (handle, Inputs (..), Outputs (..), Account (..)) where
+module Cavefish.Endpoints.Read.FetchAccount (handle, Inputs (..), Outputs (..), Account (..)) where
 
-import Control.Monad.Reader (MonadReader (ask))
-import Core.Api.ServerContext (
+import Cavefish (
   CavefishServerM,
   CavefishServices (..),
  )
-import Core.Services.WBPS qualified as Service
+import Cavefish.Services.WBPS qualified as Service
+import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson
 import GHC.Generics (Generic)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)

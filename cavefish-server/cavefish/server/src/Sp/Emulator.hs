@@ -11,13 +11,13 @@ module Sp.Emulator (
   mkServerContext,
 ) where
 
+import Cavefish
+import Cavefish.Api.ServerConfiguration
+import Cavefish.Services.TxBuilding (ServiceFee, TxBuilding (..))
+import Cavefish.Services.WBPS (WBPS (..))
 import Control.Monad.IO.Class (MonadIO (..))
 import Cooked (InitialDistribution)
 import Cooked.MockChain
-import Core.Api.ServerConfiguration
-import Core.Api.ServerContext
-import Core.Services.TxBuilding (ServiceFee, TxBuilding (..))
-import Core.Services.WBPS (WBPS (..))
 import Data.ByteString.Lazy.Char8 qualified as BL8
 import Intent.Example.DSL
 import Intent.Example.TxBuilder (buildTx)

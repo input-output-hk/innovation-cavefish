@@ -10,10 +10,10 @@ module Intent.Example.TxBuilder (
 
 import Cardano.Api (AddressInEra, ConwayEra)
 import Cardano.Api qualified as C
+import Cavefish.Services.TxBuilding (ServiceFee (..))
 import Control.Monad (join, unless, when)
 import Cooked
 import Cooked.MockChain.GenerateTx.Body (txSkelToTxBody)
-import Core.Services.TxBuilding (ServiceFee (..))
 import Data.List (nub)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (maybeToList)

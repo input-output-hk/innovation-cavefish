@@ -4,12 +4,12 @@ module Adapter.Cavefish.Client (
   ServiceProviderAPI (..),
 ) where
 
+import Cavefish.Api.ServerConfiguration (ServerConfiguration)
+import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
+import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
+import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
+import Cavefish.Endpoints.Write.Register qualified as Register
 import Cooked (InitialDistribution)
-import Core.Api.ServerConfiguration (ServerConfiguration)
-import Core.Endpoints.Read.FetchAccount qualified as FetchAccount
-import Core.Endpoints.Read.FetchAccounts qualified as FetchAccounts
-import Core.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
-import Core.Endpoints.Write.Register qualified as Register
 import Data.Default (def)
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Prototype.AskCommitmentProof qualified as AskCommitmentProof

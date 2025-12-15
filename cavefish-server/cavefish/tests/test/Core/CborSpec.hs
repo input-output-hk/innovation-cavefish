@@ -6,15 +6,15 @@ module Core.CborSpec () where
 -- import Client.Mock qualified as Mock
 -- import Control.Concurrent.STM (newTVarIO)
 -- import Cooked (Wallet, wallet)
--- import Core.Api.ServerConfiguration (ServerConfiguration)
--- import Core.Cbor (maskTxBody, serialiseTxBody)
+-- import Cavefish.Api.ServerConfiguration (ServerConfiguration)
+-- import Cavefish.Cbor (maskTxBody, serialiseTxBody)
 -- import Intent.Example.DSL (
 --   AddressW (AddressW),
 --   BuildTxResult (BuildTxResult, tx),
 --   IntentDSL (AndExpsW, PayToW, SpendFromW),
 --   toInternalIntent,
 --  )
--- import Core.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
+-- import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 -- import Data.Default (def)
 -- import Data.List.NonEmpty (NonEmpty ((:|)))
 -- import Data.Map.Strict qualified as Map

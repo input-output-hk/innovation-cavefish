@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-missing-import-lists #-}
 
-module Core.Endpoints.Write.DemonstrateCommitment (
+module Cavefish.Endpoints.Write.DemonstrateCommitment (
   handle,
   Inputs (..),
   Outputs (..),
@@ -9,13 +9,13 @@ module Core.Endpoints.Write.DemonstrateCommitment (
 
 import Cardano.Api (ConwayEra, Tx)
 import Cardano.Api qualified as Api
-import Control.Monad.Reader (MonadReader (ask))
-import Core.Api.ServerContext (
+import Cavefish (
   CavefishServerM,
   CavefishServices (CavefishServices, txBuildingService, wbpsService),
  )
-import Core.Services.TxBuilding qualified as Service
-import Core.Services.WBPS qualified as Service
+import Cavefish.Services.TxBuilding qualified as Service
+import Cavefish.Services.WBPS qualified as Service
+import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 import Intent.Example.DSL (

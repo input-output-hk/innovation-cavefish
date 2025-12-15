@@ -33,11 +33,11 @@ module Client.Mock (
   decodeHex,
 ) where
 
+import Cavefish (CavefishServerM)
+import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
+import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
+import Cavefish.Endpoints.Write.Register qualified as Register
 import Control.Monad.Error.Class (throwError)
-import Core.Api.ServerContext (CavefishServerM)
-import Core.Endpoints.Read.FetchAccounts qualified as FetchAccounts
-import Core.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
-import Core.Endpoints.Write.Register qualified as Register
 import Data.Aeson (Value)
 import Data.ByteArray qualified as BA
 import Data.ByteArray.Encoding qualified as BAE

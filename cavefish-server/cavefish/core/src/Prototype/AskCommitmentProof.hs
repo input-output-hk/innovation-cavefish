@@ -7,7 +7,7 @@
 
 module Prototype.AskCommitmentProof (handle, Inputs (..), Outputs (..)) where
 
-import Core.Api.ServerContext (
+import Cavefish (
   CavefishServerM,
  )
 import Data.Aeson (FromJSON, ToJSON)
