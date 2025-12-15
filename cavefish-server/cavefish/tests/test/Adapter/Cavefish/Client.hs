@@ -1,10 +1,9 @@
 module Adapter.Cavefish.Client (
   getServiceProviderAPI,
-  mkApplication,
+  mkTestCavefishMonad,
   ServiceProviderAPI (..),
 ) where
 
-import Cavefish.Api.ServerConfiguration (ServerConfiguration)
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
 import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
 import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
@@ -60,14 +59,13 @@ runClientOrFail clientEnv action = do
       Left err -> expectationFailure ("HTTP client call failed: " <> show err) >> fail "http client failure"
       Right value -> pure value
 
-mkApplication ::
+mkTestCavefishMonad ::
   FileScheme ->
   InitialDistribution ->
   Application
-mkApplication wbpsScheme initialDistribution =
-  let serverConfigurationByDefault :: ServerConfiguration = def
-   in mkServer errStatusTraceMiddleware $
-        mkServerContext
-          initialDistribution
-          wbpsScheme
-          serverConfigurationByDefault
+mkTestCavefishMonad wbpsScheme initialDistribution =
+  mkServer errStatusTraceMiddleware $
+    mkServerContext
+      initialDistribution
+      wbpsScheme
+      def
