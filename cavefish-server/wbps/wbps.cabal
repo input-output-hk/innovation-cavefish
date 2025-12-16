@@ -75,27 +75,27 @@ library
     , aeson
     , base16-bytestring
     , bytestring
-    , cardano-api            ^>=10.16.1.0
-    , cardano-binary         ^>=1.7.1.0
+    , cardano-api
+    , cardano-binary
     , cardano-crypto-class
-    , cardano-ledger-alonzo  ^>=1.13.0.0
-    , cardano-ledger-api     ^>=1.11.0.0
-    , cardano-ledger-core    ^>=1.17.0.0
-    , cborg                  ^>=0.2.10.0
-    , containers             ^>=0.6.7
-    , cooked-validators      ^>=7.0.0
+    , cardano-ledger-alonzo
+    , cardano-ledger-api
+    , cardano-ledger-core
+    , cborg
+    , containers
+    , cooked-validators
     , cryptonite
     , filepath
     , hex-text
     , memory
     , mtl
-    , path                   >=0.9.0      && <0.10
-    , path-io                >=1.8.0      && <1.9
-    , plutus-ledger          ^>=1.4.0.0
-    , plutus-ledger-api      ^>=1.45.0.0
+    , path
+    , path-io
+    , plutus-ledger
+    , plutus-ledger-api
     , process
-    , scientific             ^>=0.3.8.0
-    , shh                    >=0.7.0      && <0.8
+    , scientific
+    , shh
     , text
     , transformers
     , validation
@@ -115,7 +115,7 @@ test-suite wbps-unit-tests
     , mtl
     , path
     , path-io
-    , QuickCheck        ^>=2.15.0.1
+    , QuickCheck
     , tasty
     , tasty-hunit
     , tasty-quickcheck
@@ -135,9 +135,9 @@ test-suite wbps-integration-tests
   build-depends:
     , bytestring
     , cardano-crypto-class
-    , containers            ^>=0.6.7
-    , path                  ^>=0.9.6
-    , path-io               ^>=1.8.2
+    , containers
+    , path
+    , path-io
     , QuickCheck
     , tasty
     , tasty-hunit

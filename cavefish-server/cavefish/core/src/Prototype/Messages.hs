@@ -4,12 +4,11 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Prototype.Messages where
 
-import Cardano.Api qualified as Api
+import Cardano.Api qualified as Api (TxId, deserialiseFromRawBytesHex, serialiseToRawBytesHexText)
 import Cavefish (
   CavefishServerM,
  )
@@ -25,12 +24,12 @@ import Data.Aeson (
   (.=),
  )
 import Data.ByteString (ByteString)
-import Data.ByteString qualified as BS
-import Data.ByteString.Lazy qualified as BL
+import Data.ByteString qualified as BS (length, splitAt)
+import Data.ByteString.Lazy qualified as BL (fromStrict)
 import Data.Map (Map)
-import Data.Map.Strict qualified as Map
+import Data.Map.Strict qualified as Map (delete, lookup)
 import Data.Text (Text)
-import Data.Text.Encoding qualified as TE
+import Data.Text.Encoding qualified as TE (encodeUtf8)
 import Data.Time.Clock (UTCTime)
 import GHC.Generics (Generic)
 import Ledger.Tx.CardanoAPI (CardanoTx, pattern CardanoEmulatorEraTx)
@@ -59,8 +58,8 @@ import Servant (
   errBody,
   throwError,
  )
-import WBPS.Core.Cardano.Cbor
-import WBPS.Core.Keys.Ed25519 qualified as Ed25519
+import WBPS.Core.Cardano.Cbor (serialiseTx)
+import WBPS.Core.Keys.Ed25519 qualified as Ed25519 (UserWalletPublicKey)
 
 -- | Cavefish API a
 data TransactionResp

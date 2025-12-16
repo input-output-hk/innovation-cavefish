@@ -37,7 +37,10 @@ import Ledger (
   cardanoPubKeyHash,
   pubKeyHash,
  )
-import Plutus.Script.Utils.Address
+import Plutus.Script.Utils.Address (
+  ToAddress (toAddress),
+  ToPubKeyHash (toPubKeyHash),
+ )
 import WBPS.Core.Cardano.TxAbs (TxAbs (absFee, absMint, outputs, sigKeys, validityInterval))
 
 type ChangeDelta = Api.Value

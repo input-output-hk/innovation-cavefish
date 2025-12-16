@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
-
 module Cavefish.Endpoints.Write.DemonstrateCommitment (
   handle,
   Inputs (..),
@@ -11,20 +9,18 @@ import Cavefish (
   CavefishServerM,
   CavefishServices (CavefishServices, txBuildingService, wbpsService),
  )
-import Cavefish.Services.TxBuilding qualified as Service
-import Cavefish.Services.WBPS qualified as Service
+import Cavefish.Services.TxBuilding qualified as TxService (TxBuilding (..))
+import Cavefish.Services.WBPS qualified as WbpsService (WBPS (..))
 import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
-import Intent.Example.DSL (
-  IntentDSL,
- )
+import Intent.Example.DSL (IntentDSL)
 import WBPS.Commitment (
-  Commitment (..),
+  Commitment (Commitment),
   PublicMessage (PublicMessage),
   Session (SessionCreated, commitment, publicMessage),
  )
-import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx (..))
+import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 
 data Inputs = Inputs
@@ -42,12 +38,11 @@ data Outputs = Outputs
 handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey, intent} = do
   CavefishServices
-    { txBuildingService = Service.TxBuilding {build}
-    , wbpsService = Service.WBPS {createSession}
+    { txBuildingService = TxService.TxBuilding {build}
+    , wbpsService = WbpsService.WBPS {createSession}
     } <-
     ask
 
   unsignedTx <- build intent
-  SessionCreated {publicMessage = PublicMessage txAbs, commitment} <-
-    createSession userWalletPublicKey unsignedTx
+  SessionCreated {publicMessage = PublicMessage txAbs, commitment} <- createSession userWalletPublicKey unsignedTx
   return Outputs {txAbs, commitment}

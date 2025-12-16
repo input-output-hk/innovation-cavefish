@@ -1,10 +1,7 @@
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
-
 module Core.IntentSpecs (spec) where
 
-import Cardano.Api (lovelaceToValue)
-import Cardano.Api qualified as Api
-import Data.Text qualified as Text
+import Cardano.Api (lovelaceToValue, serialiseAddress)
+import Data.Text qualified as Text (unpack)
 import Intent.Example.DSL (
   AddressW (AddressW),
   CanonicalIntent (payTo),
@@ -13,8 +10,8 @@ import Intent.Example.DSL (
   unAdressConwayEra,
  )
 import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
-import WBPS.Core.Keys.Ed25519 (PaymentAddess (..), Wallet (..))
-import WBPS.Core.Keys.Ed25519 qualified as Ed25519
+import WBPS.Core.Keys.Ed25519 (PaymentAddess (PaymentAddess), Wallet (Wallet, paymentAddress))
+import WBPS.Core.Keys.Ed25519 qualified as Ed25519 (generateWallet)
 
 spec :: Spec
 spec =
@@ -28,5 +25,5 @@ spec =
           case payTo canonicalIntent of
             [(outValue, outAddr)] -> do
               outValue `shouldBe` lovelaceToValue 10_000_000
-              Api.serialiseAddress (unAdressConwayEra outAddr) `shouldBe` expectedPaymentVerificationKey
+              serialiseAddress (unAdressConwayEra outAddr) `shouldBe` expectedPaymentVerificationKey
             other -> expectationFailure ("unexpected payTo entries: " <> show other)

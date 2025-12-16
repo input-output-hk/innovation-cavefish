@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
-
 -- | Module for building Cardano transactions based on high-level intents.
 --     This module provides functionality to construct transactions using the Cooked
 --     library, interpreting intents that specify spending sources, payment outputs,
@@ -8,20 +6,51 @@ module Intent.Example.TxBuilder (
   buildTx,
 ) where
 
-import Cardano.Api qualified as C
-import Cavefish.Services.TxBuilding (ServiceFee (..))
+import Cardano.Api qualified as C (
+  AsType (..),
+  Quantity (..),
+  Value,
+  deserialiseAddress,
+  lovelaceToValue,
+  quantityToLovelace,
+  serialiseAddress,
+ )
+import Cavefish.Services.TxBuilding (ServiceFee (ServiceFee, amount, paidTo))
 import Control.Monad (join, unless)
-import Cooked
+import Cooked (
+  BalancingPolicy (DoNotBalance),
+  MonadBlockChain,
+  Payable (Value),
+  TxSkelOut,
+  balanceTxSkel,
+  currentSlot,
+  emptyTxSkelRedeemer,
+  onlyValueOutputsAtSearch,
+  receives,
+  runUtxoSearch,
+  txSkelIns,
+  txSkelMints,
+  txSkelOptBalancingPolicy,
+  txSkelOpts,
+  txSkelOutPKHashAT,
+  txSkelOuts,
+  txSkelSigners,
+  txSkelTemplate,
+  txSkelValidityRange,
+  walletPKHashToWallet,
+ )
 import Cooked.MockChain.GenerateTx.Body (txSkelToTxBody)
 import Data.List (nub)
-import Data.Map.Strict qualified as Map
-import Data.Text qualified as Text
-import Intent.Example.DSL
-import Ledger (Interval, PubKeyHash, Slot, cardanoPubKeyHash, interval)
-import Ledger qualified
+import Data.Map.Strict qualified as Map (fromList)
+import Data.Text qualified as Text (unpack)
+import Intent.Example.DSL (
+  AdressConwayEra (AdressConwayEra),
+  CanonicalIntent (CanonicalIntent, changeTo, maxFee, maxInterval, mustMint, payTo, spendFrom),
+ )
+import Ledger (Interval, PubKeyHash, Slot, always, cardanoPubKeyHash, interval)
 import Ledger.Tx.CardanoAPI (fromCardanoValue)
 import Optics.Core (preview)
-import WBPS.Core.Cardano.UnsignedTx (UnsignedTx (..))
+import WBPS.Core.Cardano.UnsignedTx (UnsignedTx (UnsignedTx))
 import WBPS.Core.Keys.Ed25519 (PaymentAddess (unPaymentAddess))
 
 -- | Build a Cardano transaction based on the provided intent.
@@ -101,7 +130,7 @@ buildServiceFee ServiceFee {..}
       pure [receives pkh (Value value)]
 
 buildValidity :: MonadBlockChain m => Maybe Slot -> m (Interval Slot)
-buildValidity Nothing = pure Ledger.always
+buildValidity Nothing = pure always
 buildValidity (Just slop) = do
   now <- currentSlot
   pure $ interval now (now + slop)

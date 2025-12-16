@@ -2,13 +2,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 
 module Spec (spec) where
 
 import Adapter.Cavefish.Client (
   ReadAPI (ReadAPI, fetchAccount),
   ServiceProviderAPI (ServiceProviderAPI, read, write),
-  Setup (Setup, alice, bob, provider, serviceProvider),
+  Setup (Setup, alice, bob, serviceProvider),
   WriteAPI (
     WriteAPI,
     askCommitmentProof,
@@ -27,9 +28,10 @@ import Prototype.AskCommitmentProof qualified as AskCommitmentProof
 import Test.Hspec (Spec, describe, it, shouldBe)
 import WBPS.Core.Keys.Ed25519 (
   PaymentAddess (PaymentAddess),
-  Wallet (..),
   generateKeyPair,
   generateKeyTuple,
+  paymentAddress,
+  publicKey,
   userWalletPK,
  )
 
@@ -69,7 +71,6 @@ spec = do
                    }
                , alice
                , bob
-               , provider
                } -> do
                 Register.Outputs {publicVerificationContext, ek} <- register . Register.Inputs . publicKey $ alice
 

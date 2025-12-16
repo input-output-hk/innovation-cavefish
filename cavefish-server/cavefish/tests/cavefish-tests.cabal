@@ -95,7 +95,6 @@ test-suite test
     , data-default
     , hspec
     , http-client
-    , plutus-ledger
     , plutus-ledger-api
     , plutus-script-utils
     , servant-client

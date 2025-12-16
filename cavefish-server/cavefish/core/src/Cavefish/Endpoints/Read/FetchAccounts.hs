@@ -1,17 +1,15 @@
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
-
 module Cavefish.Endpoints.Read.FetchAccounts (handle, Outputs (..), Account (..)) where
 
 import Cavefish (
   CavefishServerM,
-  CavefishServices (..),
+  CavefishServices (CavefishServices, wbpsService),
  )
-import Cavefish.Services.WBPS qualified as Service
+import Cavefish.Services.WBPS qualified as Service (WBPS (..))
 import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson (FromJSON, ToJSON, Value)
 import GHC.Generics (Generic)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Keys.ElGamal qualified as ElGamal
+import WBPS.Core.Keys.ElGamal qualified as ElGamal (EncryptionKey, KeyPair (KeyPair, ek))
 import WBPS.Registration (
   AccountCreated (
     AccountCreated,

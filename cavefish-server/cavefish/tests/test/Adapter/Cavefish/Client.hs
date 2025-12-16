@@ -6,22 +6,16 @@ module Adapter.Cavefish.Client (
   ReadAPI (..),
 ) where
 
-import Cardano.Api qualified as C
-import Cavefish.Api.ServerConfiguration (
-  ServerConfiguration (..),
- )
-import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
-import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
-import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
-import Cavefish.Endpoints.Write.Register qualified as Register
-import Cavefish.Services.TxBuilding (ServiceFee (..))
+import Cavefish.Api.ServerConfiguration (ServerConfiguration (ServerConfiguration, httpServer, serviceProviderFee, transactionExpiry, wbps))
+import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount (Inputs, Outputs)
+import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts (Outputs)
+import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment (Inputs, Outputs)
+import Cavefish.Endpoints.Write.Register qualified as Register (Inputs, Outputs)
+import Cavefish.Services.TxBuilding (ServiceFee (ServiceFee, amount, paidTo))
 import Control.Monad ((>=>))
-import Cooked hiding (Wallet, distributionFromList)
-import Data.Coerce (coerce)
+import Cooked (InitialDistribution (InitialDistribution), Payable (Value), receives)
 import Data.Default (Default (def))
 import Data.Foldable (foldl')
-import Data.Maybe (fromMaybe)
-import Ledger qualified
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.Wai.Handler.Warp qualified as Warp
 import Plutus.Script.Utils.Value (ada)
@@ -35,7 +29,7 @@ import Sp.Middleware (errStatusTraceMiddleware)
 import Sp.Server (Cavefish, mkServer)
 import Test.Hspec (expectationFailure)
 import WBPS.Core.FileScheme (FileScheme, mkFileSchemeFromRoot)
-import WBPS.Core.Keys.Ed25519 (PaymentAddess (PaymentAddess), Wallet (..), generateWallet)
+import WBPS.Core.Keys.Ed25519 (Wallet (Wallet, paymentAddress), generateWallet)
 
 getServiceProviderAPI :: ServiceFee -> Int -> IO ServiceProviderAPI
 getServiceProviderAPI fee port = do
@@ -93,7 +87,7 @@ runClientOrFail clientEnv action = do
 
 mkTestCavefishMonad ::
   FileScheme ->
-  Cooked.InitialDistribution ->
+  InitialDistribution ->
   ServerConfiguration ->
   Application
 mkTestCavefishMonad wbpsScheme initialDistribution serverConfiguration =
@@ -131,8 +125,8 @@ setupCavefish actions = do
 
 distributionFromList :: [(Wallet, [Api.Value])] -> Cooked.InitialDistribution
 distributionFromList =
-  Cooked.InitialDistribution
-    . foldl' (\x (user, values) -> x <> map (Cooked.receives user . Cooked.Value) values) []
+  InitialDistribution
+    . foldl' (\x (user, values) -> x <> map (receives user . Value) values) []
 
 data Setup = Setup
   { serviceProvider :: ServiceProviderAPI
