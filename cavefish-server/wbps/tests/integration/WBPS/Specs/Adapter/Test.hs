@@ -2,8 +2,8 @@
 
 module WBPS.Specs.Adapter.Test (findInputsDir) where
 
-import Path
-import Path.IO
+import Path (Abs, Dir, Path, parent, reldir, relfile, (</>))
+import Path.IO (doesDirExist, doesFileExist)
 
 findInputsDir :: Path Abs Dir -> IO (Path Abs Dir)
 findInputsDir currentDir = do

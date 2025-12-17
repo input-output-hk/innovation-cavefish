@@ -97,7 +97,9 @@ library
     , memory
     , monad-time
     , mtl
+    , optics-core
     , plutus-ledger
+    , plutus-script-utils
     , say
     , servant-server
     , stm

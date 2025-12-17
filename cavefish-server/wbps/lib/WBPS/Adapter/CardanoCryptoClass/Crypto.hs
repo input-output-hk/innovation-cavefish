@@ -21,23 +21,40 @@ module WBPS.Adapter.CardanoCryptoClass.Crypto (
   manualTesting,
 ) where
 
-import Cardano.Crypto.DSIGN
+import Cardano.Crypto.DSIGN (
+  ContextDSIGN,
+  DSIGNAlgorithm,
+  Ed25519DSIGN,
+  SignKeyDSIGN,
+  Signable,
+  VerKeyDSIGN,
+  deriveVerKeyDSIGN,
+  genKeyDSIGN,
+  rawDeserialiseSignKeyDSIGN,
+  rawDeserialiseVerKeyDSIGN,
+  rawSerialiseSigDSIGN,
+  rawSerialiseSignKeyDSIGN,
+  rawSerialiseVerKeyDSIGN,
+  seedSizeDSIGN,
+  signDSIGN,
+ )
 import Cardano.Crypto.Hash (ByteString)
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Crypto.Error (CryptoFailable (..))
-import Crypto.PubKey.Ed25519 qualified as E
-import Crypto.Random
-import Data.Aeson as A hiding (decode, decode', encode)
-import Data.ByteArray qualified as BA
-import Data.ByteString qualified as BS
+import Crypto.Random (MonadRandom (getRandomBytes))
+import Data.Aeson as A (
+  FromJSON (parseJSON),
+  KeyValue ((.=)),
+  ToJSON (toJSON),
+  Value (Object, String),
+  object,
+  (.:),
+ )
 import Data.Coerce (coerce)
-import Data.Data (Proxy (..))
-import Data.List qualified as T
+import Data.Data (Proxy (Proxy))
 import Data.Maybe (fromMaybe)
-import Data.String
-import Data.Text as Text hiding (drop)
-import GHC.Generics
+import Data.String (IsString (fromString))
+import Data.Text as Text (Text, pack, stripPrefix, unpack)
 import GHC.Stack (HasCallStack)
 import Text.Hex (decodeHex, encodeHex)
 

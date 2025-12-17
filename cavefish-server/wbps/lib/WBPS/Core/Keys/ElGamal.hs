@@ -18,8 +18,8 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Crypto.Number.ModArithmetic (inverse)
 import Crypto.Random (getRandomBytes)
 import Data.Aeson (
-  FromJSON (..),
-  ToJSON (..),
+  FromJSON (parseJSON),
+  ToJSON (toJSON),
   Value (Array, Number, Object, String),
   eitherDecode,
   (.:),

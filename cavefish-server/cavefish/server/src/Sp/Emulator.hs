@@ -1,6 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
-
 -- | Module providing an implementation of the transaction building and submission
 --    functions using the Cooked mock chain.
 --
@@ -11,15 +8,18 @@ module Sp.Emulator (
   mkServerContext,
 ) where
 
-import Cavefish
-import Cavefish.Api.ServerConfiguration
-import Cavefish.Services.TxBuilding (ServiceFee, TxBuilding (..))
-import Cavefish.Services.WBPS (WBPS (..))
-import Control.Monad.IO.Class (MonadIO (..))
+import Cavefish (CavefishServices (CavefishServices, txBuildingService, wbpsService))
+import Cavefish.Api.ServerConfiguration (
+  ServerConfiguration (ServerConfiguration, httpServer, serviceProviderFee, transactionExpiry, wbps),
+ )
+import Cavefish.Services.TxBuilding (ServiceFee, TxBuilding (TxBuilding, build, fees, submit))
+import Cavefish.Services.WBPS (WBPS (WBPS, createSession, loadAccount, loadAccounts, register))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Cooked (InitialDistribution)
-import Cooked.MockChain
-import Data.ByteString.Lazy.Char8 qualified as BL8
-import Intent.Example.DSL
+import Cooked.MockChain (runMockChainFrom)
+import Cooked.MockChain.Direct (MockChainReturn (mcrValue))
+import Data.ByteString.Lazy.Char8 qualified as BL8 (pack)
+import Intent.Example.DSL (IntentDSL, toCanonicalIntent)
 import Intent.Example.TxBuilder (buildTx)
 import Servant (
   err422,
@@ -27,10 +27,13 @@ import Servant (
   errBody,
   throwError,
  )
-import WBPS.Commitment qualified as WBPS
+import WBPS.Core.Cardano.UnsignedTx (UnsignedTx)
+import WBPS.Core.Commitment.Commitment qualified as Commitment
+import WBPS.Core.Failure (RegistrationFailed (AccountAlreadyRegistered))
 import WBPS.Core.FileScheme (FileScheme)
-import WBPS.Registration (RegistrationFailed (AccountAlreadyRegistered), withFileSchemeIO)
-import WBPS.Registration qualified as WBPS
+import WBPS.Core.Registration.FetchAccounts qualified as Registration
+import WBPS.Core.Registration.Register qualified as Registration
+import WBPS.WBPS (runWBPS)
 
 mkServerContext ::
   InitialDistribution ->
@@ -51,23 +54,23 @@ mkServerContext
       , wbpsService =
           WBPS
             { register = \userWalletPublicKey ->
-                liftIO (withFileSchemeIO wbpsScheme (WBPS.register userWalletPublicKey))
+                liftIO (runWBPS wbpsScheme (Registration.register userWalletPublicKey))
                   >>= \case
                     Left [AccountAlreadyRegistered _] -> throwError err422 {errBody = BL8.pack "Account Already Registered"}
                     Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     Right x -> pure x
             , createSession = \userWalletPublicKey tx ->
-                liftIO (WBPS.withFileSchemeIO wbpsScheme (WBPS.createSession userWalletPublicKey tx))
+                liftIO (runWBPS wbpsScheme (Commitment.createSession userWalletPublicKey tx))
                   >>= \case
                     (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     (Right x) -> pure x
             , loadAccount = \userWalletPublicKey ->
-                liftIO (WBPS.withFileSchemeIO wbpsScheme (WBPS.loadAccount userWalletPublicKey))
+                liftIO (runWBPS wbpsScheme (Registration.loadAccount userWalletPublicKey))
                   >>= \case
                     (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     Right x -> pure x
             , loadAccounts =
-                liftIO (withFileSchemeIO wbpsScheme WBPS.loadAccounts)
+                liftIO (runWBPS wbpsScheme Registration.loadAccounts)
                   >>= \case
                     (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     Right x -> pure x
@@ -80,7 +83,7 @@ buildWithCooked ::
   InitialDistribution ->
   ServiceFee ->
   IntentDSL ->
-  m TxUnsigned
+  m UnsignedTx
 buildWithCooked initialDistribution serviceProviderFee intentDSL = do
   case toCanonicalIntent intentDSL of
     Left err -> liftIO $ fail ("buildTx failed: " <> show err)

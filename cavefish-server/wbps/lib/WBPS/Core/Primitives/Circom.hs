@@ -1,6 +1,9 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 module WBPS.Core.Primitives.Circom (
   defCommitmentParams,
@@ -10,17 +13,17 @@ module WBPS.Core.Primitives.Circom (
   compileBuildCommitmentForFileScheme,
 ) where
 
+import Control.Monad (unless)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, asks)
-import Path (parent)
-import Path qualified
-import Shh
+import Path qualified (parent, toFilePath)
+import Shh (ExecReference (SearchPath), Proc, load)
 import System.FilePath (dropTrailingPathSeparator, takeDirectory, (</>))
-import WBPS.Core.FileScheme
+import WBPS.Core.FileScheme (FileScheme (FileScheme, relationCircom))
 
 load
   SearchPath
-  [ "echo"
-  , "circom"
+  [ "circom" :: String
   ]
 
 -- | Fixed set of template arguments required by the BuildCommitment circom template.
@@ -39,6 +42,13 @@ data BuildCommitmentCompileScheme = BuildCommitmentCompileScheme
   , includeDir :: FilePath
   }
 
+ensureCircomAvailable :: MonadIO m => m ()
+ensureCircomAvailable = do
+  missing <- liftIO missingExecutables
+  unless (null missing) $
+    liftIO . ioError . userError $
+      "Missing required executables: " <> unwords missing
+
 compileBuildCommitment :: BuildCommitmentCompileScheme -> Proc ()
 compileBuildCommitment BuildCommitmentCompileScheme {..} =
   let includeDirClean = dropTrailingPathSeparator includeDir
@@ -52,39 +62,40 @@ compileBuildCommitment BuildCommitmentCompileScheme {..} =
       circomlibDirNode = includeRootRoot </> "node_modules" </> "circomlib" </> "circuits"
    in circom
         circuitPath
-        "--r1cs"
-        "--wasm"
-        "--sym"
-        "-o"
+        ("--r1cs" :: String)
+        ("--wasm" :: String)
+        ("--sym" :: String)
+        ("-o" :: String)
         outputDir
-        "-l"
+        ("-l" :: String)
         outputDir
-        "-l"
+        ("-l" :: String)
         includeDir
-        "-l"
+        ("-l" :: String)
         circuitsDirLocal
-        "-l"
+        ("-l" :: String)
         circuitsDirSibling
-        "-l"
+        ("-l" :: String)
         circuitsBaseSibling
-        "-l"
+        ("-l" :: String)
         vendorCircomlibDir
-        "-l"
+        ("-l" :: String)
         circomlibDirNode
 
 compileBuildCommitmentForFileScheme ::
-  MonadReader FileScheme m =>
+  (MonadReader FileScheme m, MonadIO m) =>
   m (Proc ())
-compileBuildCommitmentForFileScheme =
+compileBuildCommitmentForFileScheme = do
+  ensureCircomAvailable
   asks (compileBuildCommitment . toCompileScheme)
 
 toCompileScheme ::
   FileScheme ->
   BuildCommitmentCompileScheme
 toCompileScheme FileScheme {relationCircom} =
-  let outputDir = parent relationCircom
+  let outputDir = Path.parent relationCircom
    in BuildCommitmentCompileScheme
         { circuitPath = Path.toFilePath relationCircom
         , outputDir = Path.toFilePath outputDir
-        , includeDir = Path.toFilePath (parent outputDir)
+        , includeDir = Path.toFilePath (Path.parent outputDir)
         }

@@ -5,8 +5,8 @@ module WBPS.Adapter.Data (
 ) where
 
 import Control.Monad (when)
-import Data.Bool
-import Data.Validation (Validation (..))
+import Data.Bool (bool)
+import Data.Validation (Validation (Failure, Success))
 
 whenM :: Monad m => m Bool -> m () -> m ()
 whenM mb act = mb >>= \b -> when b act

@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
 
 module Cavefish.Endpoints.Write.Register (
   handle,
@@ -13,18 +12,18 @@ import Cavefish (
   CavefishServerM,
   CavefishServices (CavefishServices, wbpsService),
  )
-import Cavefish.Services.WBPS qualified as Service
+import Cavefish.Services.WBPS qualified as Service (WBPS (..))
 import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson (FromJSON, ToJSON, Value)
 import GHC.Generics (Generic)
-import WBPS.Core.Keys.Ed25519 (
-  UserWalletPublicKey,
- )
+import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal (EncryptionKey)
-import WBPS.Core.Keys.ElGamal qualified as ElGamal
-import WBPS.Registration (
-  AccountCreated (..),
-  PublicVerificationContext (..),
+import WBPS.Core.Keys.ElGamal qualified as ElGamal (KeyPair (..))
+import WBPS.Core.Registration.Account (
+  AccountCreated (AccountCreated, encryptionKeys, publicVerificationContext),
+ )
+import WBPS.Core.Registration.PublicVerificationContext (
+  PublicVerificationContext (PublicVerificationContext, asJson),
  )
 
 newtype Inputs = Inputs

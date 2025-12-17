@@ -1,6 +1,6 @@
 module WBPS.Adapter.Monad.Control (ifM, whenM, whenNothingThrow, whenLeftThrow) where
 
-import Control.Monad.Error.Class
+import Control.Monad.Error.Class (MonadError (throwError))
 
 ifM :: Monad m => m Bool -> m a -> m a -> m a
 ifM condM ma mb = do

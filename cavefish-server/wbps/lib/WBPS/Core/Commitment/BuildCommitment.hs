@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module WBPS.Core.BuildCommitment (
+module WBPS.Core.Commitment.BuildCommitment (
   BuildCommitmentInput (..),
   BuildCommitmentOutput (..),
   Commitment (..),
@@ -22,6 +22,7 @@ import Data.Aeson.Types qualified as AesonTypes
 import Data.ByteArray qualified as BA
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
+import Data.ByteString.Lazy.Char8 qualified as BL8
 import Data.Coerce (coerce)
 import Data.List (sort, unfoldr)
 import Data.Maybe (mapMaybe)
@@ -29,16 +30,31 @@ import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Vector qualified as V
 import Data.Word (Word8)
-import GHC.Generics
-import Path
-import Path.IO
-import Shh (Stream (StdOut), (&!>))
+import GHC.Generics (Generic)
+import Path (toFilePath, (</>))
+import Path.IO (doesFileExist, ensureDir, withTempDir)
+import Shh (Stream (Append, StdOut), (&!>), (&>))
 import System.FilePath qualified as FP
 import Text.Read (readMaybe)
 import WBPS.Adapter.CardanoCryptoClass.Crypto (FromByteString (fromByteString), Hexadecimal)
-import WBPS.Core.FileScheme
-import WBPS.Core.Keys.ElGamal (AffinePoint (..))
-import WBPS.Core.Primitives.Circom (BuildCommitmentParams (..), compileBuildCommitmentForFileScheme)
+import WBPS.Core.FileScheme (
+  FileScheme (
+    FileScheme,
+    accounts,
+    buildCommitmentR1CS,
+    buildCommitmentWASM,
+    shellLogs,
+    statementOutput,
+    witnessInput,
+    witnessOutput
+  ),
+ )
+import WBPS.Core.Keys.ElGamal (AffinePoint (AffinePoint), x, y)
+import WBPS.Core.Primitives.Circom (
+  BuildCommitmentParams (BuildCommitmentParams),
+  compileBuildCommitmentForFileScheme,
+  nbCommitmentLimbs,
+ )
 import WBPS.Core.Primitives.Snarkjs (exportStatementAsJSON)
 import WBPS.Core.Primitives.SnarkjsOverFileScheme (getGenerateBuildCommitmentWitnessProcess)
 
@@ -52,9 +68,11 @@ data BuildCommitmentOutput = BuildCommitmentOutput
   , maskedChunks :: [Integer]
   }
 
-instance {-# OVERLAPPING #-} Aeson.FromJSON [String] where
-  parseJSON (Aeson.Object o) = o .: "witness"
-  parseJSON (Aeson.Array arr) = traverse Aeson.parseJSON (V.toList arr)
+newtype WitnessValues = WitnessValues [String]
+
+instance Aeson.FromJSON WitnessValues where
+  parseJSON (Aeson.Object o) = WitnessValues <$> o .: "witness"
+  parseJSON (Aeson.Array arr) = WitnessValues <$> traverse Aeson.parseJSON (V.toList arr)
   parseJSON v = AesonTypes.typeMismatch "Array or witness object" v
 
 newtype ComId = ComId {unComId :: Hexadecimal}
@@ -83,9 +101,9 @@ mkCommitment payload =
        in BS.cons (fromIntegral (length bs)) (BS.pack bs)
     flat = BS.concat (map encodeLimb (coerce payload))
     digest = hash @_ @SHA256 flat
-    id = ComId . fromByteString @Hexadecimal $ (BA.convert digest :: ByteString)
+    commitmentId = ComId . fromByteString @Hexadecimal $ (BA.convert digest :: ByteString)
    in
-    Commitment {id, payload}
+    Commitment {id = commitmentId, payload}
 
 integerToBytes :: Integer -> [Word8]
 integerToBytes 0 = [0]
@@ -115,19 +133,21 @@ runBuildCommitment params BuildCommitmentInput {ekPowRho = AffinePoint {x, y}, .
           , "in_message" Aeson..= messageBits
           ]
   let accountsDir = accounts scheme
+
   liftIO $ do
     ensureDir accountsDir
     withTempDir accountsDir "build-commitment" $ \accountDir -> do
       let inputPath = accountDir </> witnessInput scheme
           witnessPath = accountDir </> witnessOutput scheme
           statementPath = accountDir </> statementOutput scheme
+          shellLogsFilepath = BL8.pack $ Path.toFilePath (accountDir </> shellLogs scheme)
       ensureDir accountDir
       BL.writeFile (toFilePath inputPath) (Aeson.encode inputJson)
       let witnessProc = runReader (getGenerateBuildCommitmentWitnessProcess accountDir) scheme
-      witnessProc &!> StdOut
+      witnessProc &!> StdOut &> Append shellLogsFilepath
       exportStatementAsJSON (toFilePath witnessPath) (toFilePath statementPath)
         &!> StdOut
-      parseOutputs scheme statementPath params
+      parseOutputs scheme statementPath
   where
     compileAndScheme ::
       (MonadIO m, MonadReader FileScheme m) =>
@@ -147,11 +167,11 @@ runBuildCommitment params BuildCommitmentInput {ekPowRho = AffinePoint {x, y}, .
         liftIO $ compileProc &!> StdOut
       pure scheme
 
-    parseOutputs scheme statementPath params@BuildCommitmentParams {..} = do
+    parseOutputs scheme statementPath = do
       bytes <- BL.readFile (toFilePath statementPath)
       case Aeson.eitherDecode bytes of
         Left err -> pure (Left err)
-        Right (wVals :: [String]) -> do
+        Right (WitnessValues wVals) -> do
           let ints = fmap read wVals :: [Integer]
           eIdxs <- getOutputIndices scheme params
           case eIdxs of

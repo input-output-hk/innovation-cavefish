@@ -2,10 +2,9 @@ module Main (main) where
 
 import Path.IO (getCurrentDir, getTempDir, withTempDir)
 import Test.Tasty (defaultMain, localOption, testGroup)
-import Test.Tasty.QuickCheck (QuickCheckTests (..))
-import Test.Tasty.Runners (NumThreads (..))
-import WBPS.Core.FileScheme (RootFolders (..))
-import WBPS.Registration
+import Test.Tasty.QuickCheck (QuickCheckTests (QuickCheckTests))
+import Test.Tasty.Runners (NumThreads (NumThreads))
+import WBPS.Core.FileScheme (RootFolders (RootFolders, input, output))
 import WBPS.Specs.Adapter.Test (findInputsDir)
 import WBPS.Specs.NominalCase qualified as Register.Nominal.Case
 

@@ -5,16 +5,27 @@ module WBPS.Specs.Adapter.GenCardanoKeys (
   genEd25519KeyPairs,
 ) where
 
-import Cardano.Crypto.DSIGN (seedSizeDSIGN)
+import Cardano.Crypto.DSIGN (
+  SignKeyDSIGN,
+  VerKeyDSIGN,
+  deriveVerKeyDSIGN,
+  genKeyDSIGN,
+  seedSizeDSIGN,
+ )
 import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
 import Data.ByteString qualified as BS
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NL
-import Data.Proxy (Proxy (..))
+import Data.Proxy (Proxy (Proxy))
 import Test.QuickCheck (Gen, arbitrary, vectorOf)
 import Test.QuickCheck.Gen (listOf1)
-import WBPS.Adapter.CardanoCryptoClass.Crypto as Adapter
-import WBPS.Core.Keys.Ed25519 as Ed25519
+import WBPS.Adapter.CardanoCryptoClass.Crypto as Adapter (
+  Ed25519DSIGN,
+  KeyPair (KeyPair),
+  PrivateKey (PrivateKey),
+  PublicKey (PublicKey),
+ )
+import WBPS.Core.Keys.Ed25519 as Ed25519 (KeyPair (KeyPair))
 
 -- | Generate a DSIGN seed of the correct size for Ed25519 (pure).
 genEd25519Seed :: Gen Seed
@@ -36,7 +47,7 @@ genEd25519KeyPair = do
   (x, y) <- genEd25519Keypair
   return
     ( Ed25519.KeyPair
-        (Adapter.KeyPair {signatureKey = Adapter.PrivateKey x, verificationKey = Adapter.PublicKey y})
+        (Adapter.KeyPair (Adapter.PrivateKey x) (Adapter.PublicKey y))
     )
 
 genEd25519KeyPairs :: Int -> Gen (NonEmpty Ed25519.KeyPair)

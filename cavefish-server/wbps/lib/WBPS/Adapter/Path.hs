@@ -3,10 +3,15 @@ module WBPS.Adapter.Path (
   writeTo,
 ) where
 
-import Control.Monad.IO.Class
-import Data.Aeson
-import Path as P
-import Path.IO as P
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Data.Aeson (
+  FromJSON,
+  ToJSON,
+  decodeFileStrict,
+  encodeFile,
+ )
+import Path as P (File, Path, parent, toFilePath)
+import Path.IO as P (ensureDir)
 
 writeTo ::
   (MonadIO m, ToJSON a) =>

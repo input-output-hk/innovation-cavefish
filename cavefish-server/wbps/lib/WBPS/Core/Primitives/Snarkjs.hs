@@ -1,9 +1,13 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Eta reduce" #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 module WBPS.Core.Primitives.Snarkjs (
   WitnessScheme (..),
   generateWitness,
@@ -18,13 +22,12 @@ module WBPS.Core.Primitives.Snarkjs (
   exportStatementAsJSON,
 ) where
 
-import Control.Monad.IO.Class
-import Shh
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Shh (ExecReference (SearchPath), Proc, load)
 
 load
   SearchPath
-  [ "echo"
-  , "snarkjs"
+  [ "snarkjs" :: String
   ]
 
 data WitnessScheme = WitnessScheme {wasm :: FilePath, input :: FilePath, witnessOutput :: FilePath}
@@ -32,8 +35,8 @@ data WitnessScheme = WitnessScheme {wasm :: FilePath, input :: FilePath, witness
 generateWitness :: WitnessScheme -> Proc ()
 generateWitness WitnessScheme {..} =
   snarkjs
-    "wtns"
-    "calculate"
+    ("wtns" :: String)
+    ("calculate" :: String)
     wasm
     input
     witnessOutput
@@ -48,8 +51,8 @@ data ProveScheme = ProveScheme
 generateProof :: ProveScheme -> Proc ()
 generateProof ProveScheme {..} =
   snarkjs
-    "groth16"
-    "prove"
+    ("groth16" :: String)
+    ("prove" :: String)
     provingKey
     witness
     proofOutput
@@ -61,8 +64,8 @@ verify :: VerifyScheme -> Proc ()
 verify VerifyScheme {..} =
   liftIO $
     snarkjs
-      "groth16"
-      "verify"
+      ("groth16" :: String)
+      ("verify" :: String)
       verificationKey
       statement
       proof
@@ -73,8 +76,8 @@ data ProvingKeyScheme = ProvingKeyScheme
 generateProvingKey :: ProvingKeyScheme -> Proc ()
 generateProvingKey ProvingKeyScheme {..} =
   snarkjs
-    "groth16"
-    "setup"
+    ("groth16" :: String)
+    ("setup" :: String)
     relationR1CS
     powerOfTauPrepared
     provingKeyOutput
@@ -84,17 +87,17 @@ data VerificationKeyScheme = VerificationKeyScheme {provingKey :: FilePath, veri
 generateVerificationKey :: VerificationKeyScheme -> Proc ()
 generateVerificationKey VerificationKeyScheme {..} =
   snarkjs
-    "zkey"
-    "export"
-    "verificationkey"
+    ("zkey" :: String)
+    ("export" :: String)
+    ("verificationkey" :: String)
     provingKey
     verificationKeyOutput
 
 exportStatementAsJSON :: FilePath -> FilePath -> Proc ()
 exportStatementAsJSON witness statementOutput =
   snarkjs
-    "wtns"
-    "export"
-    "json"
+    ("wtns" :: String)
+    ("export" :: String)
+    ("json" :: String)
     witness
     statementOutput

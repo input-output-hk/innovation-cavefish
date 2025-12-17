@@ -4,13 +4,11 @@
 --     intents, including their representation, normalization, and satisfaction checks
 --     against built transactions.
 module Intent.Example.DSL (
-  TxUnsigned (..),
   CanonicalIntent (..),
   IntentDSL (..),
   AddressW (..),
   AdressConwayEra (..),
   ChangeDelta,
-  source,
   emptyIntent,
   normalizeIntent,
   toIntentExpr,
@@ -22,7 +20,6 @@ module Intent.Example.DSL (
 
 import Cardano.Api (FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
-import Data.Aeson qualified as Aeson
 import Data.Foldable (foldl)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map qualified as Map
@@ -40,6 +37,10 @@ import Ledger (
   cardanoPubKeyHash,
   pubKeyHash,
  )
+import Plutus.Script.Utils.Address (
+  ToAddress (toAddress),
+  ToPubKeyHash (toPubKeyHash),
+ )
 import WBPS.Core.Cardano.TxAbs (TxAbs (absFee, absMint, outputs, sigKeys, validityInterval))
 
 type ChangeDelta = Api.Value
@@ -48,25 +49,16 @@ newtype AdressConwayEra = AdressConwayEra {unAdressConwayEra :: Api.AddressInEra
   deriving (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
 
-source :: AdressConwayEra -> Api.AddressInEra Api.ConwayEra
-source = unAdressConwayEra
+instance ToAddress AdressConwayEra where
+  toAddress = toAddress . toPubKeyHash
+
+instance ToPubKeyHash AdressConwayEra where
+  toPubKeyHash (AdressConwayEra addr) =
+    case cardanoPubKeyHash addr of
+      Just pkh -> pkh
+      Nothing -> error "toPubKeyHash: address is not backed by a payment key hash"
 
 -- Result of building a transaction
-newtype TxUnsigned = TxUnsigned
-  { txUnsigned :: Api.TxBody Api.ConwayEra
-  }
-  deriving newtype (Show, Eq)
-
-instance ToJSON TxUnsigned where
-  toJSON (TxUnsigned body) =
-    Aeson.toJSON (Api.serialiseToTextEnvelope Nothing body)
-
-instance FromJSON TxUnsigned where
-  parseJSON v = do
-    envelope <- Aeson.parseJSON v
-    case Api.deserialiseFromTextEnvelope @(Api.TxBody Api.ConwayEra) envelope of
-      Left err -> fail (show err)
-      Right body -> pure (TxUnsigned body)
 
 -- Wallet address as represented in the API
 newtype AddressW = AddressW Text
@@ -205,7 +197,7 @@ satisfies CanonicalIntent {..} tx =
        in Map.isSubmapOfBy (<=) need have
     , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
       -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
-      all (hasSigner tx.sigKeys . source) spendFrom
+      all (hasSigner tx.sigKeys . unAdressConwayEra) spendFrom
     , -- MaxInterval (if any): (tx.validityInterval.snd - tx.validityInterval.fst) ≤ i
       case maxInterval of
         Nothing -> True

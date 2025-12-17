@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
-
 -- | Client implementation using a mock client to interact with the server.
 --
 --  This module defines the `ClientM` monad and associated functions to perform
@@ -23,8 +21,8 @@ module Client.Impl (
   fetchAccounts,
 ) where
 
-import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
-import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
+import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts (Outputs)
+import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment (Outputs)
 import Client.Mock (
   Registered,
   RunServer,
@@ -34,13 +32,14 @@ import Client.Mock (
   initMockClient,
   register,
  )
-import Client.Mock qualified as ClientMock
+import Client.Mock qualified as ClientMock (fetchAccounts)
 import Control.Monad.Except (MonadError, liftEither, throwError)
 import Control.Monad.Reader (
   MonadIO,
   MonadReader (ask),
   MonadTrans (lift),
-  ReaderT (..),
+  ReaderT (ReaderT),
+  runReaderT,
  )
 import Control.Monad.State (MonadState, StateT)
 import Control.Monad.Trans.State (evalStateT)
@@ -51,16 +50,16 @@ import Data.Text (Text)
 import Intent.Example.DSL (IntentDSL)
 import Prototype.Messages (PendingResp)
 import Servant (Handler, ServerError)
-import WBPS.Core.Keys.Ed25519 qualified as Ed25519
+import WBPS.Core.Keys.Ed25519 qualified as Ed25519 (KeyPair)
 
 -- | Monad for client operations against the server.
-newtype ClientM a = ClientM (Control.Monad.Reader.ReaderT ClientEnv (StateT ClientState Handler) a)
+newtype ClientM a = ClientM (ReaderT ClientEnv (StateT ClientState Handler) a)
   deriving newtype
-    ( Control.Monad.Reader.MonadIO
+    ( MonadIO
     , Functor
     , Applicative
     , Monad
-    , Control.Monad.Reader.MonadReader ClientEnv
+    , MonadReader ClientEnv
     , MonadState ClientState
     , MonadError ServerError
     )

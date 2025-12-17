@@ -200,12 +200,12 @@ deserialiseClientWitnessBundle bytes = do
     fromTerm _ = Left "witness bundle: unexpected CBOR shape"
 
     decodeElems :: [Term] -> Either Text ClientWitnessBundle
-    decodeElems [txIdTerm, txAbsTerm, maskedBodyTerm, auxTerm, cipherTerm] = do
+    decodeElems [txIdTerm, txAbsTerm, maskedBodyTerm, auxTerm, _] = do
       txIdBytes <- expectBytes "tx id" txIdTerm
       txAbsBytes <- expectBytes "tx abs" txAbsTerm
       maskedBody <- expectBytes "masked tx body" maskedBodyTerm
       auxBytes <- expectBytes "aux nonce" auxTerm
-      cipherBytes <- expectBytes "ciphertext" cipherTerm
+      -- cipherBytes <- expectBytes "ciphertext" cipherTerm
       -- ciphertext <- deserialiseCiphertext cipherBytes
       pure
         ClientWitnessBundle

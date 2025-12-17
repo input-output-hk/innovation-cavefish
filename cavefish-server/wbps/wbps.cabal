@@ -50,6 +50,12 @@ common project-config
     TypeOperators
     ViewPatterns
 
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
+    -Wredundant-constraints -Wcompat -Wunused-packages
+    -Wmissing-import-lists
+
 library
   import:          base, project-config
   hs-source-dirs:  lib
@@ -58,44 +64,52 @@ library
     WBPS.Adapter.Data
     WBPS.Adapter.Monad.Control
     WBPS.Adapter.Path
-    WBPS.Commitment
-    WBPS.Core.BuildCommitment
     WBPS.Core.Cardano.Cbor
     WBPS.Core.Cardano.TxAbs
+    WBPS.Core.Cardano.UnsignedTx
+    WBPS.Core.Commitment.BuildCommitment
+    WBPS.Core.Commitment.Commitment
+    WBPS.Core.Commitment.Scalars
+    WBPS.Core.Failure
     WBPS.Core.FileScheme
     WBPS.Core.Keys.Ed25519
     WBPS.Core.Keys.ElGamal
     WBPS.Core.Primitives.Circom
     WBPS.Core.Primitives.Snarkjs
     WBPS.Core.Primitives.SnarkjsOverFileScheme
-    WBPS.Registration
+    WBPS.Core.Registration.Account
+    WBPS.Core.Registration.FetchAccounts
+    WBPS.Core.Registration.FileScheme
+    WBPS.Core.Registration.FileScheme.Directories
+    WBPS.Core.Registration.PublicVerificationContext
+    WBPS.Core.Registration.Register
+    WBPS.WBPS
 
   build-depends:
     , aeson
-    , base16-bytestring
     , bytestring
-    , cardano-api            ^>=10.16.1.0
-    , cardano-binary         ^>=1.7.1.0
+    , cardano-api
+    , cardano-binary
     , cardano-crypto-class
-    , cardano-ledger-alonzo  ^>=1.13.0.0
-    , cardano-ledger-api     ^>=1.11.0.0
-    , cardano-ledger-core    ^>=1.17.0.0
-    , cborg                  ^>=0.2.10.0
-    , containers             ^>=0.6.7
+    , cardano-ledger-alonzo
+    , cardano-ledger-api
+    , cardano-ledger-core
+    , cborg
+    , containers
+    , cooked-validators
     , cryptonite
     , filepath
     , hex-text
     , memory
     , mtl
-    , path                   >=0.9.0      && <0.10
-    , path-io                >=1.8.0      && <1.9
-    , plutus-ledger          ^>=1.4.0.0
-    , plutus-ledger-api      ^>=1.45.0.0
+    , path
+    , path-io
+    , plutus-ledger
+    , plutus-ledger-api
     , process
-    , scientific             ^>=0.3.8.0
-    , shh                    >=0.7.0      && <0.8
+    , scientific
+    , shh
     , text
-    , transformers
     , validation
     , vector
 
@@ -108,16 +122,9 @@ test-suite wbps-unit-tests
   build-depends:
     , aeson
     , bytestring
-    , directory
-    , filepath
-    , mtl
-    , path
-    , path-io
-    , QuickCheck        ^>=2.15.0.1
+    , QuickCheck
     , tasty
-    , tasty-hunit
     , tasty-quickcheck
-    , temporary
     , wbps
 
 test-suite wbps-integration-tests
@@ -133,11 +140,10 @@ test-suite wbps-integration-tests
   build-depends:
     , bytestring
     , cardano-crypto-class
-    , containers            ^>=0.6.7
-    , path                  ^>=0.9.6
-    , path-io               ^>=1.8.2
+    , containers
+    , path
+    , path-io
     , QuickCheck
     , tasty
-    , tasty-hunit
     , tasty-quickcheck
     , wbps

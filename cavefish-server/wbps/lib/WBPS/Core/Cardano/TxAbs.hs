@@ -5,11 +5,9 @@ import Cardano.Api qualified as Api
 import Cardano.Api.Ledger (VKey (unVKey))
 import Cardano.Api.Shelley (Tx (ShelleyTx))
 import Cardano.Crypto.DSIGN.Class (rawSerialiseVerKeyDSIGN)
-import Cardano.Ledger.Alonzo.Tx (AlonzoTx (AlonzoTx, body, wits))
+import Cardano.Ledger.Alonzo.Tx (AlonzoTx (AlonzoTx, wits))
 import Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits (AlonzoTxWits, txwitsVKey))
-import Cardano.Ledger.Api qualified as Ledger
 import Cardano.Ledger.Keys.WitVKey qualified as LedgerWit
-import Data.Functor.Identity (Identity (..))
 import Data.Set qualified as Set
 import GHC.Exts (IsList (toList))
 import GHC.Generics (Generic)

@@ -2,38 +2,36 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 
 module Spec (spec) where
 
 import Adapter.Cavefish.Client (
-  ServiceProviderAPI (
-    ServiceProviderAPI,
+  ReadAPI (ReadAPI, fetchAccount),
+  ServiceProviderAPI (ServiceProviderAPI, read, write),
+  Setup (Setup, alice, bob, serviceProvider),
+  WriteAPI (
+    WriteAPI,
     askCommitmentProof,
     demonstrateCommitment,
-    fetchAccount,
     register
   ),
-  getServiceProviderAPI,
-  mkTestCavefishMonad,
+  setupCavefish,
  )
 import Cardano.Api (lovelaceToValue)
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
 import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 import Cavefish.Endpoints.Write.Register qualified as Register
-import Control.Monad
-import Data.Default (def)
+import Data.Coerce (coerce)
 import Intent.Example.DSL (AddressW (AddressW), IntentDSL (PayToW))
-import Network.Wai.Handler.Warp qualified as Warp
 import Prototype.AskCommitmentProof qualified as AskCommitmentProof
-import Test.Hspec (Spec, describe, it, runIO, shouldBe)
-import WBPS.Core.FileScheme (FileScheme, mkFileSchemeFromRoot)
+import Test.Hspec (Spec, describe, it, shouldBe)
 import WBPS.Core.Keys.Ed25519 (
   PaymentAddess (PaymentAddess),
-  UserWalletPublicKey,
-  Wallet (Wallet, paymentAddress, publicKey),
   generateKeyPair,
   generateKeyTuple,
-  generateWallet,
+  paymentAddress,
+  publicKey,
   userWalletPK,
  )
 
@@ -44,53 +42,51 @@ spec = do
       it
         "a user can be registered to a service provider and retrieve (PublicVerificationContext,ek) from the SP"
         $ setupCavefish
-          \ServiceProviderAPI {register, fetchAccount} -> do
-            userWalletPublicKey <- userWalletPK <$> generateKeyPair
+          \Setup
+             { serviceProvider =
+               ServiceProviderAPI
+                 { write = WriteAPI {register}
+                 , read = ReadAPI {fetchAccount}
+                 }
+             } -> do
+              userWalletPublicKey <- userWalletPK <$> generateKeyPair
 
-            Register.Outputs {publicVerificationContext, ek} <-
-              register . Register.Inputs $ userWalletPublicKey
+              Register.Outputs {publicVerificationContext, ek} <-
+                register . Register.Inputs $ userWalletPublicKey
 
-            FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs $ userWalletPublicKey
+              FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs $ userWalletPublicKey
 
-            accountMaybe
-              `shouldBe` Just FetchAccount.Account {userWalletPublicKey, ek, publicVerificationContext}
+              accountMaybe
+                `shouldBe` Just FetchAccount.Account {userWalletPublicKey, ek, publicVerificationContext}
 
--- it
---   "a registered user can request to the SP to demonstrate a commitment for the intent submitted"
---   $ do
---     setupCavefish
---       \ServiceProviderAPI {register, demonstrateCommitment, askCommitmentProof, fetchAccount} -> do
---         (userWalletPublicKey, paymentAddress) <- provisionWallets
+      it
+        "a registered user can request to the SP to demonstrate a commitment for the intent submitted"
+        $ do
+          setupCavefish
+            \Setup
+               { serviceProvider =
+                 ServiceProviderAPI
+                   { write = WriteAPI {register, demonstrateCommitment, askCommitmentProof}
+                   , read = ReadAPI {fetchAccount}
+                   }
+               , alice
+               , bob
+               } -> do
+                Register.Outputs {publicVerificationContext, ek} <- register . Register.Inputs . publicKey $ alice
 
---         Register.Outputs {publicVerificationContext, ek} <- register . Register.Inputs $ userWalletPublicKey
+                DemonstrateCommitment.Outputs {commitment, txAbs} <-
+                  demonstrateCommitment
+                    . DemonstrateCommitment.Inputs (publicKey alice)
+                    $ PayToW (lovelaceToValue 10_000_000) (coerce . paymentAddress $ bob)
 
---         _ <-
---           demonstrateCommitment
---             . DemonstrateCommitment.Inputs
---               userWalletPublicKey
---             $ PayToW (lovelaceToValue 10_000_000) paymentAddress
+                (r, bigR) <- generateKeyTuple
 
---         (_, bigR) <- generateKeyTuple
+                _ <-
+                  askCommitmentProof
+                    . AskCommitmentProof.Inputs (publicKey alice)
+                    $ bigR
 
---         _ <-
---           askCommitmentProof
---             . AskCommitmentProof.Inputs userWalletPublicKey
---             $ bigR
+                FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs . publicKey $ alice
 
---         FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs $ userWalletPublicKey
-
---         accountMaybe
---           `shouldBe` Just FetchAccount.Account {userWalletPublicKey, ek, publicVerificationContext}
-
-setupCavefish :: (ServiceProviderAPI -> IO a) -> IO a
-setupCavefish action = do
-  wbpsScheme <- mkFileSchemeFromRoot "../../wbps"
-  Warp.testWithApplication
-    (pure $ mkTestCavefishMonad wbpsScheme def)
-    (getServiceProviderAPI >=> action)
-
-provisionWallets :: IO (UserWalletPublicKey, AddressW)
-provisionWallets = do
-  Wallet {publicKey = userWalletPublicKey, paymentAddress = PaymentAddess paymentAddress} <-
-    generateWallet
-  pure (userWalletPublicKey, AddressW paymentAddress)
+                accountMaybe
+                  `shouldBe` Just FetchAccount.Account {userWalletPublicKey = publicKey alice, ek, publicVerificationContext}

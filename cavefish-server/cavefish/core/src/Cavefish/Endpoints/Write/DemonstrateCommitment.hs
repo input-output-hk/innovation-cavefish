@@ -1,29 +1,22 @@
-{-# OPTIONS_GHC -Wno-missing-import-lists #-}
-
 module Cavefish.Endpoints.Write.DemonstrateCommitment (
   handle,
   Inputs (..),
   Outputs (..),
-  Commitment (..),
 ) where
 
-import Cardano.Api (ConwayEra, Tx)
-import Cardano.Api qualified as Api
 import Cavefish (
   CavefishServerM,
   CavefishServices (CavefishServices, txBuildingService, wbpsService),
  )
-import Cavefish.Services.TxBuilding qualified as Service
-import Cavefish.Services.WBPS qualified as Service
+import Cavefish.Services.TxBuilding qualified as TxService (TxBuilding (..))
+import Cavefish.Services.WBPS qualified as WbpsService (WBPS (..))
 import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
-import Intent.Example.DSL (
-  IntentDSL,
-  TxUnsigned (TxUnsigned),
- )
-import WBPS.Commitment (
-  Commitment (..),
+import Intent.Example.DSL (IntentDSL)
+import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx)
+import WBPS.Core.Commitment.BuildCommitment (Commitment)
+import WBPS.Core.Commitment.Commitment (
   PublicMessage (PublicMessage),
   Session (SessionCreated, commitment, publicMessage),
  )
@@ -37,21 +30,18 @@ data Inputs = Inputs
 
 data Outputs = Outputs
   { commitment :: Commitment
-  , txAbs :: Tx ConwayEra
+  , txAbs :: AbstractUnsignedTx
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
 handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey, intent} = do
   CavefishServices
-    { txBuildingService = Service.TxBuilding {build}
-    , wbpsService = Service.WBPS {createSession}
+    { txBuildingService = TxService.TxBuilding {build}
+    , wbpsService = WbpsService.WBPS {createSession}
     } <-
     ask
 
-  TxUnsigned tx <- build intent
-
-  let unsignedTx = Api.makeSignedTransaction [] tx
-  SessionCreated {publicMessage = PublicMessage txAbs, commitment} <-
-    createSession userWalletPublicKey unsignedTx
+  unsignedTx <- build intent
+  SessionCreated {publicMessage = PublicMessage txAbs, commitment} <- createSession userWalletPublicKey unsignedTx
   return Outputs {txAbs, commitment}
