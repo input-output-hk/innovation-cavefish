@@ -82,10 +82,10 @@ library
     WBPS.Core.Registration.Register
     WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh
     WBPS.Core.Registration.SnarkJs.OverShh
-    WBPS.Core.Session.Commitment.BuildCommitment
-    WBPS.Core.Session.Commitment.Commitment
+    WBPS.Core.Session.Commitment.Build
     WBPS.Core.Session.Commitment.Scalars
     WBPS.Core.Session.Create
+    WBPS.Core.ZK.Message
     WBPS.WBPS
 
   build-depends:
@@ -97,6 +97,7 @@ library
     , containers            ^>=0.6.7
     , cooked-validators
     , cryptonite
+    , data-default
     , filepath
     , hex-text
     , memory
@@ -135,17 +136,25 @@ test-suite wbps-integration-tests
   hs-source-dirs: tests/integration
   main-is:        Main.hs
   other-modules:
+    WBPS.Specs.Adapter.Fixture
     WBPS.Specs.Adapter.GenCardanoKeys
     WBPS.Specs.Adapter.Test
     WBPS.Specs.NominalCase
+    WBPS.Specs.Session.Commitment.Build
 
   build-depends:
+    , aeson
     , bytestring
+    , cardano-api
     , cardano-crypto-class
     , containers
+    , data-default
+    , mtl
     , path
     , path-io
     , QuickCheck
+    , random
     , tasty
+    , tasty-hunit
     , tasty-quickcheck
     , wbps

@@ -1,18 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module WBPS.Core.Session.Commitment.BuildCommitment (
-  BuildCommitmentInput (..),
-  BuildCommitmentOutput (..),
+module WBPS.Core.Session.Commitment.Build (
+  build,
+  Context (..),
+  Input (..),
   Commitment (..),
   CommitmentPayload (..),
   ComId (..),
-  mkCommitment,
-  runBuildCommitment,
 ) where
 
 import Cardano.Crypto.Hash (ByteString)
 import Control.Monad (unless)
+import Control.Monad.Except (MonadError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ask, runReader)
 import Crypto.Hash (SHA256, hash)
@@ -24,6 +24,7 @@ import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
 import Data.ByteString.Lazy.Char8 qualified as BL8
 import Data.Coerce (coerce)
+import Data.Default (Default (def))
 import Data.List (sort, unfoldr)
 import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
@@ -31,12 +32,16 @@ import Data.Text.IO qualified as TIO
 import Data.Vector qualified as V
 import Data.Word (Word8)
 import GHC.Generics (Generic)
-import Path (toFilePath, (</>))
+import Path (Path, toFilePath, (</>))
 import Path.IO (doesFileExist, ensureDir, withTempDir)
 import Shh (Stream (Append, StdOut), (&!>), (&>))
 import System.FilePath qualified as FP
 import Text.Read (readMaybe)
 import WBPS.Adapter.CardanoCryptoClass.Crypto (FromByteString (fromByteString), Hexadecimal)
+import WBPS.Core.Failure (
+  RegistrationFailed,
+  toWBPSFailure,
+ )
 import WBPS.Core.FileScheme (
   FileScheme (
     FileScheme,
@@ -51,22 +56,43 @@ import WBPS.Core.FileScheme (
  )
 import WBPS.Core.Keys.ElGamal (AffinePoint (AffinePoint), x, y)
 import WBPS.Core.Primitives.Circom (
-  BuildCommitmentParams (BuildCommitmentParams),
   compileBuildCommitmentForFileScheme,
-  nbCommitmentLimbs,
  )
 import WBPS.Core.Primitives.Snarkjs (exportStatementAsJSON)
 import WBPS.Core.Primitives.SnarkjsOverFileScheme (getGenerateBuildCommitmentWitnessProcess)
+import WBPS.Core.ZK.Message (
+  MessageBits (MessageBits, unMessageBits),
+ )
 
-data BuildCommitmentInput = BuildCommitmentInput
+build ::
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
+  Input ->
+  m Commitment
+build input = do
+  Output {maskedChunks} <- toWBPSFailure =<< runBuildCommitment def input
+  return $ mkCommitment (CommitmentPayload maskedChunks)
+
+data Input = Input
   { ekPowRho :: AffinePoint
-  , messageBits :: [Int]
+  , messageBits :: MessageBits
   }
 
-data BuildCommitmentOutput = BuildCommitmentOutput
-  { messageChunks :: [Integer]
-  , maskedChunks :: [Integer]
+data Output = Output
+  { messageChunks :: MessageBits
+  , maskedChunks :: MessageBits
   }
+
+data Context = Context
+  { commitmentLimbSize :: Int
+  , nbCommitmentLimbs :: Int
+  }
+
+instance Default Context where
+  def =
+    Context
+      { commitmentLimbSize = 252
+      , nbCommitmentLimbs = 522
+      }
 
 newtype WitnessValues = WitnessValues [String]
 
@@ -79,7 +105,7 @@ newtype ComId = ComId {unComId :: Hexadecimal}
   deriving newtype (Eq, Show, FromJSON, ToJSON)
 
 newtype CommitmentPayload = CommitmentPayload
-  { payload :: [Integer]
+  { unPayload :: MessageBits
   }
   deriving newtype (Eq, Show, FromJSON, ToJSON)
 
@@ -121,16 +147,16 @@ allM p = fmap and . mapM p
 
 runBuildCommitment ::
   (MonadIO m, MonadReader FileScheme m) =>
-  BuildCommitmentParams ->
-  BuildCommitmentInput ->
-  m (Either String BuildCommitmentOutput)
-runBuildCommitment params BuildCommitmentInput {ekPowRho = AffinePoint {x, y}, ..} = do
-  scheme <- compileAndScheme params
+  Context ->
+  Input ->
+  m (Either String Output)
+runBuildCommitment params Input {ekPowRho = AffinePoint {x, y}, ..} = do
+  scheme <- compileAndScheme
   let inputJson =
         Aeson.object
           [ "in_seed_x" Aeson..= x
           , "in_seed_y" Aeson..= y
-          , "in_message" Aeson..= messageBits
+          , "in_message" Aeson..= unMessageBits messageBits
           ]
   let accountsDir = accounts scheme
 
@@ -147,50 +173,50 @@ runBuildCommitment params BuildCommitmentInput {ekPowRho = AffinePoint {x, y}, .
       witnessProc &!> StdOut &> Append shellLogsFilepath
       exportStatementAsJSON (toFilePath witnessPath) (toFilePath statementPath)
         &!> StdOut
-      parseOutputs scheme statementPath
-  where
-    compileAndScheme ::
-      (MonadIO m, MonadReader FileScheme m) =>
-      BuildCommitmentParams ->
-      m FileScheme
-    compileAndScheme _ = do
-      scheme@FileScheme {buildCommitmentWASM, buildCommitmentR1CS} <- ask
-      let requiredArtifacts =
-            [ buildCommitmentWASM
-            , buildCommitmentR1CS
-            ]
-      artifactsPresent <-
-        liftIO $
-          allM doesFileExist requiredArtifacts
-      unless artifactsPresent $ do
-        compileProc <- compileBuildCommitmentForFileScheme
-        liftIO $ compileProc &!> StdOut
-      pure scheme
+      parseOutputs params scheme statementPath
 
-    parseOutputs scheme statementPath = do
-      bytes <- BL.readFile (toFilePath statementPath)
-      case Aeson.eitherDecode bytes of
+compileAndScheme ::
+  (MonadIO m, MonadReader FileScheme m) =>
+  m FileScheme
+compileAndScheme = do
+  scheme@FileScheme {buildCommitmentWASM, buildCommitmentR1CS} <- ask
+  let requiredArtifacts =
+        [ buildCommitmentWASM
+        , buildCommitmentR1CS
+        ]
+  artifactsPresent <-
+    liftIO $
+      allM doesFileExist requiredArtifacts
+  unless artifactsPresent $ do
+    compileProc <- compileBuildCommitmentForFileScheme
+    liftIO $ compileProc &!> StdOut
+  pure scheme
+
+parseOutputs :: Context -> FileScheme -> Path b t -> IO (Either String Output)
+parseOutputs params scheme statementPath = do
+  bytes <- BL.readFile (toFilePath statementPath)
+  case Aeson.eitherDecode bytes of
+    Left err -> pure (Left err)
+    Right (WitnessValues wVals) -> do
+      let ints = fmap read wVals :: [Integer]
+      eIdxs <- getOutputIndices scheme params
+      case eIdxs of
         Left err -> pure (Left err)
-        Right (WitnessValues wVals) -> do
-          let ints = fmap read wVals :: [Integer]
-          eIdxs <- getOutputIndices scheme params
-          case eIdxs of
-            Left err -> pure (Left err)
-            Right (msgIdxs, maskedIdxs) -> do
-              let maxIdx = maximum (msgIdxs ++ maskedIdxs)
-              if maxIdx >= length ints
-                then pure (Left "witness shorter than expected when extracting commitment outputs")
-                else
-                  let messageChunks = [ints !! i | i <- msgIdxs]
-                      maskedChunks = [ints !! i | i <- maskedIdxs]
-                   in pure (Right BuildCommitmentOutput {messageChunks, maskedChunks})
+        Right (msgIdxs, maskedIdxs) -> do
+          let maxIdx = maximum (msgIdxs ++ maskedIdxs)
+          if maxIdx >= length ints
+            then pure (Left "witness shorter than expected when extracting commitment outputs")
+            else
+              let messageChunks = MessageBits [ints !! i | i <- msgIdxs]
+                  maskedChunks = MessageBits [ints !! i | i <- maskedIdxs]
+               in pure (Right Output {messageChunks, maskedChunks})
 
 getOutputIndices ::
   MonadIO m =>
   FileScheme ->
-  BuildCommitmentParams ->
+  Context ->
   m (Either String ([Int], [Int]))
-getOutputIndices FileScheme {buildCommitmentR1CS} BuildCommitmentParams {..} = liftIO $ do
+getOutputIndices FileScheme {buildCommitmentR1CS} Context {nbCommitmentLimbs} = liftIO $ do
   -- Circom emits a .sym file alongside the r1cs/wasm that maps witness indices to signal names.
   -- This code reads that file line-by-line, splits on commas, and collects indices whose names
   -- start with main.out_message_chunk[ and main.out_masked_chunk[. It sorts these to recover the
