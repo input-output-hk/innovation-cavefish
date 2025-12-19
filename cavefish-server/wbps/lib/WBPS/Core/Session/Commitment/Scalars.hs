@@ -1,5 +1,5 @@
 -- | Commitment scalar utilities will live here.
-module WBPS.Core.Commitment.Scalars (
+module WBPS.Core.Session.Commitment.Scalars (
   compute,
   CommitmentScalars (..),
 ) where

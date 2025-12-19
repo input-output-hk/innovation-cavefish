@@ -16,11 +16,12 @@ import Cardano.Api qualified as C (
   serialiseAddress,
  )
 import Cavefish.Services.TxBuilding (ServiceFee (ServiceFee, amount, paidTo))
-import Control.Monad (join, unless)
+import Control.Monad (join, unless, when)
 import Cooked (
-  BalancingPolicy (DoNotBalance),
+  BalancingPolicy (BalanceWithFirstSignatory),
   MonadBlockChain,
   Payable (Value),
+  TxSkel (txSkelSignatories),
   TxSkelOut,
   balanceTxSkel,
   currentSlot,
@@ -28,19 +29,16 @@ import Cooked (
   onlyValueOutputsAtSearch,
   receives,
   runUtxoSearch,
+  signatoryPubKey,
   txSkelIns,
   txSkelMints,
   txSkelOptBalancingPolicy,
   txSkelOpts,
-  txSkelOutPKHashAT,
   txSkelOuts,
-  txSkelSigners,
   txSkelTemplate,
   txSkelValidityRange,
-  walletPKHashToWallet,
  )
 import Cooked.MockChain.GenerateTx.Body (txSkelToTxBody)
-import Data.List (nub)
 import Data.Map.Strict qualified as Map (fromList)
 import Data.Text qualified as Text (unpack)
 import Intent.Example.DSL (
@@ -49,7 +47,6 @@ import Intent.Example.DSL (
  )
 import Ledger (Interval, PubKeyHash, Slot, always, cardanoPubKeyHash, interval)
 import Ledger.Tx.CardanoAPI (fromCardanoValue)
-import Optics.Core (preview)
 import WBPS.Core.Cardano.UnsignedTx (UnsignedTx (UnsignedTx))
 import WBPS.Core.Keys.Ed25519 (PaymentAddess (unPaymentAddess))
 
@@ -59,17 +56,9 @@ import WBPS.Core.Keys.Ed25519 (PaymentAddess (unPaymentAddess))
 buildTx :: MonadBlockChain m => CanonicalIntent -> ServiceFee -> m UnsignedTx
 buildTx CanonicalIntent {..} serviceFee = do
   unless (null mustMint) $ fail "buildTx: minting not supported yet"
+  when (null spendFrom) $ fail "No source address defined to spend from"
   utxos <- join <$> mapM (runUtxoSearch . onlyValueOutputsAtSearch) spendFrom
   let inputs = Map.fromList [(oref, emptyTxSkelRedeemer) | (oref, _) <- utxos]
-  signers <-
-    nub
-      <$> mapM
-        ( \(oref, out) ->
-            case preview txSkelOutPKHashAT out >>= walletPKHashToWallet of
-              Just w -> pure w
-              Nothing -> fail ("buildTx: no mock wallet for input " <> show oref)
-        )
-        utxos
 
   payOuts <- traverse buildPayTo payTo
   feeOuts <- buildServiceFee serviceFee
@@ -77,14 +66,14 @@ buildTx CanonicalIntent {..} serviceFee = do
 
   let opts =
         (txSkelOpts txSkelTemplate)
-          { txSkelOptBalancingPolicy = DoNotBalance -- maybe BalanceWithFirstSigner BalanceWith changeTo
+          { txSkelOptBalancingPolicy = BalanceWithFirstSignatory
           }
       skelUnbalanced =
         txSkelTemplate
           { txSkelIns = inputs
           , txSkelOuts = payOuts <> feeOuts
           , txSkelMints = mempty -- N.H todo
-          , txSkelSigners = signers
+          , txSkelSignatories = map signatoryPubKey spendFrom
           , txSkelValidityRange = validityRange
           , txSkelOpts = opts
           }

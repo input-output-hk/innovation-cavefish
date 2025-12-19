@@ -8,9 +8,9 @@ import Data.Time (UTCTime)
 import GHC.Conc (TVar)
 import GHC.Generics (Generic)
 import Prototype.Pke (PkeCiphertext)
-import WBPS.Core.Commitment.BuildCommitment (ComId)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.Ed25519 qualified as Ed25519
+import WBPS.Core.Session.Commitment.Build (ComId)
 
 data Pending = Pending
   { tx :: Tx ConwayEra

@@ -41,7 +41,7 @@ registerSpecs rootFolders =
   testProperty
     "Register - Client can register and an account is persisted and created for them and all these accounts are retrievable"
     $ forAll (genFixtureNominalCase rootFolders)
-    $ \FixtureNominalCase {fileScheme = scheme, ..} ->
+    $ \FixtureNominalCase {fileScheme = scheme, userWalletKeyPairs} ->
       ioProperty $
         do
           runWBPS

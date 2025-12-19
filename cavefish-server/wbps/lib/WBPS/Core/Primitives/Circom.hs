@@ -6,8 +6,6 @@
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
 module WBPS.Core.Primitives.Circom (
-  defCommitmentParams,
-  BuildCommitmentParams (..),
   BuildCommitmentCompileScheme (..),
   compileBuildCommitment,
   compileBuildCommitmentForFileScheme,
@@ -27,15 +25,6 @@ load
   ]
 
 -- | Fixed set of template arguments required by the BuildCommitment circom template.
-data BuildCommitmentParams = BuildCommitmentParams
-  { messageSize :: Int
-  , commitmentLimbSize :: Int
-  , nbCommitmentLimbs :: Int
-  }
-
-defCommitmentParams :: BuildCommitmentParams
-defCommitmentParams = BuildCommitmentParams 131544 252 522
-
 data BuildCommitmentCompileScheme = BuildCommitmentCompileScheme
   { circuitPath :: FilePath
   , outputDir :: FilePath

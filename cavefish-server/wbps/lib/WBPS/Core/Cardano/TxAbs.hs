@@ -1,104 +1,104 @@
 module WBPS.Core.Cardano.TxAbs where
 
-import Cardano.Api (CtxTx, TxOut (TxOut), TxOutValue (TxOutValueShelleyBased))
-import Cardano.Api qualified as Api
-import Cardano.Api.Ledger (VKey (unVKey))
-import Cardano.Api.Shelley (Tx (ShelleyTx))
-import Cardano.Crypto.DSIGN.Class (rawSerialiseVerKeyDSIGN)
-import Cardano.Ledger.Alonzo.Tx (AlonzoTx (AlonzoTx, wits))
-import Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits (AlonzoTxWits, txwitsVKey))
-import Cardano.Ledger.Keys.WitVKey qualified as LedgerWit
-import Data.Set qualified as Set
-import GHC.Exts (IsList (toList))
-import GHC.Generics (Generic)
-import Ledger (
-  CardanoTx (CardanoEmulatorEraTx),
-  Coin (Coin),
-  Interval,
-  PubKey (PubKey),
-  Slot,
-  cardanoPubKeyHash,
-  getCardanoTxFee,
-  getCardanoTxMint,
-  getCardanoTxOutputs,
-  getCardanoTxValidityRange,
-  pubKeyHash,
- )
-import Ledger.Tx qualified as LedgerTx
-import PlutusLedgerApi.V1.Bytes (fromBytes)
+-- import Cardano.Api (CtxTx, TxOut (TxOut), TxOutValue (TxOutValueShelleyBased))
+-- import Cardano.Api qualified as Api
+-- import Cardano.Api.Ledger (VKey (unVKey))
 
-data TxAbs era = TxAbs
-  { outputs :: [TxOut CtxTx era]
-  , validityInterval :: Interval Slot
-  , absMint :: Api.Value
-  , absFee :: Integer
-  , sigKeys :: Set.Set PubKey
-  }
-  deriving stock (Eq, Show, Generic)
-  deriving anyclass (Api.ToJSON, Api.FromJSON)
+-- import Cardano.Crypto.DSIGN.Class (rawSerialiseVerKeyDSIGN)
+-- import Cardano.Ledger.Alonzo.Tx (AlonzoTx (AlonzoTx, wits))
+-- import Cardano.Ledger.Alonzo.TxWits (AlonzoTxWits (AlonzoTxWits, txwitsVKey))
+-- import Cardano.Ledger.Keys.WitVKey qualified as LedgerWit
+-- import Data.Set qualified as Set
+-- import GHC.Exts (IsList (toList))
+-- import GHC.Generics (Generic)
+-- import Ledger (
+--   CardanoTx (CardanoEmulatorEraTx),
+--   Coin (Coin),
+--   Interval,
+--   PubKey (PubKey),
+--   Slot,
+--   cardanoPubKeyHash,
+--   getCardanoTxFee,
+--   getCardanoTxMint,
+--   getCardanoTxOutputs,
+--   getCardanoTxValidityRange,
+--   pubKeyHash,
+--  )
+-- import Ledger.Tx qualified as LedgerTx
+-- import PlutusLedgerApi.V1.Bytes (fromBytes)
 
-cardanoTxToTxAbs :: CardanoTx -> TxAbs Api.ConwayEra
-cardanoTxToTxAbs cardanoTx@(CardanoEmulatorEraTx tx) =
-  let signerKeys = extractSignerKeys tx
-      txOutputs = [out | LedgerTx.TxOut out <- getCardanoTxOutputs cardanoTx]
-   in TxAbs
-        { outputs = maskChangeOutput signerKeys txOutputs
-        , validityInterval = getCardanoTxValidityRange cardanoTx
-        , absMint = getCardanoTxMint cardanoTx
-        , absFee = let Coin fee = getCardanoTxFee cardanoTx in fee
-        , sigKeys = signerKeys
-        }
+-- data TxAbs era = TxAbs
+--   { outputs :: [TxOut CtxTx era]
+--   , validityInterval :: Interval Slot
+--   , absMint :: Api.Value
+--   , absFee :: Integer
+--   , sigKeys :: Set.Set PubKey
+--   }
+--   deriving stock (Eq, Show, Generic)
+--   deriving anyclass (Api.ToJSON, Api.FromJSON)
 
-extractSignerKeys :: Api.Tx Api.ConwayEra -> Set.Set PubKey
-extractSignerKeys (ShelleyTx _ AlonzoTx {wits = AlonzoTxWits {txwitsVKey}}) =
-  Set.fromList (map witnessToPubKey (Set.toList txwitsVKey))
-  where
-    witnessToPubKey (LedgerWit.WitVKey vkey _) =
-      let rawKey = rawSerialiseVerKeyDSIGN (unVKey vkey)
-       in PubKey (fromBytes rawKey)
+-- cardanoTxToTxAbs :: CardanoTx -> TxAbs Api.ConwayEra
+-- cardanoTxToTxAbs cardanoTx@(CardanoEmulatorEraTx tx) =
+--   let signerKeys = extractSignerKeys tx
+--       txOutputs = [out | LedgerTx.TxOut out <- getCardanoTxOutputs cardanoTx]
+--    in TxAbs
+--         { outputs = maskChangeOutput signerKeys txOutputs
+--         , validityInterval = getCardanoTxValidityRange cardanoTx
+--         , absMint = getCardanoTxMint cardanoTx
+--         , absFee = let Coin fee = getCardanoTxFee cardanoTx in fee
+--         , sigKeys = signerKeys
+--         }
 
--- TODO WG: make these comments clearer
--- This is in accordance with the paper's statement (section 23:9):
--- The value of the first output is zeroed out to allow for
--- any leftover input funds to be returned to the LC’s change address.
-maskChangeOutput ::
-  Set.Set PubKey ->
-  [TxOut CtxTx Api.ConwayEra] ->
-  [TxOut CtxTx Api.ConwayEra]
-maskChangeOutput signerKeys outs =
-  snd (foldr step (False, []) outs)
-  where
-    signerHashes = Set.fromList (map pubKeyHash (Set.toList signerKeys))
+-- extractSignerKeys :: Api.Tx Api.ConwayEra -> Set.Set PubKey
+-- extractSignerKeys (ShelleyTx _ AlonzoTx {wits = AlonzoTxWits {txwitsVKey}}) =
+--   Set.fromList (map witnessToPubKey (Set.toList txwitsVKey))
+--   where
+--     witnessToPubKey (LedgerWit.WitVKey vkey _) =
+--       let rawKey = rawSerialiseVerKeyDSIGN (unVKey vkey)
+--        in PubKey (fromBytes rawKey)
 
-    step ::
-      TxOut CtxTx Api.ConwayEra ->
-      (Bool, [TxOut CtxTx Api.ConwayEra]) ->
-      (Bool, [TxOut CtxTx Api.ConwayEra])
-    step out@(TxOut addr value datum refScript) (masked, acc)
-      | masked = (masked, out : acc)
-      | Just pkh <- cardanoPubKeyHash addr
-      , Set.member pkh signerHashes
-      , valuePositive (Api.txOutValueToValue value) =
-          -- Mask the first (from the right) positive output controlled by a signer; this is the
-          -- change output that the paper requires us to hide.
-          (True, zeroTxOutValue (TxOut addr value datum refScript) : acc)
-      | otherwise = (masked, out : acc)
+-- -- TODO WG: make these comments clearer
+-- -- This is in accordance with the paper's statement (section 23:9):
+-- -- The value of the first output is zeroed out to allow for
+-- -- any leftover input funds to be returned to the LC’s change address.
+-- maskChangeOutput ::
+--   Set.Set PubKey ->
+--   [TxOut CtxTx Api.ConwayEra] ->
+--   [TxOut CtxTx Api.ConwayEra]
+-- maskChangeOutput signerKeys outs =
+--   snd (foldr step (False, []) outs)
+--   where
+--     signerHashes = Set.fromList (map pubKeyHash (Set.toList signerKeys))
 
-valuePositive :: Api.Value -> Bool
-valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList
+--     step ::
+--       TxOut CtxTx Api.ConwayEra ->
+--       (Bool, [TxOut CtxTx Api.ConwayEra]) ->
+--       (Bool, [TxOut CtxTx Api.ConwayEra])
+--     step out@(TxOut addr value datum refScript) (masked, acc)
+--       | masked = (masked, out : acc)
+--       | Just pkh <- cardanoPubKeyHash addr
+--       , Set.member pkh signerHashes
+--       , valuePositive (Api.txOutValueToValue value) =
+--           -- Mask the first (from the right) positive output controlled by a signer; this is the
+--           -- change output that the paper requires us to hide.
+--           (True, zeroTxOutValue (TxOut addr value datum refScript) : acc)
+--       | otherwise = (masked, out : acc)
 
-zeroTxOutValue :: TxOut CtxTx Api.ConwayEra -> TxOut CtxTx Api.ConwayEra
-zeroTxOutValue (TxOut addr value datum refScript) =
-  TxOut addr (zeroValue value) datum refScript
-  where
-    zeroValue :: TxOutValue era -> TxOutValue era
-    zeroValue (TxOutValueShelleyBased era ledgerValue) =
-      TxOutValueShelleyBased era $
-        case era of
-          Api.ShelleyBasedEraMary -> Api.toLedgerValue Api.MaryEraOnwardsMary mempty
-          Api.ShelleyBasedEraAlonzo -> Api.toLedgerValue Api.MaryEraOnwardsAlonzo mempty
-          Api.ShelleyBasedEraBabbage -> Api.toLedgerValue Api.MaryEraOnwardsBabbage mempty
-          Api.ShelleyBasedEraConway -> Api.toLedgerValue Api.MaryEraOnwardsConway mempty
-          Api.ShelleyBasedEraShelley -> ledgerValue
-          Api.ShelleyBasedEraAllegra -> ledgerValue
-    zeroValue other = other
+-- valuePositive :: Api.Value -> Bool
+-- valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList
+
+-- zeroTxOutValue :: TxOut CtxTx Api.ConwayEra -> TxOut CtxTx Api.ConwayEra
+-- zeroTxOutValue (TxOut addr value datum refScript) =
+--   TxOut addr (zeroValue value) datum refScript
+--   where
+--     zeroValue :: TxOutValue era -> TxOutValue era
+--     zeroValue (TxOutValueShelleyBased era ledgerValue) =
+--       TxOutValueShelleyBased era $
+--         case era of
+--           Api.ShelleyBasedEraMary -> Api.toLedgerValue Api.MaryEraOnwardsMary mempty
+--           Api.ShelleyBasedEraAlonzo -> Api.toLedgerValue Api.MaryEraOnwardsAlonzo mempty
+--           Api.ShelleyBasedEraBabbage -> Api.toLedgerValue Api.MaryEraOnwardsBabbage mempty
+--           Api.ShelleyBasedEraConway -> Api.toLedgerValue Api.MaryEraOnwardsConway mempty
+--           Api.ShelleyBasedEraShelley -> ledgerValue
+--           Api.ShelleyBasedEraAllegra -> ledgerValue
+--     zeroValue other = other

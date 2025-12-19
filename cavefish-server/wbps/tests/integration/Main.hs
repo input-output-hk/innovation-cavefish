@@ -7,6 +7,7 @@ import Test.Tasty.Runners (NumThreads (NumThreads))
 import WBPS.Core.FileScheme (RootFolders (RootFolders, input, output))
 import WBPS.Specs.Adapter.Test (findInputsDir)
 import WBPS.Specs.NominalCase qualified as Register.Nominal.Case
+import WBPS.Specs.Session.Commitment.Build qualified as Commitment.BuildCommitment
 
 main :: IO ()
 main = do
@@ -20,5 +21,6 @@ main = do
             "Nominal Cases"
             [ localOption (NumThreads 8) . localOption (QuickCheckTests 10) $
                 Register.Nominal.Case.specs RootFolders {input = inputFolder, output = outputFolder}
+            , Commitment.BuildCommitment.specs RootFolders {input = inputFolder, output = outputFolder}
             ]
         ]

@@ -23,7 +23,8 @@ import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
 import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 import Cavefish.Endpoints.Write.Register qualified as Register
 import Data.Coerce (coerce)
-import Intent.Example.DSL (AddressW (AddressW), IntentDSL (PayToW))
+import Data.List.NonEmpty qualified as NE
+import Intent.Example.DSL (AddressW (AddressW), IntentDSL (AndExpsW, PayToW, SpendFromW))
 import Prototype.AskCommitmentProof qualified as AskCommitmentProof
 import Test.Hspec (Spec, describe, it, shouldBe)
 import WBPS.Core.Keys.Ed25519 (
@@ -77,7 +78,12 @@ spec = do
                 DemonstrateCommitment.Outputs {commitment, txAbs} <-
                   demonstrateCommitment
                     . DemonstrateCommitment.Inputs (publicKey alice)
-                    $ PayToW (lovelaceToValue 10_000_000) (coerce . paymentAddress $ bob)
+                    $ AndExpsW
+                      ( NE.fromList
+                          [ SpendFromW (coerce . paymentAddress $ alice)
+                          , PayToW (lovelaceToValue 10_000_000) (coerce . paymentAddress $ bob)
+                          ]
+                      )
 
                 (r, bigR) <- generateKeyTuple
 
