@@ -20,7 +20,6 @@ module Intent.Example.DSL (
 
 import Cardano.Api (FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
-import Data.Foldable (foldl)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map qualified as Map
 import Data.Text (Text)
@@ -147,7 +146,7 @@ normalizeIntent = go emptyIntent
       PayTo v a -> acc {payTo = (v, a) : payTo acc}
       ChangeTo a -> acc {changeTo = Just a}
       MaxFee f -> acc {maxFee = Just (maybe f (min f) (maxFee acc))}
-      AndExps xs -> Data.Foldable.foldl go acc xs
+      AndExps xs -> foldl go acc xs
 
 toIntentExpr :: IntentDSL -> Either Text InternalIntentDSL
 toIntentExpr = \case

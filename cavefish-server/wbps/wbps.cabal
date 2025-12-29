@@ -94,7 +94,7 @@ library
     , cardano-api
     , cardano-crypto-class
     , cardano-ledger-api
-    , containers            ^>=0.6.7
+    , containers
     , cooked-validators
     , cryptonite
     , data-default
@@ -145,7 +145,6 @@ test-suite wbps-integration-tests
   build-depends:
     , aeson
     , bytestring
-    , cardano-api
     , cardano-crypto-class
     , containers
     , data-default
@@ -153,7 +152,6 @@ test-suite wbps-integration-tests
     , path
     , path-io
     , QuickCheck
-    , random
     , tasty
     , tasty-hunit
     , tasty-quickcheck
