@@ -315,7 +315,7 @@ template RebuildChallenge(message_size) {
 //   - P3: RebuildChallenge(R, X, μ) → digest and assert challenge == digest
 // ======================================================================
 template CardanoWBPS(message_size, message_private_part_size, message_private_part_offset) {
-    var commitment_limb_size = 252;
+    var commitment_limb_size = 254;
     assert(message_size % commitment_limb_size == 0);
     var nb_commitment_limbs = message_size \ commitment_limb_size;
 
@@ -393,4 +393,4 @@ component main { public [
     commitment_payload, // Com_tx   
     challenge, // c
     message_public_part // TxAbs
-] } = CardanoWBPS(9*252, 333, 32);
+] } = CardanoWBPS(9*254, 333, 32);

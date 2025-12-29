@@ -67,11 +67,9 @@ library
     WBPS.Core.Cardano.Cbor
     WBPS.Core.Cardano.TxAbs
     WBPS.Core.Cardano.UnsignedTx
-    WBPS.Core.Commitment.BuildCommitment
-    WBPS.Core.Commitment.Commitment
-    WBPS.Core.Commitment.Scalars
     WBPS.Core.Failure
     WBPS.Core.FileScheme
+    WBPS.Core.Groth16.Setup
     WBPS.Core.Keys.Ed25519
     WBPS.Core.Keys.ElGamal
     WBPS.Core.Primitives.Circom
@@ -81,23 +79,25 @@ library
     WBPS.Core.Registration.FetchAccounts
     WBPS.Core.Registration.FileScheme
     WBPS.Core.Registration.FileScheme.Directories
-    WBPS.Core.Registration.PublicVerificationContext
     WBPS.Core.Registration.Register
+    WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh
+    WBPS.Core.Registration.SnarkJs.OverShh
+    WBPS.Core.Session.Commitment.Build
+    WBPS.Core.Session.Commitment.Scalars
+    WBPS.Core.Session.Create
+    WBPS.Core.ZK.Message
     WBPS.WBPS
 
   build-depends:
     , aeson
     , bytestring
     , cardano-api
-    , cardano-binary
     , cardano-crypto-class
-    , cardano-ledger-alonzo
     , cardano-ledger-api
-    , cardano-ledger-core
-    , cborg
     , containers
     , cooked-validators
     , cryptonite
+    , data-default
     , filepath
     , hex-text
     , memory
@@ -118,7 +118,10 @@ test-suite wbps-unit-tests
   type:           exitcode-stdio-1.0
   hs-source-dirs: tests/unit
   main-is:        Main.hs
-  other-modules:  WBPS.Specs.Core.Keys.Ed25519
+  other-modules:
+    WBPS.Specs.Core.Keys.Ed25519
+    WBPS.Specs.Session.Commitment.Scalars
+
   build-depends:
     , aeson
     , bytestring
@@ -133,17 +136,23 @@ test-suite wbps-integration-tests
   hs-source-dirs: tests/integration
   main-is:        Main.hs
   other-modules:
+    WBPS.Specs.Adapter.Fixture
     WBPS.Specs.Adapter.GenCardanoKeys
     WBPS.Specs.Adapter.Test
     WBPS.Specs.NominalCase
+    WBPS.Specs.Session.Commitment.Build
 
   build-depends:
+    , aeson
     , bytestring
     , cardano-crypto-class
     , containers
+    , data-default
+    , mtl
     , path
     , path-io
     , QuickCheck
     , tasty
+    , tasty-hunit
     , tasty-quickcheck
     , wbps

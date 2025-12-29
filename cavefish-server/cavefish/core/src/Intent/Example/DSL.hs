@@ -13,35 +13,26 @@ module Intent.Example.DSL (
   normalizeIntent,
   toIntentExpr,
   toCanonicalIntent,
-  satisfies,
+  -- satisfies,
   outExactly,
   valuePositive,
 ) where
 
 import Cardano.Api (FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
-import Data.Foldable (foldl)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map qualified as Map
-import Data.Set qualified as Set
 import Data.Text (Text)
 import GHC.Exts (IsList (toList))
 import GHC.Generics (Generic)
 import Ledger (
-  Extended (Finite),
-  Interval (Interval),
-  LowerBound (LowerBound),
-  PubKey,
   Slot,
-  UpperBound (UpperBound),
   cardanoPubKeyHash,
-  pubKeyHash,
  )
 import Plutus.Script.Utils.Address (
   ToAddress (toAddress),
   ToPubKeyHash (toPubKeyHash),
  )
-import WBPS.Core.Cardano.TxAbs (TxAbs (absFee, absMint, outputs, sigKeys, validityInterval))
 
 type ChangeDelta = Api.Value
 
@@ -155,7 +146,7 @@ normalizeIntent = go emptyIntent
       PayTo v a -> acc {payTo = (v, a) : payTo acc}
       ChangeTo a -> acc {changeTo = Just a}
       MaxFee f -> acc {maxFee = Just (maybe f (min f) (maxFee acc))}
-      AndExps xs -> Data.Foldable.foldl go acc xs
+      AndExps xs -> foldl go acc xs
 
 toIntentExpr :: IntentDSL -> Either Text InternalIntentDSL
 toIntentExpr = \case
@@ -187,39 +178,39 @@ toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent
 toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent =
   fmap normalizeIntent . toIntentExpr
 
--- | Check whether a transaction satisfies an intent, given the change delta.
-satisfies :: CanonicalIntent -> TxAbs Api.ConwayEra -> Bool
-satisfies CanonicalIntent {..} tx =
-  and
-    [ -- MustMint: v ≤ tx.mint
-      let need = Map.fromList . toList $ mconcat mustMint
-          have = Map.fromList (toList tx.absMint)
-       in Map.isSubmapOfBy (<=) need have
-    , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
-      -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
-      all (hasSigner tx.sigKeys . unAdressConwayEra) spendFrom
-    , -- MaxInterval (if any): (tx.validityInterval.snd - tx.validityInterval.fst) ≤ i
-      case maxInterval of
-        Nothing -> True
-        Just i -> case toClosedFinite tx.validityInterval of
-          Nothing -> False
-          Just (lo, hi) -> (hi - lo) <= i
-    , -- PayTo: (s, v) ∈ tx.outputs
-      all (\(value, addr) -> any (outMatches addr value) tx.outputs) payTo
-    , -- ChangeTo: (s,consumed − produced) ∈ tx.outputs
-      case changeTo of
-        Nothing -> True
-        Just addr -> any (outMatchesChange addr) tx.outputs
-    , -- not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
-      -- MaxFee (if any): tx.fee ≤ f
-      maybe True (\f -> tx.absFee <= f) maxFee
-    ]
-  where
-    hasSigner :: Set.Set PubKey -> Api.AddressInEra Api.ConwayEra -> Bool
-    hasSigner sigs addr =
-      case cardanoPubKeyHash addr of
-        Nothing -> False
-        Just pkh -> any ((== pkh) . pubKeyHash) (Set.toList sigs)
+-- -- | Check whether a transaction satisfies an intent, given the change delta.
+-- satisfies :: CanonicalIntent -> TxAbs Api.ConwayEra -> Bool
+-- satisfies CanonicalIntent {..} tx =
+--   and
+--     [ -- MustMint: v ≤ tx.mint
+--       let need = Map.fromList . toList $ mconcat mustMint
+--           have = Map.fromList (toList tx.absMint)
+--        in Map.isSubmapOfBy (<=) need have
+--     , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
+--       -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
+--       all (hasSigner tx.sigKeys . unAdressConwayEra) spendFrom
+--     , -- MaxInterval (if any): (tx.validityInterval.snd - tx.validityInterval.fst) ≤ i
+--       case maxInterval of
+--         Nothing -> True
+--         Just i -> case toClosedFinite tx.validityInterval of
+--           Nothing -> False
+--           Just (lo, hi) -> (hi - lo) <= i
+--     , -- PayTo: (s, v) ∈ tx.outputs
+--       all (\(value, addr) -> any (outMatches addr value) tx.outputs) payTo
+--     , -- ChangeTo: (s,consumed − produced) ∈ tx.outputs
+--       case changeTo of
+--         Nothing -> True
+--         Just addr -> any (outMatchesChange addr) tx.outputs
+--     , -- not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
+--       -- MaxFee (if any): tx.fee ≤ f
+--       maybe True (\f -> tx.absFee <= f) maxFee
+--     ]
+--   where
+--     hasSigner :: Set.Set PubKey -> Api.AddressInEra Api.ConwayEra -> Bool
+--     hasSigner sigs addr =
+--       case cardanoPubKeyHash addr of
+--         Nothing -> False
+--         Just pkh -> any ((== pkh) . pubKeyHash) (Set.toList sigs)
 
 valueLeq :: Api.Value -> Api.Value -> Bool
 valueLeq need have =
@@ -234,13 +225,13 @@ valueEq a b = valueLeq a b && valueLeq b a
 valuePositive :: Api.Value -> Bool
 valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList
 
-outMatches ::
-  AdressConwayEra ->
-  Api.Value ->
-  Api.TxOut Api.CtxTx Api.ConwayEra ->
-  Bool
-outMatches addrReq vReq (Api.TxOut addr vOut _ _) =
-  addrReq == AdressConwayEra addr && valueLeq vReq (Api.txOutValueToValue vOut)
+-- outMatches ::
+--   AdressConwayEra ->
+--   Api.Value ->
+--   Api.TxOut Api.CtxTx Api.ConwayEra ->
+--   Bool
+-- outMatches addrReq vReq (Api.TxOut addr vOut _ _) =
+--   addrReq == AdressConwayEra addr && valueLeq vReq (Api.txOutValueToValue vOut)
 
 outExactly ::
   AdressConwayEra ->
@@ -250,21 +241,21 @@ outExactly ::
 outExactly addrReq vReq (Api.TxOut addr vOut _ _) =
   addrReq == AdressConwayEra addr && valueEq vReq (Api.txOutValueToValue vOut)
 
-outMatchesChange ::
-  AdressConwayEra ->
-  Api.TxOut Api.CtxTx Api.ConwayEra ->
-  Bool
-outMatchesChange addrReq (Api.TxOut addr vOut _ _) =
-  addrReq == AdressConwayEra addr && valueIsPlaceholder (Api.txOutValueToValue vOut)
+-- outMatchesChange ::
+--   AdressConwayEra ->
+--   Api.TxOut Api.CtxTx Api.ConwayEra ->
+--   Bool
+-- outMatchesChange addrReq (Api.TxOut addr vOut _ _) =
+--   addrReq == AdressConwayEra addr && valueIsPlaceholder (Api.txOutValueToValue vOut)
 
-valueIsPlaceholder :: Api.Value -> Bool
-valueIsPlaceholder = valueEq mempty
+-- valueIsPlaceholder :: Api.Value -> Bool
+-- valueIsPlaceholder = valueEq mempty
 
 -- | Convert an interval to a closed finite interval, if possible.
-toClosedFinite :: (Num a, Ord a) => Interval a -> Maybe (a, a)
-toClosedFinite (Interval (LowerBound loE loC) (UpperBound hiE hiC)) = do
-  lo <- case loE of Finite x -> Just x; _ -> Nothing
-  hi <- case hiE of Finite x -> Just x; _ -> Nothing
-  let lo' = if loC then lo else lo + 1
-      hi' = if hiC then hi else hi - 1
-  if hi' >= lo' then Just (lo', hi') else Nothing
+-- toClosedFinite :: (Num a, Ord a) => Interval a -> Maybe (a, a)
+-- toClosedFinite (Interval (LowerBound loE loC) (UpperBound hiE hiC)) = do
+--   lo <- case loE of Finite x -> Just x; _ -> Nothing
+--   hi <- case hiE of Finite x -> Just x; _ -> Nothing
+--   let lo' = if loC then lo else lo + 1
+--       hi' = if hiC then hi else hi - 1
+--   if hi' >= lo' then Just (lo', hi') else Nothing

@@ -13,11 +13,13 @@ import Cavefish.Api.ServerConfiguration (
   ServerConfiguration (ServerConfiguration, httpServer, serviceProviderFee, transactionExpiry, wbps),
  )
 import Cavefish.Services.TxBuilding (ServiceFee, TxBuilding (TxBuilding, build, fees, submit))
-import Cavefish.Services.WBPS (WBPS (WBPS, createSession, loadAccount, loadAccounts, register))
+import Cavefish.Services.WBPS (WBPS (WBPS, create, loadAccount, loadAccounts, register))
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Cooked (InitialDistribution)
-import Cooked.MockChain (runMockChainFrom)
-import Cooked.MockChain.Direct (MockChainReturn (mcrValue))
+import Cooked (
+  InitialDistribution,
+  mcrValue,
+  runMockChainFromInitDist,
+ )
 import Data.ByteString.Lazy.Char8 qualified as BL8 (pack)
 import Intent.Example.DSL (IntentDSL, toCanonicalIntent)
 import Intent.Example.TxBuilder (buildTx)
@@ -28,11 +30,11 @@ import Servant (
   throwError,
  )
 import WBPS.Core.Cardano.UnsignedTx (UnsignedTx)
-import WBPS.Core.Commitment.Commitment qualified as Commitment
 import WBPS.Core.Failure (RegistrationFailed (AccountAlreadyRegistered))
 import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Core.Registration.FetchAccounts qualified as Registration
 import WBPS.Core.Registration.Register qualified as Registration
+import WBPS.Core.Session.Create qualified as Session
 import WBPS.WBPS (runWBPS)
 
 mkServerContext ::
@@ -59,8 +61,8 @@ mkServerContext
                     Left [AccountAlreadyRegistered _] -> throwError err422 {errBody = BL8.pack "Account Already Registered"}
                     Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     Right x -> pure x
-            , createSession = \userWalletPublicKey tx ->
-                liftIO (runWBPS wbpsScheme (Commitment.createSession userWalletPublicKey tx))
+            , create = \userWalletPublicKey tx ->
+                liftIO (runWBPS wbpsScheme (Session.create userWalletPublicKey tx))
                   >>= \case
                     (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     (Right x) -> pure x
@@ -88,7 +90,7 @@ buildWithCooked initialDistribution serviceProviderFee intentDSL = do
   case toCanonicalIntent intentDSL of
     Left err -> liftIO $ fail ("buildTx failed: " <> show err)
     Right canonicalIntent -> do
-      let mockChainReturnUnsignedTx = runMockChainFrom initialDistribution (buildTx canonicalIntent serviceProviderFee)
+      let mockChainReturnUnsignedTx = runMockChainFromInitDist initialDistribution (buildTx canonicalIntent serviceProviderFee)
       case mcrValue mockChainReturnUnsignedTx of
         Left err -> liftIO $ fail ("buildTx failed: " <> show err)
         Right result -> return result

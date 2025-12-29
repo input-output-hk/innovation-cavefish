@@ -19,8 +19,7 @@ import Cardano.Api qualified as Api
 import Cardano.Api qualified as C
 import Cardano.Crypto.DSIGN.Ed25519 (Ed25519DSIGN)
 import Control.Monad.IO.Class (MonadIO)
--- import Cooked (IsTxSkelOutAllowedOwner)
-import Cooked.Skeleton.Output (IsTxSkelOutAllowedOwner (toPKHOrValidator))
+import Cooked (IsTxSkelOutAllowedOwner (toPKHOrVScript), User (UserPubKey))
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Coerce (coerce)
 import Data.String (IsString)
@@ -51,7 +50,7 @@ getPrivateKey :: KeyPair -> PrivateKey
 getPrivateKey (KeyPair (Adapter.KeyPair {..})) = PrivateKey signatureKey
 
 newtype PaymentVerificationKey = PaymentVerificationKey (Api.VerificationKey Api.PaymentKey)
-  deriving newtype (Show, Eq, IsString)
+  deriving newtype (Show, Eq)
 
 newtype PaymentAddess = PaymentAddess {unPaymentAddess :: Text}
   deriving newtype (Show, Eq, IsString, ToJSON, FromJSON)
@@ -96,7 +95,7 @@ data Wallet = Wallet
   deriving (Show)
 
 instance IsTxSkelOutAllowedOwner Wallet where
-  toPKHOrValidator = Left . walletPubKeyHash
+  toPKHOrVScript = UserPubKey . walletPubKeyHash
 
 walletPubKeyHash :: Wallet -> Api.PubKeyHash
 walletPubKeyHash Wallet {paymentAddress = PaymentAddess addrText} =

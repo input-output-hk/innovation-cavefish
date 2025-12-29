@@ -8,6 +8,7 @@ module WBPS.Core.Keys.ElGamal (
   EncryptionKey (..),
   DecryptionKey (..),
   Rho,
+  mkRho,
   generateKeyPair,
   encryptionKeyPowRho,
   generatorPowRho,
@@ -41,6 +42,10 @@ newtype Rho = Rho Integer
 
 generateElGamalExponent :: MonadIO m => m Rho
 generateElGamalExponent = liftIO (Rho . bsToInteger <$> getRandomBytes 16)
+
+-- | Construct a rho value after validating the scalar size constraint.
+mkRho :: Integer -> Either String Rho
+mkRho = fmap Rho . validateScalar
 
 -- | Affine point on BabyJub.
 data AffinePoint = AffinePoint {x :: Integer, y :: Integer}

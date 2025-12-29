@@ -18,16 +18,13 @@ import WBPS.Core.Failure (RegistrationFailed (AccountAlreadyRegistered))
 import WBPS.Core.FileScheme (FileScheme (FileScheme, encryptionKeys), getShellLogsFilepath)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
-import WBPS.Core.Primitives.SnarkjsOverFileScheme (
-  getGenerateProvingKeyProcess,
-  getGenerateVerificationKeyProcess,
- )
 import WBPS.Core.Registration.Account (
   AccountCreated (AccountCreated, userWalletPublicKey),
  )
 import WBPS.Core.Registration.FetchAccounts (loadAccount, loadExistingAccount)
 import WBPS.Core.Registration.FileScheme (deriveDirectoryAccountFrom)
 import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
+import WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh (getGenerateProvingKeyProcess, getGenerateVerificationKeyProcess)
 
 register ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>

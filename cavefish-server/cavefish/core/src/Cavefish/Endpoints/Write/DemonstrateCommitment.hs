@@ -20,12 +20,10 @@ import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 import Intent.Example.DSL (IntentDSL)
 import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx)
-import WBPS.Core.Commitment.BuildCommitment (Commitment)
-import WBPS.Core.Commitment.Commitment (
-  PublicMessage (PublicMessage),
-  Session (SessionCreated, commitment, publicMessage),
- )
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Session.Commitment.Build (Commitment)
+import WBPS.Core.Session.Create (Session (SessionCreated, commitment, publicMessage))
+import WBPS.Core.ZK.Message (PublicMessage (PublicMessage))
 
 -- | Inputs for demonstrating a commitment.
 data Inputs = Inputs
@@ -53,10 +51,10 @@ handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey, intent} = do
   CavefishServices
     { txBuildingService = TxService.TxBuilding {build}
-    , wbpsService = WbpsService.WBPS {createSession}
+    , wbpsService = WbpsService.WBPS {create}
     } <-
     ask
 
   unsignedTx <- build intent
-  SessionCreated {publicMessage = PublicMessage txAbs, commitment} <- createSession userWalletPublicKey unsignedTx
+  SessionCreated {publicMessage = PublicMessage txAbs, commitment} <- create userWalletPublicKey unsignedTx
   return Outputs {txAbs, commitment}

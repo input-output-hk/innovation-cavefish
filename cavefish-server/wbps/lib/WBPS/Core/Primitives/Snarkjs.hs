@@ -15,10 +15,6 @@ module WBPS.Core.Primitives.Snarkjs (
   generateProof,
   VerifyScheme (..),
   verify,
-  ProvingKeyScheme (..),
-  generateProvingKey,
-  VerificationKeyScheme (..),
-  generateVerificationKey,
   exportStatementAsJSON,
 ) where
 
@@ -69,29 +65,6 @@ verify VerifyScheme {..} =
       verificationKey
       statement
       proof
-
-data ProvingKeyScheme = ProvingKeyScheme
-  {powerOfTauPrepared :: FilePath, relationR1CS :: FilePath, provingKeyOutput :: FilePath}
-
-generateProvingKey :: ProvingKeyScheme -> Proc ()
-generateProvingKey ProvingKeyScheme {..} =
-  snarkjs
-    ("groth16" :: String)
-    ("setup" :: String)
-    relationR1CS
-    powerOfTauPrepared
-    provingKeyOutput
-
-data VerificationKeyScheme = VerificationKeyScheme {provingKey :: FilePath, verificationKeyOutput :: FilePath}
-
-generateVerificationKey :: VerificationKeyScheme -> Proc ()
-generateVerificationKey VerificationKeyScheme {..} =
-  snarkjs
-    ("zkey" :: String)
-    ("export" :: String)
-    ("verificationkey" :: String)
-    provingKey
-    verificationKeyOutput
 
 exportStatementAsJSON :: FilePath -> FilePath -> Proc ()
 exportStatementAsJSON witness statementOutput =
