@@ -44,7 +44,7 @@ main = do
   tmpRoot <- P.getTempDir
   P.withTempDir tmpRoot "wbps-fixture" $ \outDir -> do
     cwd <- P.getCurrentDir
-    let scheme = defaultFileScheme RootFolders {input = cwd </> [reldir|wbps|] </> [reldir|inputs|], output = outDir}
+    let scheme = defaultFileScheme RootFolders {input = cwd </> [reldir|wbps|] </> [reldir|setup|], output = outDir}
     res <- runWBPS scheme $ do
       cs@CommitmentScalars {ekPowRho = ekPowRho'} <- compute ek rho
       build Input {ekPowRho = ekPowRho', messageBits}

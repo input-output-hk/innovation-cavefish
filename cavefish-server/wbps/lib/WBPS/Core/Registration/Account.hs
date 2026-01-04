@@ -4,7 +4,7 @@ module WBPS.Core.Registration.Account (
   -- | Unique identifier for a user account
   AccountCreated (..),
   -- | Event representing the creation of a new account
-  accountId,
+  deriveId,
   -- | Function to derive AccountId from UserWalletPublicKey
 ) where
 
@@ -13,8 +13,8 @@ import WBPS.Core.Keys.Ed25519 (PublicKey (PublicKey), UserWalletPublicKey (UserW
 
 newtype AccountId = AccountId String deriving (Show, Eq)
 
-accountId :: UserWalletPublicKey -> AccountId
-accountId (UserWalletPublicKey (PublicKey x)) = AccountId . show $ x
+deriveId :: UserWalletPublicKey -> AccountId
+deriveId (UserWalletPublicKey (PublicKey x)) = AccountId . show $ x
 
 data AccountCreated
   = AccountCreated

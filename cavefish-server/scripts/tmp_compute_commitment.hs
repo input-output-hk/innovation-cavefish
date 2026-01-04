@@ -32,7 +32,7 @@ main = do
       cwd <- getCurrentDir
       tmp <- getTempDir
       withTempDir tmp "wbps-fixture" $ \outDir -> do
-        let scheme = defaultFileScheme RootFolders {input = cwd </> [reldir|wbps|] </> [reldir|inputs|], output = outDir}
+        let scheme = defaultFileScheme RootFolders {input = cwd </> [reldir|wbps|] </> [reldir|setup|], output = outDir}
         let ek =
               EncryptionKey $
                 AffinePoint

@@ -1,11 +1,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module Prototype.AskCommitmentProof (handle, Inputs (..), Outputs (..)) where
+module Cavefish.Endpoints.Write.AskCommitmentProof (handle, Inputs (..), Outputs (..)) where
 
 import Cavefish (
   CavefishServerM,
@@ -15,9 +14,11 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.Ed25519 qualified as Ed25519
+import WBPS.Core.Session.Commitment (CommitmentId)
 
 data Inputs = Inputs
   { userWalletPublicKey :: UserWalletPublicKey
+  , commitmentId :: CommitmentId
   , bigR :: Ed25519.PublicKey
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
@@ -30,6 +31,7 @@ data Outputs = Outputs
 
 handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey = _, bigR = _} =
+  -- c <- Challenge.build
   pure Outputs {proof = "proof", challenge = 0}
 
 -- CavefishServices {..} <- ask

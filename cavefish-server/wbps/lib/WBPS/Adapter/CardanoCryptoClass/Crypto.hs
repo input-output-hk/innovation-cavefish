@@ -200,15 +200,19 @@ class Codec a where
   decode :: Text.Text -> Maybe a
 
   decode' :: Text.Text -> a
-  decode' =
+  decode' text =
     ( \case
         Just a -> a
-        Nothing -> error "Failed to decode"
+        Nothing -> error ("Failed to decode : " ++ unpack text)
     )
       . decode
+      $ text
 
 newtype Hexadecimal = Hexadecimal {unHexadecimal :: ByteString}
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
+
+instance IsString Hexadecimal where
+  fromString = decode' @Hexadecimal . Text.pack
 
 instance ToJSON Hexadecimal where
   toJSON = A.String . encode @Hexadecimal

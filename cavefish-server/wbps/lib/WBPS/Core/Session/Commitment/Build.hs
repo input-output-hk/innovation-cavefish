@@ -5,61 +5,52 @@ module WBPS.Core.Session.Commitment.Build (
   build,
   Context (..),
   Input (..),
-  Commitment (..),
-  CommitmentPayload (..),
-  ComId (..),
 ) where
 
-import Cardano.Crypto.Hash (ByteString)
 import Control.Monad (unless)
 import Control.Monad.Except (MonadError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader, ask, runReader)
-import Crypto.Hash (SHA256, hash)
-import Data.Aeson (FromJSON, ToJSON, (.:))
+import Control.Monad.Reader (MonadReader, ask, asks, runReader)
+import Data.Aeson ((.:))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types qualified as AesonTypes
-import Data.ByteArray qualified as BA
-import Data.ByteString qualified as BS
 import Data.ByteString.Lazy qualified as BL
 import Data.ByteString.Lazy.Char8 qualified as BL8
-import Data.Coerce (coerce)
 import Data.Default (Default (def))
-import Data.List (sort, unfoldr)
+import Data.List (sort)
 import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Vector qualified as V
-import Data.Word (Word8)
-import GHC.Generics (Generic)
 import Path (Path, toFilePath, (</>))
 import Path.IO (doesFileExist, ensureDir, withTempDir)
 import Shh (Stream (Append, StdOut), (&!>), (&>))
 import System.FilePath qualified as FP
 import Text.Read (readMaybe)
-import WBPS.Adapter.CardanoCryptoClass.Crypto (FromByteString (fromByteString), Hexadecimal)
 import WBPS.Core.Failure (
   RegistrationFailed,
   toWBPSFailure,
  )
 import WBPS.Core.FileScheme (
-  FileScheme (
-    FileScheme,
-    accounts,
-    buildCommitmentR1CS,
-    buildCommitmentWASM,
-    shellLogs,
-    statementOutput,
-    witnessInput,
-    witnessOutput
-  ),
+  Account (session, shellLogs),
+  BuildCommitment (input, output, statementOutput),
+  BuildCommitmentSetup (BuildCommitmentSetup, r1cs, wasm),
+  FileScheme (account, accounts, setup),
  )
+import WBPS.Core.FileScheme qualified as Filescheme
+import WBPS.Core.FileScheme qualified as Session (Session (commitment))
+import WBPS.Core.FileScheme qualified as Setup (Setup (commitment))
 import WBPS.Core.Keys.ElGamal (AffinePoint (AffinePoint), x, y)
 import WBPS.Core.Primitives.Circom (
   compileBuildCommitmentForFileScheme,
  )
 import WBPS.Core.Primitives.Snarkjs (exportStatementAsJSON)
 import WBPS.Core.Primitives.SnarkjsOverFileScheme (getGenerateBuildCommitmentWitnessProcess)
+import WBPS.Core.Session.Commitment (
+  Commitment,
+  CommitmentPayload (CommitmentPayload),
+  mkCommitment,
+ )
 import WBPS.Core.ZK.Message (
   MessageBits (MessageBits, unMessageBits),
  )
@@ -101,47 +92,6 @@ instance Aeson.FromJSON WitnessValues where
   parseJSON (Aeson.Array arr) = WitnessValues <$> traverse Aeson.parseJSON (V.toList arr)
   parseJSON v = AesonTypes.typeMismatch "Array or witness object" v
 
-newtype ComId = ComId {unComId :: Hexadecimal}
-  deriving newtype (Eq, Show, FromJSON, ToJSON)
-
-newtype CommitmentPayload = CommitmentPayload
-  { unPayload :: MessageBits
-  }
-  deriving newtype (Eq, Show, FromJSON, ToJSON)
-
-data Commitment
-  = Commitment {id :: ComId, payload :: CommitmentPayload}
-  deriving (Eq, Show, Generic, FromJSON, ToJSON)
-
-mkCommitment :: CommitmentPayload -> Commitment
-mkCommitment payload =
-  let
-    -- Encode each limb as big-endian bytes with length prefix
-    -- It takes the [Integer] payload limbs and encodes each as big-endian
-    -- bytes with a 1-byte length prefix (len || limb_bytes), concatenates all of them, then hashes
-    -- with SHA-256 to get ComId. This is a simple, deterministic framing to avoid ambiguity
-    -- between limbs like [1, 23] vs [12, 3], but it's not CBOR and there's no domain separation
-    -- or explicit length for the whole list.
-    encodeLimb n =
-      let bs = integerToBytes n
-       in BS.cons (fromIntegral (length bs)) (BS.pack bs)
-    flat = BS.concat (map encodeLimb (coerce payload))
-    digest = hash @_ @SHA256 flat
-    commitmentId = ComId . fromByteString @Hexadecimal $ (BA.convert digest :: ByteString)
-   in
-    Commitment {id = commitmentId, payload}
-
-integerToBytes :: Integer -> [Word8]
-integerToBytes 0 = [0]
-integerToBytes n
-  | n < 0 = error "integerToBytes: negative input"
-  | otherwise = reverse (unfoldr step n)
-  where
-    step 0 = Nothing
-    step k =
-      let (q, r) = k `quotRem` 256
-       in Just (fromIntegral r, q)
-
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM p = fmap and . mapM p
 
@@ -151,7 +101,9 @@ runBuildCommitment ::
   Input ->
   m (Either String Output)
 runBuildCommitment params Input {ekPowRho = AffinePoint {x, y}, ..} = do
-  scheme <- compileAndScheme
+  scheme <- ask
+  setup <- asks (Setup.commitment . setup)
+  Filescheme.BuildCommitment {input, output, statementOutput} <- compileAndScheme setup
   let inputJson =
         Aeson.object
           [ "in_seed_x" Aeson..= x
@@ -163,26 +115,26 @@ runBuildCommitment params Input {ekPowRho = AffinePoint {x, y}, ..} = do
   liftIO $ do
     ensureDir accountsDir
     withTempDir accountsDir "build-commitment" $ \accountDir -> do
-      let inputPath = accountDir </> witnessInput scheme
-          witnessPath = accountDir </> witnessOutput scheme
-          statementPath = accountDir </> statementOutput scheme
-          shellLogsFilepath = BL8.pack $ Path.toFilePath (accountDir </> shellLogs scheme)
+      let inputPath = accountDir </> input
+          witnessPath = accountDir </> output
+          statementPath = accountDir </> statementOutput
+          shellLogsFilepath = BL8.pack $ Path.toFilePath (accountDir </> (shellLogs . account $ scheme))
       ensureDir accountDir
       BL.writeFile (toFilePath inputPath) (Aeson.encode inputJson)
       let witnessProc = runReader (getGenerateBuildCommitmentWitnessProcess accountDir) scheme
       witnessProc &!> StdOut &> Append shellLogsFilepath
       exportStatementAsJSON (toFilePath witnessPath) (toFilePath statementPath)
         &!> StdOut
-      parseOutputs params scheme statementPath
+      parseOutputs params setup statementPath
 
 compileAndScheme ::
   (MonadIO m, MonadReader FileScheme m) =>
-  m FileScheme
-compileAndScheme = do
-  scheme@FileScheme {buildCommitmentWASM, buildCommitmentR1CS} <- ask
+  BuildCommitmentSetup ->
+  m BuildCommitment
+compileAndScheme Filescheme.BuildCommitmentSetup {wasm, r1cs} = do
   let requiredArtifacts =
-        [ buildCommitmentWASM
-        , buildCommitmentR1CS
+        [ wasm
+        , r1cs
         ]
   artifactsPresent <-
     liftIO $
@@ -190,16 +142,16 @@ compileAndScheme = do
   unless artifactsPresent $ do
     compileProc <- compileBuildCommitmentForFileScheme
     liftIO $ compileProc &!> StdOut
-  pure scheme
+  asks (Session.commitment . session . account)
 
-parseOutputs :: Context -> FileScheme -> Path b t -> IO (Either String Output)
-parseOutputs params scheme statementPath = do
+parseOutputs :: Context -> BuildCommitmentSetup -> Path b t -> IO (Either String Output)
+parseOutputs params buildCommitmentSetup statementPath = do
   bytes <- BL.readFile (toFilePath statementPath)
   case Aeson.eitherDecode bytes of
     Left err -> pure (Left err)
     Right (WitnessValues wVals) -> do
       let ints = fmap read wVals :: [Integer]
-      eIdxs <- getOutputIndices scheme params
+      eIdxs <- getOutputIndices buildCommitmentSetup params
       case eIdxs of
         Left err -> pure (Left err)
         Right (msgIdxs, maskedIdxs) -> do
@@ -213,10 +165,10 @@ parseOutputs params scheme statementPath = do
 
 getOutputIndices ::
   MonadIO m =>
-  FileScheme ->
+  BuildCommitmentSetup ->
   Context ->
   m (Either String ([Int], [Int]))
-getOutputIndices FileScheme {buildCommitmentR1CS} Context {nbCommitmentLimbs} = liftIO $ do
+getOutputIndices BuildCommitmentSetup {r1cs} Context {nbCommitmentLimbs} = liftIO $ do
   -- Circom emits a .sym file alongside the r1cs/wasm that maps witness indices to signal names.
   -- This code reads that file line-by-line, splits on commas, and collects indices whose names
   -- start with main.out_message_chunk[ and main.out_masked_chunk[. It sorts these to recover the
@@ -225,7 +177,7 @@ getOutputIndices FileScheme {buildCommitmentR1CS} Context {nbCommitmentLimbs} = 
   -- snarkjs writes. It's brittle because coupled to the exact signal names and the "main"
   -- component name; a change in circuit naming/layout would require updating the prefixes. But
   -- it's fine for now.
-  let symPath = FP.replaceExtension (toFilePath buildCommitmentR1CS) "sym"
+  let symPath = FP.replaceExtension (toFilePath r1cs) "sym"
   symLines <- T.lines <$> TIO.readFile symPath
   let parseLine l =
         case T.splitOn "," l of

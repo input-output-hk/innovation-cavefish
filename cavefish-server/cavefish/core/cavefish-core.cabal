@@ -67,6 +67,7 @@ library
     Cavefish.Api.ServerConfiguration
     Cavefish.Endpoints.Read.FetchAccount
     Cavefish.Endpoints.Read.FetchAccounts
+    Cavefish.Endpoints.Write.AskCommitmentProof
     Cavefish.Endpoints.Write.DemonstrateCommitment
     Cavefish.Endpoints.Write.Register
     Cavefish.Performance.LogEvent
@@ -74,7 +75,6 @@ library
     Cavefish.Services.WBPS
     Intent.Example.DSL
     Intent.Example.TxBuilder
-    Prototype.AskCommitmentProof
     Prototype.AskSubmission
     Prototype.Messages
     Prototype.PaymentProof

@@ -17,7 +17,8 @@ import Control.Monad.Reader (MonadReader, asks)
 import Path qualified (parent, toFilePath)
 import Shh (ExecReference (SearchPath), Proc, load)
 import System.FilePath (dropTrailingPathSeparator, takeDirectory, (</>))
-import WBPS.Core.FileScheme (FileScheme (FileScheme, relationCircom))
+import WBPS.Core.FileScheme qualified as FileScheme
+import WBPS.Core.FileScheme qualified as Setup (Setup (commitment))
 
 load
   SearchPath
@@ -72,19 +73,19 @@ compileBuildCommitment BuildCommitmentCompileScheme {..} =
         circomlibDirNode
 
 compileBuildCommitmentForFileScheme ::
-  (MonadReader FileScheme m, MonadIO m) =>
+  (MonadReader FileScheme.FileScheme m, MonadIO m) =>
   m (Proc ())
 compileBuildCommitmentForFileScheme = do
   ensureCircomAvailable
-  asks (compileBuildCommitment . toCompileScheme)
+  asks (compileBuildCommitment . toCompileScheme . Setup.commitment . FileScheme.setup)
 
 toCompileScheme ::
-  FileScheme ->
+  FileScheme.BuildCommitmentSetup ->
   BuildCommitmentCompileScheme
-toCompileScheme FileScheme {relationCircom} =
-  let outputDir = Path.parent relationCircom
+toCompileScheme FileScheme.BuildCommitmentSetup {circom = circomFile} =
+  let outputDir = Path.parent circomFile
    in BuildCommitmentCompileScheme
-        { circuitPath = Path.toFilePath relationCircom
+        { circuitPath = Path.toFilePath circomFile
         , outputDir = Path.toFilePath outputDir
         , includeDir = Path.toFilePath (Path.parent outputDir)
         }

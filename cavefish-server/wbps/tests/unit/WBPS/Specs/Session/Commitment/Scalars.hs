@@ -6,8 +6,8 @@ import Test.Tasty.QuickCheck (testProperty)
 import WBPS.Core.Keys.ElGamal (AffinePoint (AffinePoint, x, y), EncryptionKey (EncryptionKey), mkRho)
 import WBPS.Core.Session.Commitment.Scalars (
   CommitmentScalars (CommitmentScalars, ekPowRho, gPowRho),
-  compute,
  )
+import WBPS.Core.Session.Commitment.Scalars.Compute (compute)
 
 specs :: TestTree
 specs =

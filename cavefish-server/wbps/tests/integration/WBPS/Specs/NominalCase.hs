@@ -1,56 +1,70 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module WBPS.Specs.NominalCase (specs) where
 
+import Control.Arrow ((&&&))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Functor ((<&>))
 import Data.List.NonEmpty qualified as NL
 import Data.Set qualified as Sets
-import Test.QuickCheck (Gen, counterexample, forAll, ioProperty, property, (===))
+import Path (reldir)
+import Test.QuickCheck (Gen, counterexample, forAll, ioProperty, property, (.&&.), (===))
 import Test.Tasty (TestTree)
 import Test.Tasty.QuickCheck (testProperty)
 import WBPS.Core.FileScheme (
-  FileScheme,
-  RootFolders,
   defaultFileScheme,
  )
 import WBPS.Core.Keys.Ed25519 (KeyPair, userWalletPK)
 import WBPS.Core.Registration.FetchAccounts (loadAccounts)
 import WBPS.Core.Registration.Register (register)
+import WBPS.Core.Session.Create (create)
+import WBPS.Core.Session.FetchSession (loadSessions)
+import WBPS.Specs.Adapter.Fixture (
+  CommitmentFixtures (unsignedTxFixture),
+  commitmentFixtures,
+  readFixture,
+ )
 import WBPS.Specs.Adapter.GenCardanoKeys (genEd25519KeyPairs)
+import WBPS.Specs.Adapter.Test (getRootFolder)
 import WBPS.WBPS (runWBPS)
 
-data FixtureNominalCase = FixtureNominalCase
+newtype FixtureNominalCase = FixtureNominalCase
   { userWalletKeyPairs :: NL.NonEmpty KeyPair
-  , fileScheme :: FileScheme
   }
   deriving (Show)
 
-genFixtureNominalCase :: RootFolders -> Gen FixtureNominalCase
-genFixtureNominalCase rootFolders = do
+genFixtureNominalCase :: Gen FixtureNominalCase
+genFixtureNominalCase = do
   keyPairs <- genEd25519KeyPairs 4
-
   pure
     FixtureNominalCase
       { userWalletKeyPairs = keyPairs
-      , fileScheme = defaultFileScheme rootFolders
       }
 
-specs :: RootFolders -> TestTree
-specs = registerSpecs
-
-registerSpecs :: RootFolders -> TestTree
-registerSpecs rootFolders =
+specs :: TestTree
+specs =
   testProperty
-    "Register - Client can register and an account is persisted and created for them and all these accounts are retrievable"
-    $ forAll (genFixtureNominalCase rootFolders)
-    $ \FixtureNominalCase {fileScheme = scheme, userWalletKeyPairs} ->
-      ioProperty $
-        do
-          runWBPS
-            scheme
-            ( do
-                accountsCreated <- NL.toList <$> mapM (register . userWalletPK) userWalletKeyPairs
-                accountsLoaded <- filter (`elem` accountsCreated) <$> loadAccounts
-                pure (accountsCreated, accountsLoaded)
-            )
+    ( unlines
+        [ "- 1. Register - Where a client can register and an account is persisted and created for them and all these accounts are retrievable"
+        , "    - 2. Create Session - Where Message/Rho/Scalars and Commitment will be generated and saved"
+        ]
+    )
+    $ forAll genFixtureNominalCase
+    $ \FixtureNominalCase {userWalletKeyPairs} ->
+      ioProperty $ do
+        (rootFolders, fileScheme) <- (id &&& defaultFileScheme) <$> getRootFolder [reldir|WBPS-integration-specs-Register|]
+        runWBPS
+          fileScheme
+          ( do
+              accountsCreated <- NL.toList <$> mapM (register . userWalletPK) userWalletKeyPairs
+              accountsLoaded <- filter (`elem` accountsCreated) <$> loadAccounts
+              anUnsignedTx <- liftIO (readFixture . unsignedTxFixture . commitmentFixtures $ rootFolders)
+              sessionsCreated <- NL.toList <$> mapM (flip create anUnsignedTx . userWalletPK) userWalletKeyPairs
+              sessionsLoaded <- filter (`elem` sessionsCreated) <$> loadSessions
+              pure (accountsCreated, accountsLoaded, sessionsCreated, sessionsLoaded)
+          )
           <&> \case
-            Right (accountsCreated, accountsLoaded) -> Sets.fromList accountsCreated === Sets.fromList accountsLoaded
+            Right (accountsCreated, accountsLoaded, sessionsCreated, sessionsLoaded) ->
+              counterexample "Loaded accounts mismatch" (Sets.fromList accountsCreated === Sets.fromList accountsLoaded)
+                .&&. counterexample "Loaded sessions mismatch" (Sets.fromList sessionsLoaded === Sets.fromList sessionsCreated)
             Left failures -> counterexample ("LoadAccounts failed: " <> show failures) (property False)

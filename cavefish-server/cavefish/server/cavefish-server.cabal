@@ -72,6 +72,7 @@ library
     , clock
     , cooked-validators
     , http-types
+    , path
     , servant
     , servant-server
     , text
@@ -92,6 +93,9 @@ executable cavefish-server
     , cavefish-core
     , cavefish-server
     , data-default
+    , filepath
+    , path
+    , path-io
     , warp
     , wbps
 

@@ -1,7 +1,7 @@
 module Main (main) where
 
-import Spec qualified
+import Cavefish.Nominal qualified
 import Test.Hspec (hspec)
 
 main :: IO ()
-main = hspec Spec.spec
+main = hspec Cavefish.Nominal.spec

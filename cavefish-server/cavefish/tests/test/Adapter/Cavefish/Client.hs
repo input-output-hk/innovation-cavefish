@@ -9,6 +9,7 @@ module Adapter.Cavefish.Client (
 import Cavefish.Api.ServerConfiguration (ServerConfiguration (ServerConfiguration, httpServer, serviceProviderFee, transactionExpiry, wbps))
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount (Inputs, Outputs)
 import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts (Outputs)
+import Cavefish.Endpoints.Write.AskCommitmentProof qualified as AskCommitmentProof
 import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment (Inputs, Outputs)
 import Cavefish.Endpoints.Write.Register qualified as Register (Inputs, Outputs)
 import Cavefish.Services.TxBuilding (ServiceFee (ServiceFee, amount, paidTo))
@@ -18,9 +19,9 @@ import Data.Default (Default (def))
 import Data.Foldable (foldl')
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.Wai.Handler.Warp qualified as Warp
+import Path (Dir, Path, Rel)
 import Plutus.Script.Utils.Value (ada)
 import PlutusLedgerApi.V3 qualified as Api
-import Prototype.AskCommitmentProof qualified as AskCommitmentProof
 import Servant (Application, Proxy (Proxy), type (:<|>) ((:<|>)))
 import Servant.Client (BaseUrl (BaseUrl))
 import Servant.Client qualified as SC
@@ -97,9 +98,9 @@ mkTestCavefishMonad wbpsScheme initialDistribution serverConfiguration =
       wbpsScheme
       serverConfiguration
 
-setupCavefish :: (Setup -> IO a) -> IO a
-setupCavefish actions = do
-  wbpsScheme <- mkFileSchemeFromRoot "../../wbps"
+setupCavefish :: Path Rel Dir -> (Setup -> IO a) -> IO a
+setupCavefish folderLabel actions = do
+  wbpsScheme <- mkFileSchemeFromRoot folderLabel
   alice <- generateWallet
   bob <- generateWallet
   provider@Wallet {paymentAddress} <- generateWallet

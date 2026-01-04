@@ -150,9 +150,12 @@ let
         repo_root="$repo_root/cavefish-server"
       fi
 
-      if [ -d "$repo_root/wbps/inputs" ]; then
-        export PATH="$repo_root/wbps/inputs:$PATH"
-        export BABYJUBJUB_KEYGEN="$repo_root/wbps/inputs/babyjubjub-keygen"
+      export WBPS_TEST_INPUT_ROOT="$repo_root/wbps/setup"
+      export WBPS_TEST_OUTPUT_ROOT="$repo_root/output/tests"
+
+      if [ -d "$repo_root/wbps/setup" ]; then
+        export PATH="$repo_root/wbps/setup:$PATH"
+        export BABYJUBJUB_KEYGEN="$repo_root/wbps/setup/babyjubjub-keygen"
       fi
 
       if [ -d "$repo_root/node_modules/.bin" ]; then
