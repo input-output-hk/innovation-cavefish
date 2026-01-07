@@ -82,6 +82,7 @@ let
   ];
 
   commonPkgs = [
+    # haskell tools
     tools.haskell-language-server
     tools.haskell-language-server.package.components.exes.haskell-language-server-wrapper
     tools.stylish-haskell
@@ -90,9 +91,14 @@ let
     tools.cabal-fmt
     tools.hlint
 
+    pkgs.cargo
+    pkgs.rust-script
+
+    # nix tools
     pkgs.nixfmt-rfc-style
     pkgs.shellcheck
-    pkgs.github-cli
+    pkgs.nix-prefetch-git
+
     pkgs.act
     pkgs.bzip2
     pkgs.gawk
@@ -101,11 +107,13 @@ let
     pkgs.curl
     pkgs.bash
     pkgs.git
+    pkgs.github-cli
     pkgs.git-lfs
     pkgs.which
+
+    # build tools
     pkgs.watchexec
     pkgs.ghciwatch
-    pkgs.nix-prefetch-git
 
     # Additions for gen-tags.sh
     pkgs.haskellPackages.fast-tags

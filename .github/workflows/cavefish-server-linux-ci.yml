@@ -94,10 +94,10 @@ jobs:
 
       - name: Build babyjubjub-keygen (native) and add to PATH
         run: |
-          DEST="$GITHUB_WORKSPACE/cavefish-server/wbps/inputs/babyjubjub-keygen"
-          echo "Building babyjubjub-keygen for $(uname -m) -> $DEST"
-          DEST="$DEST" bash "$GITHUB_WORKSPACE/wbps/tooling/gen_babyjubjub_keys.sh"
-          echo "$GITHUB_WORKSPACE/cavefish-server/wbps/inputs" >> "$GITHUB_PATH"
+          cargo install rust-script
+          echo "Building and testing babyjubjub-keygen for $(uname -m) -> $DEST"
+          "$GITHUB_WORKSPACE"/wbps/tooling/babyjubjub-keygen.rs
+          echo "$GITHUB_WORKSPACE/cavefish-server/wbps/setup" >> "$GITHUB_PATH"
 
       - name: Install circom & snarkjs
         run: |

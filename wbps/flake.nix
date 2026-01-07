@@ -46,6 +46,8 @@
             # circom circuit compiler
             circom
             #
+            cargo
+            rust-script
             # nixfmt for formatting Nix code according to RFC style
             pkgs.nixfmt-rfc-style
             # misc tools
