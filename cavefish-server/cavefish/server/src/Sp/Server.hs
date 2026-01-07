@@ -11,6 +11,7 @@ module Sp.Server (
 import Cavefish (CavefishServerM, CavefishServices, runCavefishMonad)
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
 import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
+import Cavefish.Endpoints.Write.AskCommitmentProof qualified as AskCommitmentProof
 import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 import Cavefish.Endpoints.Write.Register qualified as Register
 import Data.Text (Text)
@@ -20,7 +21,6 @@ import Network.Wai.Middleware.Cors (
   cors,
   simpleCorsResourcePolicy,
  )
-import Prototype.AskCommitmentProof qualified as AskCommitmentProof
 import Prototype.AskSubmission qualified as AskSubmission
 import Prototype.Messages (
   PendingResp,

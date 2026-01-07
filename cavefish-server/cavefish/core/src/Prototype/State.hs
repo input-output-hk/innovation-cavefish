@@ -10,7 +10,7 @@ import GHC.Generics (Generic)
 import Prototype.Pke (PkeCiphertext)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.Ed25519 qualified as Ed25519
-import WBPS.Core.Session.Commitment.Build (ComId)
+import WBPS.Core.Session.Commitment (CommitmentId)
 
 data Pending = Pending
   { tx :: Tx ConwayEra
@@ -22,7 +22,7 @@ data Pending = Pending
   , auxNonce :: ByteString
   , rho :: ByteString
   , message :: ByteString
-  , comId :: ComId
+  , comId :: CommitmentId
   , comTx :: [Integer]
   , commitment :: Maybe Ed25519.PublicKey
   , challenge :: Maybe ByteString

@@ -26,6 +26,8 @@ jobs:
       CABAL_CACHE_VERSION: "2025-10-23"
       SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
       SECP_CACHE_VERSION: "2022-12-30"
+      WBPS_TEST_INPUT_ROOT: ${{ github.workspace }}/cavefish-server/wbps/setup
+      WBPS_TEST_OUTPUT_ROOT: ${{ github.workspace }}/cavefish-server/output/tests
 
     defaults:
       run:

@@ -84,8 +84,7 @@ test-suite test
   hs-source-dirs: test
   other-modules:
     Adapter.Cavefish.Client
-    Core.CborSpec
-    Spec
+    Cavefish.Nominal
 
   build-depends:
     , cardano-api
@@ -95,6 +94,7 @@ test-suite test
     , data-default
     , hspec
     , http-client
+    , path
     , plutus-ledger-api
     , plutus-script-utils
     , servant-client

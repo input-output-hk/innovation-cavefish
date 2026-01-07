@@ -61,8 +61,8 @@
             export PATH=$PWD/node_modules/.bin:$PATH
             if [ -x "$PWD/babyjubjub-keygen" ]; then
               export PATH=$PWD:$PATH
-            elif [ -x "$PWD/../cavefish-server/wbps/inputs/babyjubjub-keygen" ]; then
-              export PATH=$PWD/../cavefish-server/wbps/inputs:$PATH
+            elif [ -x "$PWD/../cavefish-server/wbps/setup/babyjubjub-keygen" ]; then
+              export PATH=$PWD/../cavefish-server/wbps/setup:$PATH
             else
               echo "babyjubjub-keygen not found; run wbps/tooling/gen_babyjubjub_keys.sh to build it" >&2
             fi

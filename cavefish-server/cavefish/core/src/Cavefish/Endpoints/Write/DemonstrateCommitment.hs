@@ -21,8 +21,11 @@ import GHC.Generics (Generic)
 import Intent.Example.DSL (IntentDSL)
 import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Session.Commitment.Build (Commitment)
-import WBPS.Core.Session.Create (Session (SessionCreated, commitment, publicMessage))
+import WBPS.Core.Session.Commitment (Commitment)
+import WBPS.Core.Session.Session (
+  CommitmentDemonstrated (CommitmentDemonstrated, commitment, publicMessage),
+  Session (commitmentDemonstrated),
+ )
 import WBPS.Core.ZK.Message (PublicMessage (PublicMessage))
 
 -- | Inputs for demonstrating a commitment.
@@ -51,10 +54,10 @@ handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey, intent} = do
   CavefishServices
     { txBuildingService = TxService.TxBuilding {build}
-    , wbpsService = WbpsService.WBPS {create}
+    , wbpsService = WbpsService.WBPS {createSession}
     } <-
     ask
 
   unsignedTx <- build intent
-  SessionCreated {publicMessage = PublicMessage txAbs, commitment} <- create userWalletPublicKey unsignedTx
+  CommitmentDemonstrated {publicMessage = PublicMessage txAbs, commitment} <- commitmentDemonstrated <$> createSession userWalletPublicKey unsignedTx
   return Outputs {txAbs, commitment}

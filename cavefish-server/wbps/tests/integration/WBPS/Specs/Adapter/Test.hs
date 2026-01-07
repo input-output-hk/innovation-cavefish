@@ -1,28 +1,28 @@
-{-# LANGUAGE QuasiQuotes #-}
+module WBPS.Specs.Adapter.Test (getRootFolder) where
 
-module WBPS.Specs.Adapter.Test (findInputsDir) where
+import Path (Abs, Dir, Path, Rel, parseAbsDir, (</>))
+import Path.IO (ensureDir, listDir, removeDirRecur, removeFile)
+import System.Environment (getEnv)
+import WBPS.Core.FileScheme (RootFolders (RootFolders, input, output))
 
-import Path (Abs, Dir, Path, parent, reldir, relfile, (</>))
-import Path.IO (doesDirExist, doesFileExist)
+getRootFolder :: Path Rel Dir -> IO RootFolders
+getRootFolder dirLabel = do
+  inputRoot <- requiredEnvDir "WBPS_TEST_INPUT_ROOT"
+  outputRoot <- requiredEnvDir "WBPS_TEST_OUTPUT_ROOT"
+  ensureDir $ outputRoot </> dirLabel
+  clearDir $ outputRoot </> dirLabel
 
-findInputsDir :: Path Abs Dir -> IO (Path Abs Dir)
-findInputsDir currentDir = do
-  let withinDir = currentDir </> [reldir|wbps|]
-      inputsHere = currentDir </> [reldir|inputs|]
-      inputsWithin = withinDir </> [reldir|inputs|]
-      cabalHere = currentDir </> [relfile|wbps.cabal|]
-      cabalWithin = withinDir </> [relfile|wbps.cabal|]
-  hereHasInputs <- doesDirExist inputsHere
-  hereHasCabal <- doesFileExist cabalHere
-  if hereHasInputs && hereHasCabal
-    then pure inputsHere
-    else do
-      withinHasInputs <- doesDirExist inputsWithin
-      withinHasCabal <- doesFileExist cabalWithin
-      if withinHasInputs && withinHasCabal
-        then pure inputsWithin
-        else
-          let parentDir = parent currentDir
-           in if parentDir == currentDir
-                then fail "Could not locate wbps/inputs directory from current working directory."
-                else findInputsDir parentDir
+  pure
+    RootFolders
+      { input = inputRoot
+      , output = outputRoot </> dirLabel
+      }
+
+requiredEnvDir :: String -> IO (Path Abs Dir)
+requiredEnvDir envVar = parseAbsDir =<< getEnv envVar
+
+clearDir :: Path Abs Dir -> IO ()
+clearDir dir = do
+  (dirs, files) <- listDir dir
+  mapM_ removeDirRecur dirs
+  mapM_ removeFile files

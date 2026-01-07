@@ -47,7 +47,7 @@ package.json
 # ====================================================
 # project-local outputs
 # ====================================================
-wbps/output/
+output/
 
 # ====================================================
 # emacs, Make emacs projectile happy with monorepos

@@ -13,7 +13,7 @@ module Intent.Example.DSL (
   normalizeIntent,
   toIntentExpr,
   toCanonicalIntent,
-  -- satisfies,
+  satisfies,
   outExactly,
   valuePositive,
 ) where
@@ -33,6 +33,7 @@ import Plutus.Script.Utils.Address (
   ToAddress (toAddress),
   ToPubKeyHash (toPubKeyHash),
  )
+import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx)
 
 type ChangeDelta = Api.Value
 
@@ -178,39 +179,39 @@ toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent
 toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent =
   fmap normalizeIntent . toIntentExpr
 
--- -- | Check whether a transaction satisfies an intent, given the change delta.
--- satisfies :: CanonicalIntent -> TxAbs Api.ConwayEra -> Bool
--- satisfies CanonicalIntent {..} tx =
---   and
---     [ -- MustMint: v ≤ tx.mint
---       let need = Map.fromList . toList $ mconcat mustMint
---           have = Map.fromList (toList tx.absMint)
---        in Map.isSubmapOfBy (<=) need have
---     , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
---       -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
---       all (hasSigner tx.sigKeys . unAdressConwayEra) spendFrom
---     , -- MaxInterval (if any): (tx.validityInterval.snd - tx.validityInterval.fst) ≤ i
---       case maxInterval of
---         Nothing -> True
---         Just i -> case toClosedFinite tx.validityInterval of
---           Nothing -> False
---           Just (lo, hi) -> (hi - lo) <= i
---     , -- PayTo: (s, v) ∈ tx.outputs
---       all (\(value, addr) -> any (outMatches addr value) tx.outputs) payTo
---     , -- ChangeTo: (s,consumed − produced) ∈ tx.outputs
---       case changeTo of
---         Nothing -> True
---         Just addr -> any (outMatchesChange addr) tx.outputs
---     , -- not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
---       -- MaxFee (if any): tx.fee ≤ f
---       maybe True (\f -> tx.absFee <= f) maxFee
---     ]
---   where
---     hasSigner :: Set.Set PubKey -> Api.AddressInEra Api.ConwayEra -> Bool
---     hasSigner sigs addr =
---       case cardanoPubKeyHash addr of
+satisfies :: IntentDSL -> AbstractUnsignedTx -> Bool
+satisfies _ _ = True
+
+-- and
+--   [ -- MustMint: v ≤ tx.mint
+--     let need = Map.fromList . toList $ mconcat mustMint
+--         have = Map.fromList (toList tx.absMint)
+--      in Map.isSubmapOfBy (<=) need have
+--   , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
+--     -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
+--     all (hasSigner tx.sigKeys . unAdressConwayEra) spendFrom
+--   , -- MaxInterval (if any): (tx.validityInterval.snd - tx.validityInterval.fst) ≤ i
+--     case maxInterval of
+--       Nothing -> True
+--       Just i -> case toClosedFinite tx.validityInterval of
 --         Nothing -> False
---         Just pkh -> any ((== pkh) . pubKeyHash) (Set.toList sigs)
+--         Just (lo, hi) -> (hi - lo) <= i
+--   , -- PayTo: (s, v) ∈ tx.outputs
+--     all (\(value, addr) -> any (outMatches addr value) tx.outputs) payTo
+--   , -- ChangeTo: (s,consumed − produced) ∈ tx.outputs
+--     case changeTo of
+--       Nothing -> True
+--       Just addr -> any (outMatchesChange addr) tx.outputs
+--   , -- not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
+--     -- MaxFee (if any): tx.fee ≤ f
+--     maybe True (\f -> tx.absFee <= f) maxFee
+--   ]
+-- where
+--   hasSigner :: Set.Set PubKey -> Api.AddressInEra Api.ConwayEra -> Bool
+--   hasSigner sigs addr =
+--     case cardanoPubKeyHash addr of
+--       Nothing -> False
+--       Just pkh -> any ((== pkh) . pubKeyHash) (Set.toList sigs)
 
 valueLeq :: Api.Value -> Api.Value -> Bool
 valueLeq need have =

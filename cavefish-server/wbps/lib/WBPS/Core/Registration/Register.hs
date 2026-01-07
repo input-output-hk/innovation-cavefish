@@ -15,14 +15,18 @@ import Path.IO (ensureDir)
 import Shh (Stream (Append, StdOut), (&!>), (&>))
 import WBPS.Adapter.Path (writeTo)
 import WBPS.Core.Failure (RegistrationFailed (AccountAlreadyRegistered))
-import WBPS.Core.FileScheme (FileScheme (FileScheme, encryptionKeys), getShellLogsFilepath)
+import WBPS.Core.FileScheme (
+  Account (Account, encryptionKeys),
+  FileScheme (FileScheme, account),
+  getShellLogsFilepath,
+ )
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.Account (
   AccountCreated (AccountCreated, userWalletPublicKey),
  )
 import WBPS.Core.Registration.FetchAccounts (loadAccount, loadExistingAccount)
-import WBPS.Core.Registration.FileScheme (deriveDirectoryAccountFrom)
+import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
 import WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh (getGenerateProvingKeyProcess, getGenerateVerificationKeyProcess)
 
@@ -35,20 +39,20 @@ register userWalletPublicKey =
     >>= \case
       Just AccountCreated {userWalletPublicKey = existingUserWalletKey} -> throwError [AccountAlreadyRegistered existingUserWalletKey]
       Nothing -> do
-        register' =<< deriveDirectoryAccountFrom userWalletPublicKey
+        register' =<< deriveAccountDirectoryFrom userWalletPublicKey
         loadExistingAccount userWalletPublicKey
 
 register' ::
   (MonadIO m, MonadReader FileScheme m) =>
   Directory.Account ->
   m ()
-register' account = do
-  FileScheme {..} <- ask
-  ensureDir account
-  ElGamal.generateKeyPair >>= writeTo (account </> encryptionKeys)
-  generateProvingKeyProcess <- getGenerateProvingKeyProcess account
-  generateVerificationKeyProcess <- getGenerateVerificationKeyProcess account
-  shellLogsFilepath <- getShellLogsFilepath account
+register' accountDirectory = do
+  FileScheme {account = Account {encryptionKeys}} <- ask
+  ensureDir accountDirectory
+  ElGamal.generateKeyPair >>= writeTo (accountDirectory </> encryptionKeys)
+  generateProvingKeyProcess <- getGenerateProvingKeyProcess accountDirectory
+  generateVerificationKeyProcess <- getGenerateVerificationKeyProcess accountDirectory
+  shellLogsFilepath <- getShellLogsFilepath accountDirectory
   liftIO $
     (generateProvingKeyProcess >> generateVerificationKeyProcess)
       &!> StdOut

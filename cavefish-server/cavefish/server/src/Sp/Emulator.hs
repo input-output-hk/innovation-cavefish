@@ -13,7 +13,7 @@ import Cavefish.Api.ServerConfiguration (
   ServerConfiguration (ServerConfiguration, httpServer, serviceProviderFee, transactionExpiry, wbps),
  )
 import Cavefish.Services.TxBuilding (ServiceFee, TxBuilding (TxBuilding, build, fees, submit))
-import Cavefish.Services.WBPS (WBPS (WBPS, create, loadAccount, loadAccounts, register))
+import Cavefish.Services.WBPS (WBPS (WBPS, createSession, loadAccount, loadAccounts, loadSession, register))
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Cooked (
   InitialDistribution,
@@ -24,17 +24,21 @@ import Data.ByteString.Lazy.Char8 qualified as BL8 (pack)
 import Intent.Example.DSL (IntentDSL, toCanonicalIntent)
 import Intent.Example.TxBuilder (buildTx)
 import Servant (
+  err404,
   err422,
   err500,
   errBody,
   throwError,
  )
 import WBPS.Core.Cardano.UnsignedTx (UnsignedTx)
-import WBPS.Core.Failure (RegistrationFailed (AccountAlreadyRegistered))
+import WBPS.Core.Failure (
+  RegistrationFailed (AccountAlreadyRegistered, SessionNotFound),
+ )
 import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Core.Registration.FetchAccounts qualified as Registration
 import WBPS.Core.Registration.Register qualified as Registration
 import WBPS.Core.Session.Create qualified as Session
+import WBPS.Core.Session.FetchSession qualified as SessionFetch
 import WBPS.WBPS (runWBPS)
 
 mkServerContext ::
@@ -61,7 +65,7 @@ mkServerContext
                     Left [AccountAlreadyRegistered _] -> throwError err422 {errBody = BL8.pack "Account Already Registered"}
                     Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     Right x -> pure x
-            , create = \userWalletPublicKey tx ->
+            , createSession = \userWalletPublicKey tx ->
                 liftIO (runWBPS wbpsScheme (Session.create userWalletPublicKey tx))
                   >>= \case
                     (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
@@ -75,6 +79,12 @@ mkServerContext
                 liftIO (runWBPS wbpsScheme Registration.loadAccounts)
                   >>= \case
                     (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
+                    Right x -> pure x
+            , loadSession = \userWalletPublicKey commitmentId ->
+                liftIO (runWBPS wbpsScheme (SessionFetch.loadExistingSession userWalletPublicKey commitmentId))
+                  >>= \case
+                    Left [SessionNotFound _ _] -> throwError err404 {errBody = BL8.pack "Session Not Found"}
+                    Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     Right x -> pure x
             }
       }

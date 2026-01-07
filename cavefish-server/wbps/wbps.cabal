@@ -82,9 +82,17 @@ library
     WBPS.Core.Registration.Register
     WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh
     WBPS.Core.Registration.SnarkJs.OverShh
+    WBPS.Core.Session.Challenge
+    WBPS.Core.Session.Commitment
     WBPS.Core.Session.Commitment.Build
     WBPS.Core.Session.Commitment.Scalars
+    WBPS.Core.Session.Commitment.Scalars.Compute
     WBPS.Core.Session.Create
+    WBPS.Core.Session.FetchSession
+    WBPS.Core.Session.FileScheme
+    WBPS.Core.Session.FileScheme.Directories
+    WBPS.Core.Session.R
+    WBPS.Core.Session.Session
     WBPS.Core.ZK.Message
     WBPS.WBPS
 

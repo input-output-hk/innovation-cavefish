@@ -80,7 +80,7 @@
 //        message μ, ensuring the proof is non-malleable and self-consistent.
 // ======================================================================
 // Parameters (top-level):
-//   message_size                    : |μ| (must be a multiple of 254 bits)
+//   message_size                    : |μ| (must be a multiple of 252 bits)
 //   message_private_part_size       : size of the private overlay window
 //   message_private_part_offset     : starting bit offset for the private overlay
 //
