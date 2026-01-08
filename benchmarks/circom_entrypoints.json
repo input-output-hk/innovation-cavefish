@@ -1,0 +1,16 @@
+{
+    "blake2b": "pragma circom 2.1.2;\ninclude \"blake2b_templ.circom\";\ncomponent main = blake2b_templ({str_config});",
+    "sha256_bytes": "pragma circom 2.1.2;\ninclude \"sha256_bytes_templ.circom\";\ncomponent main = sha256_bytes_templ({str_config});",
+    "sha512_bytes": "pragma circom 2.1.2;\ninclude \"sha512_bytes_templ.circom\";\ncomponent main = sha512_bytes_templ({str_config});",
+    "sha256_bits": "pragma circom 2.1.2;\ninclude \"sha256_bits_templ.circom\";\ncomponent main = sha256_bits_templ({str_config});",
+    "poseidon2_rate1": "pragma circom 2.1.2;\ninclude \"poseidon2_rate1_templ.circom\";\ncomponent main = poseidon2_rate1_templ({str_config});",
+    "scalarmulany": "pragma circom 2.1.2;\ninclude \"scalarmulany_templ.circom\";\ncomponent main = scalarmulany_templ({str_config});",
+    "scalarmulfix": "pragma circom 2.1.2;\ninclude \"scalarmulfix_templ.circom\";\ncomponent main = scalarmulfix_templ();",
+    "blake2bvarlen_quad": "pragma circom 2.1.2;\ninclude \"blake2bvarlen_quad_templ.circom\";\ncomponent main = blake2bvarlen_quad_templ({str_config});",
+    "blake2bvarlen_linear": "pragma circom 2.1.2;\ninclude \"blake2bvarlen_linear_templ.circom\";\ncomponent main = blake2bvarlen_linear_templ({str_config});",
+    "blake2bcompress": "pragma circom 2.1.2;\ninclude \"blake2bcompress_templ.circom\";\ncomponent main = blake2bcompress_templ();",
+    "poseidon_prf_chained": "pragma circom 2.1.2;\ninclude \"poseidon_prf_chained_templ.circom\";\ncomponent main = poseidon_prf_chained_templ({str_config});",
+    "poseidon_prf_oneshot": "pragma circom 2.1.2;\ninclude \"poseidon_prf_oneshot_templ.circom\";\ncomponent main = poseidon_prf_oneshot_templ({str_config});",
+    "bytestrcomp": "pragma circom 2.1.2;\ninclude \"bytestrcomp_templ.circom\";\ncomponent main = bytestrcomp_templ({str_config});"
+
+}

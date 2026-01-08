@@ -1,0 +1,3 @@
+[submodule "benchmarks/circuits/core/circomlib"]
+	path = benchmarks/circuits/core/circomlib
+	url = https://github.com/iden3/circomlib.git

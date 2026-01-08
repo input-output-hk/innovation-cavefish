@@ -1,0 +1,22 @@
+[
+  {
+    "instance": "blake2b_128",
+    "setup_size": 17,
+    "constraints": 79387,
+    "setup": {
+      "samples": 1,
+      "avg": 45.876091718673706,
+      "std": 0.0
+    },
+    "prover": {
+      "samples": 1,
+      "avg": 3.431760787963867,
+      "std": 0.0
+    },
+    "verifier": {
+      "samples": 1,
+      "avg": 0.3794982433319092,
+      "std": 0.0
+    }
+  }
+]
