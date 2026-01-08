@@ -9,6 +9,8 @@ module WBPS.Core.FileScheme (
   Session (..),
   BuildCommitmentSetup (..),
   BuildCommitment (..),
+  WitnessGeneration (..),
+  WitnessGenerationSetup (..),
   Account (..),
   RootFolders (..),
 ) where
@@ -61,6 +63,10 @@ defaultFileScheme RootFolders {..} =
                 , r1cs = input </> [reldir|commitment|] </> [relfile|BuildCommitment.r1cs|]
                 , wasm = input </> [reldir|commitment|] </> [reldir|BuildCommitment_js|] </> [relfile|BuildCommitment.wasm|]
                 }
+          , witness =
+              WitnessGenerationSetup
+                { wasm = input </> [reldir|witness|] </> [relfile|generator.wasm|]
+                }
           }
     , accounts = output </> [reldir|accounts|]
     , account =
@@ -82,12 +88,18 @@ defaultFileScheme RootFolders {..} =
                       , output = [relfile|internal_witness.wtns|]
                       , statementOutput = [relfile|internal_public.json|]
                       }
+                , witness =
+                    WitnessGeneration
+                      { input = [relfile|witness_input.json|]
+                      , output = [relfile|witness.wtns|]
+                      }
+                , proof =
+                    ProofGeneration
+                      { statement = [relfile|statement.json|]
+                      , proof = [relfile|proof.json|]
+                      }
                 }
           , shellLogs = [relfile|shellLogs.txt|]
-          }
-    , witnessGenerator =
-        WitnessGenerator
-          { wasm = [relfile|witness.wasm|]
           }
     }
 
@@ -101,7 +113,6 @@ data FileScheme = FileScheme
   { setup :: Setup
   , accounts :: Directory.Accounts
   , account :: Account
-  , witnessGenerator :: WitnessGenerator
   }
   deriving (Show, Eq)
 
@@ -109,6 +120,13 @@ data Setup = Setup
   { relationR1CS :: Path Abs File
   , powerOfTauPrepared :: Path Abs File
   , commitment :: BuildCommitmentSetup
+  , witness :: WitnessGenerationSetup
+  }
+  deriving (Show, Eq)
+
+newtype WitnessGenerationSetup
+  = WitnessGenerationSetup
+  { wasm :: Path Abs File
   }
   deriving (Show, Eq)
 
@@ -137,12 +155,22 @@ data Session = Session
   { message :: Path Rel File
   , rho :: Path Rel File
   , commitment :: BuildCommitment
+  , witness :: WitnessGeneration
+  , proof :: ProofGeneration
   }
   deriving (Show, Eq)
 
-data WitnessGenerator
-  = WitnessGenerator
-  { wasm :: Path Rel File
+data WitnessGeneration
+  = WitnessGeneration
+  { input :: Path Rel File
+  , output :: Path Rel File
+  }
+  deriving (Show, Eq)
+
+data ProofGeneration
+  = ProofGeneration
+  { statement :: Path Rel File
+  , proof :: Path Rel File
   }
   deriving (Show, Eq)
 

@@ -29,7 +29,7 @@ import WBPS.Core.Keys.Ed25519 qualified as Ed25519
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, setup, userWalletPublicKey))
 import WBPS.Core.Registration.FetchAccounts (loadAccount)
-import WBPS.Core.Session.Commitment
+import WBPS.Core.Session.Commitment (Commitment (Commitment, id))
 import WBPS.Core.Session.Commitment.Build (Input (Input, ekPowRho, messageBits), build)
 import WBPS.Core.Session.Commitment.Scalars as CommitmentScalars (
   CommitmentScalars (CommitmentScalars, ekPowRho),
@@ -45,7 +45,7 @@ import WBPS.Core.Session.Session (
     publicMessage,
     rho
   ),
-  Session (SessionCreated, account, commitmentDemonstrated),
+  Session (SessionCreated),
  )
 import WBPS.Core.ZK.Message (Message (Message), PublicMessage (PublicMessage), messageToBits, unMessage)
 
@@ -67,37 +67,27 @@ create userWalletPublicKey unsignedTx =
         rho <- ElGamal.generateElGamalExponent
         commitmentScalars@CommitmentScalars {ekPowRho} <- CommitmentScalars.compute ek rho
         commitment <- build Input {ekPowRho, messageBits}
-        saveAndReturn
-          SessionCreated
-            { account
-            , commitmentDemonstrated =
-                CommitmentDemonstrated
-                  { message
-                  , publicMessage = PublicMessage . toAbstractUnsignedTx . unMessage $ message
-                  , rho
-                  , commitmentScalars
-                  , commitment
-                  }
-            }
-
-saveAndReturn ::
-  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
-  Session -> m Session
-saveAndReturn session = save session >> return session
+        SessionCreated account
+          <$> save
+            account
+            CommitmentDemonstrated
+              { message
+              , publicMessage = PublicMessage . toAbstractUnsignedTx . unMessage $ message
+              , rho
+              , commitmentScalars
+              , commitment
+              }
 
 save ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
-  Session -> m ()
+  AccountCreated -> CommitmentDemonstrated -> m CommitmentDemonstrated
 save
-  SessionCreated
-    { account = AccountCreated {userWalletPublicKey}
-    , commitmentDemonstrated =
-      CommitmentDemonstrated
-        { message
-        , rho
-        , commitmentScalars
-        , commitment = commitment@Commitment {id = sessionId}
-        }
+  AccountCreated {userWalletPublicKey}
+  event@CommitmentDemonstrated
+    { message
+    , rho
+    , commitmentScalars
+    , commitment = commitment@Commitment {id = sessionId}
     } = do
     sessionDirectory <- deriveSessionDirectoryFrom userWalletPublicKey sessionId
     ensureDir sessionDirectory
@@ -113,3 +103,4 @@ save
     writeTo (sessionDirectory </> rhoDir) rho
     writeTo (sessionDirectory </> [reldir|commitment|] </> scalarsDir) commitmentScalars
     writeTo (sessionDirectory </> [reldir|commitment|] </> commitmentDir) commitment
+    return event

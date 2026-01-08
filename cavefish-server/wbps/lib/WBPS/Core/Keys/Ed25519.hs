@@ -1,6 +1,5 @@
 module WBPS.Core.Keys.Ed25519 (
   UserWalletPublicKey (..),
-  UserCommitmentPublicKey (..),
   KeyPair (..),
   PublicKey (..),
   PrivateKey (..),
@@ -9,6 +8,7 @@ module WBPS.Core.Keys.Ed25519 (
   getPublicKey,
   getPrivateKey,
   userWalletPK,
+  userWalletPublicKeyToWord8s,
   generateKeyPair,
   generateKeyTuple,
   generateWallet,
@@ -24,14 +24,13 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.Coerce (coerce)
 import Data.String (IsString)
 import Data.Text (Text)
+import Data.Word (Word8)
 import Ledger.Address qualified as Ledger
 import PlutusLedgerApi.V3 qualified as Api
 import WBPS.Adapter.CardanoCryptoClass.Crypto qualified as Adapter
+import WBPS.Adapter.Data.ByteString (bytesToBitsLE)
 
 newtype UserWalletPublicKey = UserWalletPublicKey PublicKey
-  deriving newtype (ToJSON, FromJSON, IsString, Ord, Show, Eq)
-
-newtype UserCommitmentPublicKey = UserCommitmentPublicKey PublicKey
   deriving newtype (ToJSON, FromJSON, IsString, Ord, Show, Eq)
 
 newtype KeyPair = KeyPair (Adapter.KeyPair Ed25519DSIGN)
@@ -77,6 +76,10 @@ paymentVerificationKey' kp =
 
 userWalletPK :: KeyPair -> UserWalletPublicKey
 userWalletPK (KeyPair (Adapter.KeyPair {..})) = UserWalletPublicKey . PublicKey $ verificationKey
+
+userWalletPublicKeyToWord8s :: UserWalletPublicKey -> [Word8]
+userWalletPublicKeyToWord8s (UserWalletPublicKey (PublicKey pk)) =
+  bytesToBitsLE (Adapter.toByteString pk)
 
 generateKeyPair :: forall m. MonadIO m => m KeyPair
 generateKeyPair = KeyPair <$> Adapter.generateKeyPair @Ed25519DSIGN

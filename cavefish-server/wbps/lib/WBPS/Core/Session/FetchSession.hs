@@ -8,6 +8,7 @@ module WBPS.Core.Session.FetchSession (
   loadSession,
   loadExistingSession,
   loadSessions,
+  loadExistingCommitmentDemonstrationEvents,
   -- | Load an existing session
 ) where
 
@@ -86,6 +87,31 @@ loadExistingSession userWalletPublicKey commitmentId =
           asks (FileScheme.session . FileScheme.account)
         message <- readFrom (sessionDirectory </> messageDir) >>= whenNothingThrow [SessionMessageNotFound userWalletPublicKey commitmentId]
         SessionCreated account
+          <$> ( CommitmentDemonstrated
+                  message
+                  (PublicMessage . toAbstractUnsignedTx . unMessage $ message)
+                  <$> (readFrom (sessionDirectory </> rhoDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
+                  <*> (readFrom (sessionDirectory </> [reldir|commitment|] </> scalarsDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
+                  <*> (readFrom (sessionDirectory </> [reldir|commitment|] </> commitmentDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
+              )
+
+loadExistingCommitmentDemonstrationEvents ::
+  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
+  UserWalletPublicKey -> CommitmentId -> m (AccountCreated, CommitmentDemonstrated)
+loadExistingCommitmentDemonstrationEvents userWalletPublicKey commitmentId =
+  loadAccount userWalletPublicKey
+    >>= \case
+      Nothing -> throwError [AccountNotFound userWalletPublicKey]
+      Just accountCreated -> do
+        sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId
+        FileScheme.Session
+          { message = messageDir
+          , rho = rhoDir
+          , commitment = FileScheme.BuildCommitment {scalars = scalarsDir, commitment = commitmentDir}
+          } <-
+          asks (FileScheme.session . FileScheme.account)
+        message <- readFrom (sessionDirectory </> messageDir) >>= whenNothingThrow [SessionMessageNotFound userWalletPublicKey commitmentId]
+        (accountCreated,)
           <$> ( CommitmentDemonstrated
                   message
                   (PublicMessage . toAbstractUnsignedTx . unMessage $ message)

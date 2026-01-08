@@ -37,9 +37,8 @@ import WBPS.Core.Keys.Ed25519 (
   publicKey,
   userWalletPK,
  )
-import WBPS.Core.Session.Commitment (Commitment (Commitment, id, payload))
+import WBPS.Core.Session.Commitment (Commitment (Commitment, id))
 import WBPS.Core.Session.R (R (R))
-import Prelude hiding (id)
 
 spec :: Spec
 spec = do
@@ -89,7 +88,7 @@ spec = do
                         )
                 Register.Outputs {publicVerificationContext, ek} <- register . Register.Inputs . publicKey $ alice
 
-                DemonstrateCommitment.Outputs {commitment = Commitment {id, payload}, txAbs} <-
+                DemonstrateCommitment.Outputs {commitment = commitment@Commitment {id = commitmentId}, txAbs} <-
                   demonstrateCommitment
                     . DemonstrateCommitment.Inputs (publicKey alice)
                     $ intent
@@ -102,7 +101,7 @@ spec = do
                   askCommitmentProof
                     AskCommitmentProof.Inputs
                       { userWalletPublicKey = publicKey alice
-                      , commitmentId = id
+                      , commitmentId
                       , bigR = R bigR
                       }
 

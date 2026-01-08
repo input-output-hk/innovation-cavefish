@@ -12,6 +12,7 @@ import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Account (AccountCreated)
 import WBPS.Core.Session.Commitment (CommitmentId)
 import WBPS.Core.Session.Create (Session)
+import WBPS.Core.Session.Session (CommitmentDemonstrated)
 
 data WBPS = WBPS
   { register ::
@@ -35,4 +36,8 @@ data WBPS = WBPS
       forall m.
       (MonadIO m, MonadError ServerError m) =>
       UserWalletPublicKey -> CommitmentId -> m Session
+  , loadCommitmentDemonstrationEvents ::
+      forall m.
+      (MonadIO m, MonadError ServerError m) =>
+      UserWalletPublicKey -> CommitmentId -> m (AccountCreated, CommitmentDemonstrated)
   }

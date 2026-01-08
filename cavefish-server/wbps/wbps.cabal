@@ -62,6 +62,10 @@ library
   exposed-modules:
     WBPS.Adapter.CardanoCryptoClass.Crypto
     WBPS.Adapter.Data
+    WBPS.Adapter.Data.Aeson
+    WBPS.Adapter.Data.ByteString
+    WBPS.Adapter.Math.AffinePoint
+    WBPS.Adapter.Math.Integer
     WBPS.Adapter.Monad.Control
     WBPS.Adapter.Path
     WBPS.Core.Cardano.Cbor
@@ -93,6 +97,8 @@ library
     WBPS.Core.Session.FileScheme.Directories
     WBPS.Core.Session.R
     WBPS.Core.Session.Session
+    WBPS.Core.Session.Witness
+    WBPS.Core.Session.Witness.Generate
     WBPS.Core.ZK.Message
     WBPS.WBPS
 

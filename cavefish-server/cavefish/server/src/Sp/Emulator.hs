@@ -13,7 +13,7 @@ import Cavefish.Api.ServerConfiguration (
   ServerConfiguration (ServerConfiguration, httpServer, serviceProviderFee, transactionExpiry, wbps),
  )
 import Cavefish.Services.TxBuilding (ServiceFee, TxBuilding (TxBuilding, build, fees, submit))
-import Cavefish.Services.WBPS (WBPS (WBPS, createSession, loadAccount, loadAccounts, loadSession, register))
+import Cavefish.Services.WBPS (WBPS (WBPS, createSession, loadAccount, loadAccounts, loadCommitmentDemonstrationEvents, loadSession, register))
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Cooked (
   InitialDistribution,
@@ -82,6 +82,12 @@ mkServerContext
                     Right x -> pure x
             , loadSession = \userWalletPublicKey commitmentId ->
                 liftIO (runWBPS wbpsScheme (SessionFetch.loadExistingSession userWalletPublicKey commitmentId))
+                  >>= \case
+                    Left [SessionNotFound _ _] -> throwError err404 {errBody = BL8.pack "Session Not Found"}
+                    Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
+                    Right x -> pure x
+            , loadCommitmentDemonstrationEvents = \userWalletPublicKey commitmentId ->
+                liftIO (runWBPS wbpsScheme (SessionFetch.loadExistingCommitmentDemonstrationEvents userWalletPublicKey commitmentId))
                   >>= \case
                     Left [SessionNotFound _ _] -> throwError err404 {errBody = BL8.pack "Session Not Found"}
                     Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}

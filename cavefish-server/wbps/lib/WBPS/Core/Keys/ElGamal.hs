@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -21,21 +20,16 @@ import Crypto.Random (getRandomBytes)
 import Data.Aeson (
   FromJSON (parseJSON),
   ToJSON (toJSON),
-  Value (Array, Number, Object, String),
   eitherDecode,
-  (.:),
  )
-import Data.Aeson.Types (Parser, typeMismatch)
 import Data.Bits (shiftL, shiftR, testBit)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.ByteString.Lazy.Char8 qualified as BL8
-import Data.Scientific (floatingOrInteger)
-import Data.Text qualified as T
-import Data.Vector qualified as V
 import GHC.Generics (Generic)
 import System.Process (readProcess)
-import Text.Read (readMaybe)
+import WBPS.Adapter.Math.AffinePoint (AffinePoint (AffinePoint, x, y), parseIntegerValue)
+import WBPS.Adapter.Math.Integer qualified as Integer
 
 newtype Rho = Rho Integer
   deriving newtype (Eq, Show, FromJSON, ToJSON)
@@ -47,12 +41,8 @@ generateElGamalExponent = liftIO (Rho . bsToInteger <$> getRandomBytes 16)
 mkRho :: Integer -> Either String Rho
 mkRho = fmap Rho . validateScalar
 
--- | Affine point on BabyJub.
-data AffinePoint = AffinePoint {x :: Integer, y :: Integer}
-  deriving (Eq, Show, Generic, Ord)
-
 -- | Public encryption key (X = x·G)
-newtype EncryptionKey = EncryptionKey {unEncryptionKey :: AffinePoint}
+newtype EncryptionKey = EncryptionKey {unEncryptionKey :: WBPS.Adapter.Math.AffinePoint.AffinePoint}
   deriving (Eq, Show, Generic, Ord)
 
 -- | Secret decryption key (scalar seed x)
@@ -65,21 +55,6 @@ data KeyPair = KeyPair
   }
   deriving (Show, Eq, Ord, Generic, ToJSON, FromJSON)
 
-instance ToJSON AffinePoint where
-  toJSON (AffinePoint x y) = toJSON (fmap integerValue [x, y])
-
-instance FromJSON AffinePoint where
-  parseJSON = \case
-    Array arr ->
-      case V.toList arr of
-        [vx, vy] -> AffinePoint <$> parseIntegerValue vx <*> parseIntegerValue vy
-        _ -> fail "AffinePoint: expected array with exactly two elements"
-    Object o ->
-      AffinePoint
-        <$> (o .: "x" >>= parseIntegerValue)
-        <*> (o .: "y" >>= parseIntegerValue)
-    v -> typeMismatch "AffinePoint" v
-
 instance ToJSON EncryptionKey where
   toJSON (EncryptionKey p) = toJSON p
 
@@ -87,10 +62,10 @@ instance FromJSON EncryptionKey where
   parseJSON v = EncryptionKey <$> parseJSON v
 
 instance ToJSON DecryptionKey where
-  toJSON (DecryptionKey n) = integerValue n
+  toJSON (DecryptionKey n) = Integer.toValue n
 
 instance FromJSON DecryptionKey where
-  parseJSON = fmap DecryptionKey . parseIntegerValue
+  parseJSON = fmap DecryptionKey . WBPS.Adapter.Math.AffinePoint.parseIntegerValue
 
 generateKeyPair :: forall m. MonadIO m => m KeyPair
 generateKeyPair = liftIO $ do
@@ -101,17 +76,17 @@ generateKeyPair = liftIO $ do
 
 -- | Multiply an encryption key (affine BabyJub point) by the scalar ρ.
 --   ρ must satisfy 0 ≤ ρ < 2^251 to mirror the circuit constraint.
-encryptionKeyPowRho :: EncryptionKey -> Rho -> Either String AffinePoint
+encryptionKeyPowRho :: EncryptionKey -> Rho -> Either String WBPS.Adapter.Math.AffinePoint.AffinePoint
 encryptionKeyPowRho point (Rho rho) = do
   scalar <- validateScalar rho
   affine <- ensureOnCurve point
   scalarMul affine scalar
 
 -- | Multiply the fixed generator g by ρ (same constraint as 'encryptionKeyPow').
-generatorPowRho :: Rho -> Either String AffinePoint
+generatorPowRho :: Rho -> Either String WBPS.Adapter.Math.AffinePoint.AffinePoint
 generatorPowRho = encryptionKeyPowRho (EncryptionKey generatorPoint)
 
-scalarMul :: EncryptionKey -> Integer -> Either String AffinePoint
+scalarMul :: EncryptionKey -> Integer -> Either String WBPS.Adapter.Math.AffinePoint.AffinePoint
 scalarMul point scalar =
   affineFromProjective $
     go scalar identity (toProjective point)
@@ -131,7 +106,7 @@ data PointProjective = PointProjective
   }
 
 toProjective :: EncryptionKey -> PointProjective
-toProjective (EncryptionKey AffinePoint {x, y}) =
+toProjective (EncryptionKey WBPS.Adapter.Math.AffinePoint.AffinePoint {x, y}) =
   PointProjective (modQ x) (modQ y) 1
 
 addProjective :: PointProjective -> PointProjective -> PointProjective
@@ -154,20 +129,20 @@ addProjective PointProjective {px = x1, py = y1, pz = z1} PointProjective {px = 
     y3 = mul (mul a g) dac
     z3 = mul f g
 
-affineFromProjective :: PointProjective -> Either String AffinePoint
+affineFromProjective :: PointProjective -> Either String WBPS.Adapter.Math.AffinePoint.AffinePoint
 affineFromProjective PointProjective {px, py, pz} =
   case inverse (modQ pz) babyJubPrime of
     Nothing -> Left "encountered point at infinity when normalising BabyJub point"
     Just zInv ->
       Right
-        AffinePoint
+        WBPS.Adapter.Math.AffinePoint.AffinePoint
           { x = mul px zInv
           , y = mul py zInv
           }
 
 ensureOnCurve :: EncryptionKey -> Either String EncryptionKey
-ensureOnCurve (EncryptionKey AffinePoint {x, y})
-  | lhs == rhs = Right (EncryptionKey (AffinePoint x' y'))
+ensureOnCurve (EncryptionKey WBPS.Adapter.Math.AffinePoint.AffinePoint {x, y})
+  | lhs == rhs = Right (EncryptionKey (WBPS.Adapter.Math.AffinePoint.AffinePoint x' y'))
   | otherwise = Left "encryption key is not on the BabyJub curve"
   where
     x' = modQ x
@@ -214,22 +189,9 @@ scalarLimit = 1 `shiftL` 251
 bsToInteger :: ByteString -> Integer
 bsToInteger = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0
 
-generatorPoint :: AffinePoint
+generatorPoint :: WBPS.Adapter.Math.AffinePoint.AffinePoint
 generatorPoint =
-  AffinePoint
+  WBPS.Adapter.Math.AffinePoint.AffinePoint
     { x = 5299619240641551281634865583518297030282874472190772894086521144482721001553
     , y = 16950150798460657717958625567821834550301663161624707787222815936182638968203
     }
-
-integerValue :: Integer -> Value
-integerValue = String . T.pack . show
-
-parseIntegerValue :: Value -> Parser Integer
-parseIntegerValue = \case
-  String t ->
-    maybe (fail "expected integer encoded as decimal string") pure (readMaybe (T.unpack t))
-  Number n ->
-    case floatingOrInteger n of
-      Right i -> pure i
-      Left (_ :: Double) -> fail "expected integral number, got fractional"
-  v -> typeMismatch "integer (string or number)" v

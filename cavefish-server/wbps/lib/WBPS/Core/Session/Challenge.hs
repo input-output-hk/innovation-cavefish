@@ -7,6 +7,7 @@ module WBPS.Core.Session.Challenge (
   Challenge (..),
   compute,
   computeByUsingTxId,
+  toWord8s,
 ) where
 
 import Cardano.Api qualified as Api
@@ -65,6 +66,10 @@ computeByUsingTxId (UserWalletPublicKey userPk) message (R rPk) =
     xBytes = publicKeyBytes userPk
     txIdBytes = txIdFromMessage message
     txIdBytesReversed = BS.map reverseBits8 txIdBytes
+
+toWord8s :: Challenge -> [Word8]
+toWord8s (Challenge digest) =
+  BS.unpack (BA.convert digest :: ByteString)
 
 publicKeyBytes :: PublicKey -> ByteString
 publicKeyBytes (PublicKey pk) =
