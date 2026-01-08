@@ -12,13 +12,15 @@ import Cavefish (
  )
 import Cavefish.Services.WBPS qualified as WbpsService
 import Control.Monad.Reader (ask)
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON, ToJSON, encode)
 import Data.Text (Text)
+import Data.Text.Lazy qualified as TextLazy
+import Data.Text.Lazy.Encoding qualified as TextLazyEncoding
 import GHC.Generics (Generic)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Session.Challenge (Challenge)
-import WBPS.Core.Session.Challenge qualified as Challenge
 import WBPS.Core.Session.Commitment (CommitmentId)
+import WBPS.Core.Session.Proof (Proof (Proof))
 import WBPS.Core.Session.R (R)
 import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, message))
 
@@ -31,16 +33,12 @@ data Inputs = Inputs
 
 data Outputs = Outputs
   { challenge :: Challenge
-  , proof :: Text
+  , proof :: Proof
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
 handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey, commitmentId, bigR} = do
-  CavefishServices {wbpsService = WbpsService.WBPS {loadCommitmentDemonstrationEvents}} <- ask
-  (_, CommitmentDemonstrated {message}) <-
-    loadCommitmentDemonstrationEvents userWalletPublicKey commitmentId
-  let challenge = Challenge.computeByUsingTxId userWalletPublicKey message bigR
-  -- generateWitness accountCreated commitmentDemonstrated bigR challenge
-
-  pure Outputs {proof = "proof", challenge}
+  CavefishServices {wbpsService = WbpsService.WBPS {prove}} <- ask
+  (challenge, proof) <- prove userWalletPublicKey commitmentId bigR
+  pure Outputs {challenge, proof = proof}

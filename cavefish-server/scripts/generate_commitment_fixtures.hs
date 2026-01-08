@@ -17,7 +17,7 @@ import WBPS.Core.Cardano.UnsignedTx (UnsignedTx (UnsignedTx))
 import WBPS.Core.FileScheme (RootFolders (..), defaultFileScheme)
 import WBPS.Core.Keys.ElGamal (AffinePoint (..), EncryptionKey (..), mkRho)
 import WBPS.Core.Session.Commitment.Build (Commitment (..), CommitmentPayload (..), Input (..), build)
-import WBPS.Core.Session.Commitment.Scalars (CommitmentScalars (CommitmentScalars, ekPowRho), compute)
+import WBPS.Core.Session.Scalars (Scalars (Scalars, ekPowRho), compute)
 import WBPS.Core.ZK.Message (Message (Message), messageToBits)
 import WBPS.WBPS (runWBPS)
 
@@ -46,7 +46,7 @@ main = do
     cwd <- P.getCurrentDir
     let scheme = defaultFileScheme RootFolders {input = cwd </> [reldir|wbps|] </> [reldir|setup|], output = outDir}
     res <- runWBPS scheme $ do
-      cs@CommitmentScalars {ekPowRho = ekPowRho'} <- compute ek rho
+      cs@Scalars {ekPowRho = ekPowRho'} <- compute ek rho
       build Input {ekPowRho = ekPowRho', messageBits}
     case res of
       Left e -> error (show e)

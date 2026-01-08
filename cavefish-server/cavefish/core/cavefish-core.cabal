@@ -75,12 +75,6 @@ library
     Cavefish.Services.WBPS
     Intent.Example.DSL
     Intent.Example.TxBuilder
-    Prototype.AskSubmission
-    Prototype.Messages
-    Prototype.PaymentProof
-    Prototype.Pke
-    Prototype.Proof
-    Prototype.State
 
   build-depends:
     , aeson

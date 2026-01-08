@@ -12,7 +12,7 @@ import WBPS.Core.Cardano.UnsignedTx (UnsignedTx (UnsignedTx))
 import WBPS.Core.FileScheme (RootFolders (..), defaultFileScheme)
 import WBPS.Core.Keys.ElGamal (AffinePoint (..), EncryptionKey (..), mkRho)
 import WBPS.Core.Session.Commitment.Commitment (builCommitment)
-import WBPS.Core.Session.Commitment.Scalars (CommitmentScalars (ekPowRho), compute)
+import WBPS.Core.Session.Scalars (Scalars (ekPowRho), compute)
 import WBPS.Core.ZK.Message (Message (Message), messageToBits)
 import WBPS.WBPS (runWBPS)
 

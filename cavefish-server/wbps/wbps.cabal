@@ -89,16 +89,17 @@ library
     WBPS.Core.Session.Challenge
     WBPS.Core.Session.Commitment
     WBPS.Core.Session.Commitment.Build
-    WBPS.Core.Session.Commitment.Scalars
-    WBPS.Core.Session.Commitment.Scalars.Compute
-    WBPS.Core.Session.Create
+    WBPS.Core.Session.Demonstrate
     WBPS.Core.Session.FetchSession
     WBPS.Core.Session.FileScheme
     WBPS.Core.Session.FileScheme.Directories
+    WBPS.Core.Session.Proof
+    WBPS.Core.Session.Proof.Prove
     WBPS.Core.Session.R
+    WBPS.Core.Session.Scalars
+    WBPS.Core.Session.Scalars.Compute
     WBPS.Core.Session.Session
     WBPS.Core.Session.Witness
-    WBPS.Core.Session.Witness.Generate
     WBPS.Core.ZK.Message
     WBPS.WBPS
 

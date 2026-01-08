@@ -8,10 +8,14 @@ module WBPS.Core.FileScheme (
   Setup (..),
   Session (..),
   BuildCommitmentSetup (..),
-  BuildCommitment (..),
+  BuildCommitmentInternals (..),
   WitnessGeneration (..),
   WitnessGenerationSetup (..),
+  ProofGeneration (..),
   Account (..),
+  Registration (..),
+  Demonstration (..),
+  Proving (..),
   RootFolders (..),
 ) where
 
@@ -57,7 +61,7 @@ defaultFileScheme RootFolders {..} =
         Setup
           { relationR1CS = input </> [reldir|relation|] </> [relfile|relation.r1cs|]
           , powerOfTauPrepared = input </> [relfile|powersOfTauPrepared.ptau|]
-          , commitment =
+          , buildCommitment =
               BuildCommitmentSetup
                 { circom = input </> [reldir|commitment|] </> [relfile|BuildCommitment.circom|]
                 , r1cs = input </> [reldir|commitment|] </> [relfile|BuildCommitment.r1cs|]
@@ -71,32 +75,42 @@ defaultFileScheme RootFolders {..} =
     , accounts = output </> [reldir|accounts|]
     , account =
         Account
-          { provingKey = [relfile|proving_key.zkey|]
-          , verificationContext = [relfile|verification_context.json|]
-          , userPublicKey = [relfile|user_public_key.hex|]
-          , encryptionKeys = [relfile|encryption_keys.json|]
+          { registration =
+              Registration
+                { provingKey = [relfile|proving_key.zkey|]
+                , verificationContext = [relfile|verification_context.json|]
+                , userPublicKey = [relfile|user_public_key.hex|]
+                , encryptionKeys = [relfile|encryption_keys.json|]
+                }
           , sessions = [reldir|sessions|]
           , session =
               Session
-                { message = [relfile|message.json|]
-                , rho = [relfile|rho.json|]
-                , commitment =
-                    BuildCommitment
-                      { scalars = [relfile|scalars.json|]
+                { demonstration =
+                    Demonstration
+                      { preparedMessage = [relfile|preparedMessage.json|]
+                      , scalars = [relfile|scalars.json|]
                       , commitment = [relfile|commitment.json|]
-                      , input = [relfile|internal_input.json|]
-                      , output = [relfile|internal_witness.wtns|]
-                      , statementOutput = [relfile|internal_public.json|]
+                      , buildCommitmentInternals =
+                          BuildCommitmentInternals
+                            { input = [relfile|internal_input.json|]
+                            , output = [relfile|internal_witness.wtns|]
+                            , statementOutput = [relfile|internal_public.json|]
+                            }
                       }
-                , witness =
-                    WitnessGeneration
-                      { input = [relfile|witness_input.json|]
-                      , output = [relfile|witness.wtns|]
-                      }
-                , proof =
-                    ProofGeneration
-                      { statement = [relfile|statement.json|]
-                      , proof = [relfile|proof.json|]
+                , proving =
+                    Proving
+                      { witness =
+                          WitnessGeneration
+                            { input = [relfile|witness_input.json|]
+                            , output = [relfile|witness.wtns|]
+                            }
+                      , proof =
+                          ProofGeneration
+                            { statement = [relfile|statement.json|]
+                            , proof = [relfile|proof.json|]
+                            }
+                      , bigR = [relfile|big_r.json|]
+                      , challenge = [relfile|challenge.json|]
                       }
                 }
           , shellLogs = [relfile|shellLogs.txt|]
@@ -119,7 +133,7 @@ data FileScheme = FileScheme
 data Setup = Setup
   { relationR1CS :: Path Abs File
   , powerOfTauPrepared :: Path Abs File
-  , commitment :: BuildCommitmentSetup
+  , buildCommitment :: BuildCommitmentSetup
   , witness :: WitnessGenerationSetup
   }
   deriving (Show, Eq)
@@ -141,22 +155,41 @@ data BuildCommitmentSetup
 type Sessions = Path Rel Dir
 
 data Account = Account
-  { userPublicKey :: Path Rel File
-  , encryptionKeys :: Path Rel File
-  , provingKey :: Path Rel File
-  , verificationContext :: Path Rel File
+  { registration :: Registration
   , sessions :: Sessions
   , session :: Session
   , shellLogs :: Path Rel File
   }
   deriving (Show, Eq)
 
+data Registration = Registration
+  { userPublicKey :: Path Rel File
+  , encryptionKeys :: Path Rel File
+  , provingKey :: Path Rel File
+  , verificationContext :: Path Rel File
+  }
+  deriving (Show, Eq)
+
 data Session = Session
-  { message :: Path Rel File
-  , rho :: Path Rel File
-  , commitment :: BuildCommitment
-  , witness :: WitnessGeneration
+  { demonstration :: Demonstration
+  , proving :: Proving
+  }
+  deriving (Show, Eq)
+
+data Proving = Proving
+  { witness :: WitnessGeneration
   , proof :: ProofGeneration
+  , bigR :: Path Rel File
+  , challenge :: Path Rel File
+  }
+  deriving (Show, Eq)
+
+data Demonstration
+  = Demonstration
+  { preparedMessage :: Path Rel File
+  , scalars :: Path Rel File
+  , commitment :: Path Rel File
+  , buildCommitmentInternals :: BuildCommitmentInternals
   }
   deriving (Show, Eq)
 
@@ -174,12 +207,10 @@ data ProofGeneration
   }
   deriving (Show, Eq)
 
-data BuildCommitment
-  = BuildCommitment
+data BuildCommitmentInternals
+  = BuildCommitmentInternals
   { input :: Path Rel File
   , output :: Path Rel File
   , statementOutput :: Path Rel File
-  , commitment :: Path Rel File
-  , scalars :: Path Rel File
   }
   deriving (Show, Eq)

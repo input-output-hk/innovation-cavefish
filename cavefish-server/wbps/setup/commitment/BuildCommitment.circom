@@ -1,6 +1,6 @@
 // BuildCommitment circuit (P2)
 // Uses circomlib PoseidonEx (rate 2) and Bits2Num for packing/masking.
-// Note: This mirrors the wbps_cardano.circom variant (252-bit limbs) so the
+// Note: This mirrors the wbps_cardano.circom variant (254-bit limbs) so the
 // verifier can rebuild the same commitment without mod-p aliasing.
 
 pragma circom 2.1.2;
@@ -77,7 +77,9 @@ template BuildCommitment(message_size, commitment_limb_size, nb_commitment_limbs
     }
 }
 
-// Here we size for the max payload (16KB tx + 32B nonce): 131,328 bits.
-// Using 252-bit limbs keeps each limb < p (BN254) and matches the wbps_cardano
-// verifier circuit: 522 limbs -> 131,544 bits total (216 bits padding).
-component main = BuildCommitment(131544, 252, 522);
+// Sizing targets the mean tx_body size observed on Cardano mainnet history.
+// We round mean (~785B) to 800B and include a 32B nonce, then pad to 254-bit limbs:
+//   (800B + 32B) * 8 = 6,656 bits -> 27 * 254 = 6,858 bits (202 bits padding).
+// Using 254-bit limbs matches wbps_cardano.
+// See wbps/README.md for the full size distribution stats.
+component main = BuildCommitment(27*254, 254, 27);

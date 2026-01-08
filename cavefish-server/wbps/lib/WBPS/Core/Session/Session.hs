@@ -15,15 +15,13 @@ module WBPS.Core.Session.Session (
 import Data.Text qualified as Text
 import GHC.Generics (Generic)
 import WBPS.Adapter.CardanoCryptoClass.Crypto (Codec (encode))
-import WBPS.Core.Keys.ElGamal (
-  Rho,
- )
 import WBPS.Core.Registration.Account (AccountCreated)
 import WBPS.Core.Session.Challenge (Challenge)
 import WBPS.Core.Session.Commitment (Commitment (Commitment), CommitmentId (CommitmentId), id)
-import WBPS.Core.Session.Commitment.Scalars as CommitmentScalars (CommitmentScalars)
+import WBPS.Core.Session.Proof (Proof)
 import WBPS.Core.Session.R (R)
-import WBPS.Core.ZK.Message (Message, PublicMessage)
+import WBPS.Core.Session.Scalars (Scalars)
+import WBPS.Core.ZK.Message (PreparedMessage)
 
 newtype SessionId = SessionId String deriving (Show, Eq)
 
@@ -44,10 +42,8 @@ data Session
 
 data CommitmentDemonstrated
   = CommitmentDemonstrated
-  { message :: Message
-  , publicMessage :: PublicMessage
-  , rho :: Rho
-  , commitmentScalars :: CommitmentScalars
+  { preparedMessage :: PreparedMessage
+  , scalars :: Scalars
   , commitment :: Commitment
   }
   deriving (Eq, Show, Generic)
@@ -56,6 +52,7 @@ data CommitmentProved
   = CommitmentProved
   { bigR :: R
   , challenge :: Challenge
+  , proof :: Proof
   }
   deriving (Eq, Show, Generic)
 

@@ -23,13 +23,14 @@ import WBPS.Adapter.Monad.Control (ifM, whenNothingThrow)
 import WBPS.Adapter.Path (readFrom)
 import WBPS.Core.Failure (RegistrationFailed (EncryptionKeysNotFound))
 import WBPS.Core.FileScheme (
-  Account (
+  FileScheme (FileScheme, account),
+  Registration (
+    Registration,
     encryptionKeys,
     provingKey,
     userPublicKey,
     verificationContext
   ),
-  FileScheme (FileScheme, account),
  )
 import WBPS.Core.FileScheme qualified as FileScheme
 import WBPS.Core.Groth16.Setup (PublicVerificationContext (PublicVerificationContext), Setup (Setup))
@@ -65,7 +66,7 @@ loadExistingAccount ::
   UserWalletPublicKey -> m AccountCreated
 loadExistingAccount userWalletPublicKey = do
   accountDirectory <- deriveAccountDirectoryFrom userWalletPublicKey
-  FileScheme.Account {..} <- asks account
+  FileScheme.Account {registration = Registration {..}} <- asks account
   AccountCreated userWalletPublicKey
     <$> ( Setup (accountDirectory </> provingKey)
             <$> (readFrom (accountDirectory </> encryptionKeys) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])

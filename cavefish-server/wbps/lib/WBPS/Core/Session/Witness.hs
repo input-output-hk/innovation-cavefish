@@ -1,13 +1,13 @@
 module WBPS.Core.Session.Witness (
-  generateWitness,
+  generate,
   prepareInputs,
+  saveCircuitInputs,
 ) where
 
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ask)
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Default (def)
 import Data.Text (Text)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
@@ -21,7 +21,8 @@ import WBPS.Core.Failure (RegistrationFailed)
 import WBPS.Core.FileScheme (
   Account (Account, session),
   FileScheme (FileScheme, account, setup),
-  Session (Session, witness),
+  Proving (..),
+  Session (..),
   Setup (Setup, witness),
   WitnessGeneration (WitnessGeneration, input, output),
   WitnessGenerationSetup (WitnessGenerationSetup, wasm),
@@ -36,11 +37,16 @@ import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Session.Challenge (Challenge)
 import WBPS.Core.Session.Challenge qualified as Challenge
 import WBPS.Core.Session.Commitment (Commitment (Commitment, id, payload), CommitmentPayload (CommitmentPayload))
-import WBPS.Core.Session.Commitment.Scalars (CommitmentScalars (CommitmentScalars, ekPowRho))
 import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
 import WBPS.Core.Session.R (R)
-import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, commitment, commitmentScalars, message, publicMessage, rho))
-import WBPS.Core.ZK.Message (MessageBits (MessageBits), messageBitsToWord8s, messageToBits, publicMessageToMessageBits)
+import WBPS.Core.Session.Scalars (Scalars (Scalars, ekPowRho, rho))
+import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage, scalars))
+import WBPS.Core.ZK.Message (
+  MessageBits (MessageBits),
+  PreparedMessage (PreparedMessage, messageBits, publicMessage),
+  messageBitsToWord8s,
+  publicMessageToMessageBits,
+ )
 
 data CircuitInputs = CircuitInputs
   { signer_key :: [Word8]
@@ -55,28 +61,40 @@ data CircuitInputs = CircuitInputs
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
-generateWitness ::
+generate ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
   AccountCreated ->
   CommitmentDemonstrated ->
   R ->
   Challenge ->
   m ()
-generateWitness
+generate
   accountCreated@AccountCreated {userWalletPublicKey}
   commitmentDemonstrated@CommitmentDemonstrated {commitment = WBPS.Core.Session.Commitment.Commitment {id = commitmentId}}
   bigR
-  challengeValue = do
+  challenge = do
     sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId
     accountDirectory <- deriveAccountDirectoryFrom userWalletPublicKey
     FileScheme
       { setup = Setup {witness = WitnessGenerationSetup {wasm}}
-      , account = Account {session = Session {witness = WitnessGeneration {input, output}}}
+      , account =
+        Account
+          { session =
+            Session
+              { proving =
+                Proving {bigR = bigRFile, challenge = challengeFile, witness = WitnessGeneration {input, output}}
+              }
+          }
       } <-
       ask
+
+    writeTo (sessionDirectory </> bigRFile) bigR
+    writeTo (sessionDirectory </> challengeFile) challenge
+
     saveCircuitInputs
       (sessionDirectory </> input)
-      (prepareInputs accountCreated commitmentDemonstrated bigR challengeValue)
+      (prepareInputs accountCreated commitmentDemonstrated bigR challenge)
+
     shellLogsFilepath <- getShellLogsFilepath accountDirectory
     liftIO $
       Snarkjs.generateWitness
@@ -100,10 +118,8 @@ prepareInputs
     , setup = Groth16.Setup {encryptionKeys = ElGamal.KeyPair {ek = ElGamal.EncryptionKey solverKeyPoint}}
     }
   CommitmentDemonstrated
-    { message
-    , publicMessage
-    , rho
-    , commitmentScalars = CommitmentScalars {ekPowRho = commitmentPoint}
+    { preparedMessage = PreparedMessage {publicMessage, messageBits}
+    , scalars = Scalars {ekPowRho = commitmentPoint, rho}
     , commitment = Commitment {payload = CommitmentPayload (MessageBits payloadBits)}
     }
   _bigR
@@ -117,7 +133,7 @@ prepareInputs
       , commitment_payload = map Integer.toText payloadBits
       , challenge = Challenge.toWord8s challengeValue
       , message_public_part = messageBitsToWord8s (publicMessageToMessageBits publicMessage)
-      , message_private_part = messageBitsToWord8s (messageToBits def message)
+      , message_private_part = messageBitsToWord8s messageBits
       }
 
 saveCircuitInputs :: MonadIO m => Path b File -> CircuitInputs -> m ()

@@ -14,22 +14,13 @@ import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
 import Cavefish.Endpoints.Write.AskCommitmentProof qualified as AskCommitmentProof
 import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 import Cavefish.Endpoints.Write.Register qualified as Register
-import Data.Text (Text)
 import Network.Wai (Application, Middleware)
 import Network.Wai.Middleware.Cors (
   CorsResourcePolicy (corsMethods, corsRequestHeaders),
   cors,
   simpleCorsResourcePolicy,
  )
-import Prototype.AskSubmission qualified as AskSubmission
-import Prototype.Messages (
-  PendingResp,
-  TransactionResp,
-  pendingH,
-  transactionH,
- )
 import Servant (
-  Capture,
   Get,
   HasServer (ServerT),
   JSON,
@@ -45,11 +36,9 @@ type Cavefish =
   Register
     :<|> DemonstrateCommitment
     :<|> AskCommitmentProof
-    :<|> "askSubmission" :> ReqBody '[JSON] AskSubmission.Inputs :> Post '[JSON] AskSubmission.Outputs
+    -- :<|> "askSubmission" :> ReqBody '[JSON] AskSubmission.Inputs :> Post '[JSON] AskSubmission.Outputs
     :<|> FetchAccount
     :<|> FetchAccounts
-    :<|> "pending" :> Get '[JSON] PendingResp
-    :<|> "transaction" :> Capture "id" Text :> Get '[JSON] TransactionResp
 
 type Register = "register" :> ReqBody '[JSON] Register.Inputs :> Post '[JSON] Register.Outputs
 
@@ -90,8 +79,6 @@ server =
   Register.handle
     :<|> DemonstrateCommitment.handle
     :<|> AskCommitmentProof.handle
-    :<|> AskSubmission.handle
+    -- :<|> AskSubmission.handle
     :<|> FetchAccount.handle
     :<|> FetchAccounts.handle
-    :<|> pendingH
-    :<|> transactionH
