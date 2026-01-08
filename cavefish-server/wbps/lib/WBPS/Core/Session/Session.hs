@@ -22,6 +22,7 @@ import WBPS.Core.Registration.Account (AccountCreated)
 import WBPS.Core.Session.Challenge (Challenge)
 import WBPS.Core.Session.Commitment (Commitment (Commitment), CommitmentId (CommitmentId), id)
 import WBPS.Core.Session.Commitment.Scalars as CommitmentScalars (CommitmentScalars)
+import WBPS.Core.Session.Proof (Proof)
 import WBPS.Core.Session.R (R)
 import WBPS.Core.ZK.Message (Message, PublicMessage)
 
@@ -56,6 +57,7 @@ data CommitmentProved
   = CommitmentProved
   { bigR :: R
   , challenge :: Challenge
+  , proof :: Proof
   }
   deriving (Eq, Show, Generic)
 

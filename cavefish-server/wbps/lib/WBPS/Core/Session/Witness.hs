@@ -1,6 +1,7 @@
 module WBPS.Core.Session.Witness (
-  generateWitness,
+  generate,
   prepareInputs,
+  saveCircuitInputs,
 ) where
 
 import Control.Monad.Error.Class (MonadError)
@@ -21,7 +22,7 @@ import WBPS.Core.Failure (RegistrationFailed)
 import WBPS.Core.FileScheme (
   Account (Account, session),
   FileScheme (FileScheme, account, setup),
-  Session (Session, witness),
+  Session (Session, bigR, challenge, witness),
   Setup (Setup, witness),
   WitnessGeneration (WitnessGeneration, input, output),
   WitnessGenerationSetup (WitnessGenerationSetup, wasm),
@@ -55,28 +56,33 @@ data CircuitInputs = CircuitInputs
   }
   deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
-generateWitness ::
+generate ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
   AccountCreated ->
   CommitmentDemonstrated ->
   R ->
   Challenge ->
   m ()
-generateWitness
+generate
   accountCreated@AccountCreated {userWalletPublicKey}
   commitmentDemonstrated@CommitmentDemonstrated {commitment = WBPS.Core.Session.Commitment.Commitment {id = commitmentId}}
   bigR
-  challengeValue = do
+  challenge = do
     sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId
     accountDirectory <- deriveAccountDirectoryFrom userWalletPublicKey
     FileScheme
       { setup = Setup {witness = WitnessGenerationSetup {wasm}}
-      , account = Account {session = Session {witness = WitnessGeneration {input, output}}}
+      , account = Account {session = Session {bigR = bigRFile, challenge = challengeFile, witness = WitnessGeneration {input, output}}}
       } <-
       ask
+
+    writeTo (sessionDirectory </> bigRFile) bigR
+    writeTo (sessionDirectory </> challengeFile) challenge
+
     saveCircuitInputs
       (sessionDirectory </> input)
-      (prepareInputs accountCreated commitmentDemonstrated bigR challengeValue)
+      (prepareInputs accountCreated commitmentDemonstrated bigR challenge)
+
     shellLogsFilepath <- getShellLogsFilepath accountDirectory
     liftIO $
       Snarkjs.generateWitness

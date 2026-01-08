@@ -54,10 +54,11 @@ handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey, intent} = do
   CavefishServices
     { txBuildingService = TxService.TxBuilding {build}
-    , wbpsService = WbpsService.WBPS {createSession}
+    , wbpsService = WbpsService.WBPS {demonstrate}
     } <-
     ask
 
   unsignedTx <- build intent
-  CommitmentDemonstrated {publicMessage = PublicMessage txAbs, commitment} <- commitmentDemonstrated <$> createSession userWalletPublicKey unsignedTx
+  CommitmentDemonstrated {publicMessage = PublicMessage txAbs, commitment} <-
+    commitmentDemonstrated <$> demonstrate userWalletPublicKey unsignedTx
   return Outputs {txAbs, commitment}

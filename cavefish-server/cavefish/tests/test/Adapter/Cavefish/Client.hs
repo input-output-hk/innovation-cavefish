@@ -39,11 +39,8 @@ getServiceProviderAPI fee port = do
       ( register
           :<|> demonstrateCommitment
           :<|> askCommitmentProof
-          :<|> _
           :<|> fetchAccount
           :<|> fetchAccounts
-          :<|> _
-          :<|> _
         ) = SC.client (Proxy @Cavefish)
   return
     ServiceProviderAPI

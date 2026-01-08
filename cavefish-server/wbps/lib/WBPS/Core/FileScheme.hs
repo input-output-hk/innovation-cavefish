@@ -11,6 +11,7 @@ module WBPS.Core.FileScheme (
   BuildCommitment (..),
   WitnessGeneration (..),
   WitnessGenerationSetup (..),
+  ProofGeneration (..),
   Account (..),
   RootFolders (..),
 ) where
@@ -98,6 +99,8 @@ defaultFileScheme RootFolders {..} =
                       { statement = [relfile|statement.json|]
                       , proof = [relfile|proof.json|]
                       }
+                , bigR = [relfile|big_r.json|]
+                , challenge = [relfile|challenge.json|]
                 }
           , shellLogs = [relfile|shellLogs.txt|]
           }
@@ -157,6 +160,8 @@ data Session = Session
   , commitment :: BuildCommitment
   , witness :: WitnessGeneration
   , proof :: ProofGeneration
+  , bigR :: Path Rel File
+  , challenge :: Path Rel File
   }
   deriving (Show, Eq)
 
