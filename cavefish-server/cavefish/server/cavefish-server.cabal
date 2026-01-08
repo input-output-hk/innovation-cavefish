@@ -56,7 +56,7 @@ common project-config
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
-    -Wredundant-constraints -Wcompat -Wmissing-import-lists
+    -Wredundant-constraints -Wcompat -Wmissing-import-lists -threaded
 
 library
   import:          base, project-config

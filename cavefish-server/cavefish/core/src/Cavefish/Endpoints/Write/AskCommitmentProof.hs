@@ -21,7 +21,6 @@ import WBPS.Core.Session.Challenge qualified as Challenge
 import WBPS.Core.Session.Commitment (CommitmentId)
 import WBPS.Core.Session.R (R)
 import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, message))
-import WBPS.Core.Session.Witness (generateWitness)
 
 data Inputs = Inputs
   { userWalletPublicKey :: UserWalletPublicKey
@@ -39,7 +38,7 @@ data Outputs = Outputs
 handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey, commitmentId, bigR} = do
   CavefishServices {wbpsService = WbpsService.WBPS {loadCommitmentDemonstrationEvents}} <- ask
-  (accountCreated, commitmentDemonstrated@CommitmentDemonstrated {message}) <-
+  (_, CommitmentDemonstrated {message}) <-
     loadCommitmentDemonstrationEvents userWalletPublicKey commitmentId
   let challenge = Challenge.computeByUsingTxId userWalletPublicKey message bigR
   -- generateWitness accountCreated commitmentDemonstrated bigR challenge
