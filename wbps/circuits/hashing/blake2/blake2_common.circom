@@ -1,9 +1,11 @@
 
 pragma circom 2.1.2;
 
+include "../binary_utils.circom";
+
 //------------------------------------------------------------------------------
 
-function Sigma(i0) {
+function SigmaF(i0) {
 
   var out[16];
 
@@ -93,119 +95,6 @@ template XorWordConst(n, kst_word) {
   }
 
   out_word <== acc;  
-}
-
-//------------------------------------------------------------------------------
-// decompose an n-bit number into bits
-
-template ToBits(n) {
-  signal input  inp;
-  signal output out[n];
-
-  var sum = 0;
-  for(var i=0; i<n; i++) {
-    out[i] <-- (inp >> i) & 1;
-    out[i] * (1-out[i]) === 0;
-    sum += (1<<i) * out[i];
-  }
-
-  inp === sum;
-}
-
-//------------------------------------------------------------------------------
-// decompose a 33-bit number into the low 32 bits and the remaining 1 bit
-
-template Bits33() {
-  signal input  inp;
-  signal output out_bits[32];
-  signal output out_word;
-  signal u;
-
-  var sum = 0;
-  for(var i=0; i<32; i++) {
-    out_bits[i] <-- (inp >> i) & 1;
-    out_bits[i] * (1-out_bits[i]) === 0;
-    sum += (1<<i) * out_bits[i];
-  }
-
-  u <-- (inp >> 32) & 1;
-  u*(1-u) === 0;
-
-  inp === sum + (1<<32)*u;
-  out_word <== sum;
-}
-
-//------------------------------------------------------------------------------
-// decompose a 34-bit number into the low 32 bits and the remaining 2 bits
-
-template Bits34() {
-  signal input  inp;
-  signal output out_bits[32];
-  signal output out_word;
-  signal u,v;
-
-  var sum = 0;
-  for(var i=0; i<32; i++) {
-    out_bits[i] <-- (inp >> i) & 1;
-    out_bits[i] * (1-out_bits[i]) === 0;
-    sum += (1<<i) * out_bits[i];
-  }
-
-  u <-- (inp >> 32) & 1;
-  v <-- (inp >> 33) & 1;
-  u*(1-u) === 0;
-  v*(1-v) === 0;
-
-  inp === sum + (1<<32)*u + (1<<33)*v;
-  out_word <== sum;
-}
-
-//------------------------------------------------------------------------------
-// decompose a 65-bit number into the low 64 bits and the remaining 1 bit
-
-template Bits65() {
-  signal input  inp;
-  signal output out_bits[64];
-  signal output out_word;
-  signal u;
-
-  var sum = 0;
-  for(var i=0; i<64; i++) {
-    out_bits[i] <-- (inp >> i) & 1;
-    out_bits[i] * (1-out_bits[i]) === 0;
-    sum += (1<<i) * out_bits[i];
-  }
-
-  u <-- (inp >> 64) & 1;
-  u*(1-u) === 0;
-
-  inp === sum + (1<<64)*u;
-  out_word <== sum;
-}
-
-//------------------------------------------------------------------------------
-// decompose a 66-bit number into the low 64 bits and the remaining 2 bit
-
-template Bits66() {
-  signal input  inp;
-  signal output out_bits[64];
-  signal output out_word;
-  signal u,v;
-
-  var sum = 0;
-  for(var i=0; i<64; i++) {
-    out_bits[i] <-- (inp >> i) & 1;
-    out_bits[i] * (1-out_bits[i]) === 0;
-    sum += (1<<i) * out_bits[i];
-  }
-
-  u <-- (inp >> 64) & 1;
-  v <-- (inp >> 65) & 1;
-  u*(1-u) === 0;
-  v*(1-v) === 0;
-
-  inp === sum + (1<<64)*u + (1<<65)*v;
-  out_word <== sum;
 }
 
 //------------------------------------------------------------------------------
