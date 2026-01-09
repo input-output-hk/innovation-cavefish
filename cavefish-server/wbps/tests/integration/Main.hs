@@ -4,7 +4,7 @@ import Test.Tasty (defaultMain, localOption, testGroup)
 import Test.Tasty.QuickCheck (QuickCheckTests (QuickCheckTests))
 import Test.Tasty.Runners (NumThreads (NumThreads))
 import WBPS.Specs.NominalCase qualified as Register.Nominal.Case
-import WBPS.Specs.Session.Commitment.Build qualified as Commitment.BuildCommitment
+import WBPS.Specs.Session.Demonstration.Commitment.Build qualified as Commitment.BuildCommitment
 
 main :: IO ()
 main =

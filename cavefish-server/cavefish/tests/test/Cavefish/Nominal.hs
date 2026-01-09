@@ -31,45 +31,22 @@ import Path (reldir)
 import Test.Hspec (Spec, describe, it, shouldBe)
 import WBPS.Core.Keys.Ed25519 (
   PaymentAddess (PaymentAddess),
-  generateKeyPair,
   generateKeyTuple,
   paymentAddress,
   publicKey,
-  userWalletPK,
  )
-import WBPS.Core.Session.Commitment (Commitment (Commitment, id))
-import WBPS.Core.Session.R (R (R))
+import WBPS.Core.Session.Demonstration.Commitment (Commitment (Commitment, id))
+import WBPS.Core.Session.Demonstration.R (R (R))
 
 spec :: Spec
 spec = do
   describe "[Cavefish Server - Integration Spec]" $
     describe "Nominal Cases" $ do
       it
-        "a user can be registered to a service provider and retrieve (PublicVerificationContext,ek) from the SP"
-        $ setupCavefish
-          [reldir|Cavefish-Spec-Register|]
-          \Setup
-             { serviceProvider =
-               ServiceProviderAPI
-                 { write = WriteAPI {register}
-                 , read = ReadAPI {fetchAccount}
-                 }
-             } -> do
-              userWalletPublicKey <- userWalletPK <$> generateKeyPair
-
-              Register.Outputs {publicVerificationContext, ek} <-
-                register . Register.Inputs $ userWalletPublicKey
-
-              FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs $ userWalletPublicKey
-
-              accountMaybe
-                `shouldBe` Just FetchAccount.Account {userWalletPublicKey, ek, publicVerificationContext}
-
-      it
-        "a registered user can request to the SP to demonstrate a commitment for the intent submitted"
+        "register, demonstrate, prove, verify, blindly-sign and end up with signed transaction"
         $ do
           setupCavefish
-            [reldir|Cavefish-Spec-RegisterAndDemonstrateCommitment|]
+            [reldir|integration-cavefish-nominal-flow|]
             \Setup
                { serviceProvider =
                  ServiceProviderAPI

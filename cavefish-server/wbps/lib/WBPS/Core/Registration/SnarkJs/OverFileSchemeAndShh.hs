@@ -1,20 +1,26 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh (
   getGenerateProvingKeyProcess,
   getGenerateVerificationKeyProcess,
 ) where
 
 import Control.Monad.RWS (MonadReader, asks)
-import Path (toFilePath, (</>))
+import Path (reldir, toFilePath, (</>))
 import Shh (Proc)
 import WBPS.Core.FileScheme (
   Account (
     Account,
+    registration
+  ),
+  FileScheme (FileScheme, account),
+  Registration (
+    Registration,
     encryptionKeys,
     provingKey,
     userPublicKey,
     verificationContext
   ),
-  FileScheme (FileScheme, account),
   Setup (Setup, powerOfTauPrepared, relationR1CS),
  )
 import WBPS.Core.FileScheme qualified as FileScheme
@@ -31,18 +37,18 @@ toProvingKeyScheme :: Directory.Account -> FileScheme -> Snarkjs.ProvingKeySchem
 toProvingKeyScheme
   accountDirectory
   FileScheme
-    { account = Account {..}
+    { account = Account {registration = Registration {..}}
     , setup = Setup {powerOfTauPrepared, relationR1CS}
     } =
     Snarkjs.ProvingKeyScheme
       { powerOfTauPrepared = Path.toFilePath powerOfTauPrepared
       , relationR1CS = Path.toFilePath relationR1CS
-      , provingKeyOutput = Path.toFilePath (accountDirectory </> provingKey)
+      , provingKeyOutput = Path.toFilePath (accountDirectory </> [reldir|registered|] </> provingKey)
       }
 
 toVerificationKeyScheme :: Directory.Account -> FileScheme.Account -> Snarkjs.VerificationKeyScheme
-toVerificationKeyScheme accountDirectory FileScheme.Account {..} =
+toVerificationKeyScheme accountDirectory FileScheme.Account {registration = Registration {..}} =
   Snarkjs.VerificationKeyScheme
-    { provingKey = Path.toFilePath (accountDirectory </> provingKey)
-    , verificationKeyOutput = Path.toFilePath (accountDirectory </> verificationContext)
+    { provingKey = Path.toFilePath (accountDirectory </> [reldir|registered|] </> provingKey)
+    , verificationKeyOutput = Path.toFilePath (accountDirectory </> [reldir|registered|] </> verificationContext)
     }

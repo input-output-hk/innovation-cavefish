@@ -21,7 +21,7 @@ import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Core.FileScheme qualified as FileScheme
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
-import WBPS.Core.Session.Commitment (CommitmentId)
+import WBPS.Core.Session.Demonstration.Commitment (CommitmentId)
 import WBPS.Core.Session.FileScheme.Directories qualified as Directory
 import WBPS.Core.Session.Session (
   SessionId (SessionId),

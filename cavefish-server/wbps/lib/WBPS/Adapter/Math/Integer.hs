@@ -1,8 +1,8 @@
 module WBPS.Adapter.Math.Integer (
   toText,
   toValue,
-  toBitsLEFixedBytes,
-  toBytesBE,
+  toBitsLittleEndianFixedBytes,
+  toBytesBigEndian,
 ) where
 
 import Data.Aeson (Value (String))
@@ -18,9 +18,9 @@ toText = Text.pack . show
 toValue :: Integer -> Value
 toValue = String . toText
 
-toBitsLEFixedBytes :: Int -> Integer -> [Word8]
-toBitsLEFixedBytes byteLen value =
-  let bytes = toBytesBE value
+toBitsLittleEndianFixedBytes :: Int -> Integer -> [Word8]
+toBitsLittleEndianFixedBytes byteLen value =
+  let bytes = toBytesBigEndian value
       padded =
         if length bytes < byteLen
           then replicate (byteLen - length bytes) 0 <> bytes
@@ -32,10 +32,10 @@ toBitsLEFixedBytes byteLen value =
       | i <- [0 .. 7]
       ]
 
-toBytesBE :: Integer -> [Word8]
-toBytesBE 0 = [0]
-toBytesBE n
-  | n < 0 = error "toBytesBE: negative input"
+toBytesBigEndian :: Integer -> [Word8]
+toBytesBigEndian 0 = [0]
+toBytesBigEndian n
+  | n < 0 = error "toBytesBigEndian: negative input"
   | otherwise = reverse (unfoldr step n)
   where
     step 0 = Nothing

@@ -23,23 +23,19 @@ import Path (Dir, Path, reldir, toFilePath, (</>))
 import Path.IO (doesDirExist, listDirRel)
 import WBPS.Adapter.Monad.Control (ifM, whenNothingThrow)
 import WBPS.Adapter.Path (readFrom)
-import WBPS.Core.Cardano.UnsignedTx (toAbstractUnsignedTx)
 import WBPS.Core.Failure (RegistrationFailed (AccountNotFound, EncryptionKeysNotFound, SessionMessageNotFound))
 import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Core.FileScheme qualified as FileScheme
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, userWalletPublicKey))
 import WBPS.Core.Registration.FetchAccounts (loadAccount, loadAccounts)
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
-import WBPS.Core.Session.Commitment (CommitmentId)
+import WBPS.Core.Registration.Registered (Registered (Registered, userWalletPublicKey))
+import WBPS.Core.Session.Demonstration.Commitment (CommitmentId)
+import WBPS.Core.Session.Demonstration.Demonstrated (CommitmentDemonstrated (CommitmentDemonstrated))
 import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
 import WBPS.Core.Session.Session (
-  CommitmentDemonstrated (
-    CommitmentDemonstrated
-  ),
-  Session (SessionCreated),
+  Session (Demonstrated),
  )
-import WBPS.Core.ZK.Message (PublicMessage (PublicMessage), unMessage)
 
 getRecordedCommitmentIds :: MonadIO m => Path b Dir -> m [CommitmentId]
 getRecordedCommitmentIds p = do
@@ -51,7 +47,7 @@ loadSessions ::
 loadSessions = do
   ( loadAccounts
       >>= mapM
-        ( \AccountCreated {userWalletPublicKey} -> do
+        ( \Registered {userWalletPublicKey} -> do
             accountDir <- deriveAccountDirectoryFrom userWalletPublicKey
             FileScheme.Account {sessions} <- asks FileScheme.account
             recordedIds <- getRecordedCommitmentIds (accountDir </> sessions)
@@ -79,43 +75,39 @@ loadExistingSession userWalletPublicKey commitmentId =
       Nothing -> throwError [AccountNotFound userWalletPublicKey]
       Just account -> do
         sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId
-        FileScheme.Session
-          { message = messageDir
-          , rho = rhoDir
-          , commitment = FileScheme.BuildCommitment {scalars = scalarsDir, commitment = commitmentDir}
-          } <-
-          asks (FileScheme.session . FileScheme.account)
-        message <- readFrom (sessionDirectory </> messageDir) >>= whenNothingThrow [SessionMessageNotFound userWalletPublicKey commitmentId]
-        SessionCreated account
+        demonstration <- asks (FileScheme.demonstration . FileScheme.session . FileScheme.account)
+        Demonstrated account
           <$> ( CommitmentDemonstrated
-                  message
-                  (PublicMessage . toAbstractUnsignedTx . unMessage $ message)
-                  <$> (readFrom (sessionDirectory </> rhoDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
-                  <*> (readFrom (sessionDirectory </> [reldir|commitment|] </> scalarsDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
-                  <*> (readFrom (sessionDirectory </> [reldir|commitment|] </> commitmentDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
+                  <$> ( readFrom (sessionDirectory </> [reldir|demonstrated|] </> FileScheme.preparedMessage demonstration)
+                          >>= whenNothingThrow [SessionMessageNotFound userWalletPublicKey commitmentId]
+                      )
+                  <*> ( readFrom (sessionDirectory </> [reldir|demonstrated|] </> FileScheme.scalars demonstration)
+                          >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey]
+                      )
+                  <*> ( readFrom (sessionDirectory </> [reldir|demonstrated|] </> FileScheme.commitment demonstration)
+                          >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey]
+                      )
               )
 
 loadExistingCommitmentDemonstrationEvents ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
-  UserWalletPublicKey -> CommitmentId -> m (AccountCreated, CommitmentDemonstrated)
+  UserWalletPublicKey -> CommitmentId -> m (Registered, CommitmentDemonstrated)
 loadExistingCommitmentDemonstrationEvents userWalletPublicKey commitmentId =
   loadAccount userWalletPublicKey
     >>= \case
       Nothing -> throwError [AccountNotFound userWalletPublicKey]
-      Just accountCreated -> do
+      Just registered -> do
         sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId
-        FileScheme.Session
-          { message = messageDir
-          , rho = rhoDir
-          , commitment = FileScheme.BuildCommitment {scalars = scalarsDir, commitment = commitmentDir}
-          } <-
-          asks (FileScheme.session . FileScheme.account)
-        message <- readFrom (sessionDirectory </> messageDir) >>= whenNothingThrow [SessionMessageNotFound userWalletPublicKey commitmentId]
-        (accountCreated,)
+        demonstration <- asks (FileScheme.demonstration . FileScheme.session . FileScheme.account)
+        (registered,)
           <$> ( CommitmentDemonstrated
-                  message
-                  (PublicMessage . toAbstractUnsignedTx . unMessage $ message)
-                  <$> (readFrom (sessionDirectory </> rhoDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
-                  <*> (readFrom (sessionDirectory </> [reldir|commitment|] </> scalarsDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
-                  <*> (readFrom (sessionDirectory </> [reldir|commitment|] </> commitmentDir) >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey])
+                  <$> ( readFrom (sessionDirectory </> [reldir|demonstrated|] </> FileScheme.preparedMessage demonstration)
+                          >>= whenNothingThrow [SessionMessageNotFound userWalletPublicKey commitmentId]
+                      )
+                  <*> ( readFrom (sessionDirectory </> [reldir|demonstrated|] </> FileScheme.scalars demonstration)
+                          >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey]
+                      )
+                  <*> ( readFrom (sessionDirectory </> [reldir|demonstrated|] </> FileScheme.commitment demonstration)
+                          >>= whenNothingThrow [EncryptionKeysNotFound userWalletPublicKey]
+                      )
               )

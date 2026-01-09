@@ -75,26 +75,17 @@ library
     Cavefish.Services.WBPS
     Intent.Example.DSL
     Intent.Example.TxBuilder
-    Prototype.AskSubmission
-    Prototype.Messages
-    Prototype.PaymentProof
-    Prototype.Pke
-    Prototype.Proof
-    Prototype.State
 
   build-depends:
     , aeson
     , async
     , bytestring
     , cardano-api
-    , cborg
     , containers
     , contra-tracer
     , cooked-validators
-    , crypton
     , data-default
     , exceptions
-    , memory
     , monad-time
     , mtl
     , plutus-ledger

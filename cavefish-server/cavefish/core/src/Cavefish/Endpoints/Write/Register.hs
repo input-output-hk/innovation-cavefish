@@ -23,7 +23,7 @@ import WBPS.Core.Groth16.Setup (
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal (EncryptionKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal (KeyPair (..))
-import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, setup))
+import WBPS.Core.Registration.Registered (Registered (Registered, setup))
 
 newtype Inputs = Inputs
   { userWalletPublicKey :: UserWalletPublicKey
@@ -39,7 +39,7 @@ data Outputs = Outputs
 handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey} = do
   CavefishServices {wbpsService = Service.WBPS {register}} <- ask
-  AccountCreated
+  Registered
     { setup =
       Setup
         { publicVerificationContext = PublicVerificationContext {asJson = publicVerificationContext}

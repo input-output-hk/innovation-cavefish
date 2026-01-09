@@ -43,7 +43,7 @@ toText :: AffinePoint -> [Text]
 toText AffinePoint {x, y} = [Integer.toText x, Integer.toText y]
 
 toBits :: AffinePoint -> [Word8]
-toBits AffinePoint {x} = Integer.toBitsLEFixedBytes pointBytes x
+toBits AffinePoint {x} = Integer.toBitsLittleEndianFixedBytes pointBytes x
 
 parseIntegerValue :: Value -> Parser Integer
 parseIntegerValue v = case v of

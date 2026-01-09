@@ -18,7 +18,7 @@ import Path qualified (parent, toFilePath)
 import Shh (ExecReference (SearchPath), Proc, load)
 import System.FilePath (dropTrailingPathSeparator, takeDirectory, (</>))
 import WBPS.Core.FileScheme qualified as FileScheme
-import WBPS.Core.FileScheme qualified as Setup (Setup (commitment))
+import WBPS.Core.FileScheme qualified as Setup (Setup (buildCommitment))
 
 load
   SearchPath
@@ -77,7 +77,7 @@ compileBuildCommitmentForFileScheme ::
   m (Proc ())
 compileBuildCommitmentForFileScheme = do
   ensureCircomAvailable
-  asks (compileBuildCommitment . toCompileScheme . Setup.commitment . FileScheme.setup)
+  asks (compileBuildCommitment . toCompileScheme . Setup.buildCommitment . FileScheme.setup)
 
 toCompileScheme ::
   FileScheme.BuildCommitmentSetup ->

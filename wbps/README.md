@@ -110,6 +110,36 @@ This logs step-by-step Poseidon and encryption parameters used to produce cipher
 
 ---
 
+## Message sizing (tx_body)
+
+We size the circuits around a representative tx_body length derived from mainnet
+history. The mean is ~785 bytes, which we round to 800 bytes for sizing, add a 32B
+nonce, and then pad to 254-bit limbs:
+
+- tx_body target: 800 bytes (mean ~785 bytes)
+- payload: 800B + 32B nonce = 832B = 6,656 bits
+- limb packing: 27 * 254 = 6,858 bits (202 bits of zero padding)
+
+Observed tx_body distribution (mainnet history):
+
+- Min: 84 bytes
+- Max: 15036 bytes
+- Mean: 785 bytes
+- Median: 494 bytes
+- p75: 906 bytes
+- p90: 1326 bytes
+- p95: 2512 bytes
+- p99: 5983 bytes
+
+Average tx parts (bytes / share):
+
+- Body: 785 bytes (39.4%)
+- Witnesses: 1089 bytes (54.6%)
+- Aux data: 117 bytes (5.9%)
+- Other: 3 bytes (0.1%)
+
+---
+
 ## 🏰 Manual Flow (Debug Mode)
 
 If you prefer explicit commands:
@@ -183,4 +213,3 @@ node tooling/inputgen/gen_wbps_input.js --out build/wbps_cardano/wbps_cardano_in
 
 Older experiments based on `circ_eddsa_cardano.circom` (EdDSA path) have been superseded by this new **WBPS encryption + Schnorr** formulation.  
 The current setup focuses on **security modeling**, **log consistency**, and **PoseidonEx correctness** for Cavefish research.
-
