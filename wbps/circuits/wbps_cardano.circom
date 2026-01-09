@@ -357,10 +357,6 @@ template ComputeTxId(message_size) {
 //   - P3: RebuildChallenge(R, X, txId) → digest and assert challenge == digest
 // ======================================================================
 template CardanoWBPS(message_size, message_private_part_size, message_private_part_offset) {
-    // --- We are now using txId as message for RebuildChallenge
-    //var commitment_limb_size = 254;
-    //assert(message_size % commitment_limb_size == 0);
-    //var nb_commitment_limbs = message_size \ commitment_limb_size;
     var nb_commitment_limbs = 256 \ 128;
 
     // External inputs
@@ -378,7 +374,7 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
 
     // P0
     component rebuildMessage = RebuildMessage(message_size, message_private_part_size, message_private_part_offset);
-    for (var i = 0; i < message_size; i++) {
+    for (var i = 0; i < message_size ; i++) {
         rebuildMessage.in_message_public_part[i] <== message_public_part[i];
     }
     for (var j = 0; j < message_private_part_size; j++) {
