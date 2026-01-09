@@ -23,10 +23,10 @@ import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Session.Commitment (Commitment)
 import WBPS.Core.Session.Session (
-  CommitmentDemonstrated (CommitmentDemonstrated, commitment, publicMessage),
+  CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage),
   Session (commitmentDemonstrated),
  )
-import WBPS.Core.ZK.Message (PublicMessage (PublicMessage))
+import WBPS.Core.ZK.Message (PreparedMessage (PreparedMessage, publicMessage), PublicMessage (PublicMessage))
 
 -- | Inputs for demonstrating a commitment.
 data Inputs = Inputs
@@ -59,6 +59,6 @@ handle Inputs {userWalletPublicKey, intent} = do
     ask
 
   unsignedTx <- build intent
-  CommitmentDemonstrated {publicMessage = PublicMessage txAbs, commitment} <-
+  CommitmentDemonstrated {preparedMessage = PreparedMessage {publicMessage = PublicMessage txAbs}, commitment} <-
     commitmentDemonstrated <$> demonstrate userWalletPublicKey unsignedTx
   return Outputs {txAbs, commitment}

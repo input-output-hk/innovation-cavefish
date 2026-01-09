@@ -16,8 +16,9 @@ import Shh (Stream (Append, StdOut), (&!>), (&>))
 import WBPS.Adapter.Path (writeTo)
 import WBPS.Core.Failure (RegistrationFailed (AccountAlreadyRegistered))
 import WBPS.Core.FileScheme (
-  Account (Account, encryptionKeys),
+  Account (Account, registration),
   FileScheme (FileScheme, account),
+  Registration (Registration, encryptionKeys),
   getShellLogsFilepath,
  )
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
@@ -47,7 +48,7 @@ register' ::
   Directory.Account ->
   m ()
 register' accountDirectory = do
-  FileScheme {account = Account {encryptionKeys}} <- ask
+  FileScheme {account = Account {registration = Registration {encryptionKeys}}} <- ask
   ensureDir accountDirectory
   ElGamal.generateKeyPair >>= writeTo (accountDirectory </> encryptionKeys)
   generateProvingKeyProcess <- getGenerateProvingKeyProcess accountDirectory

@@ -18,10 +18,10 @@ import WBPS.Core.Session.Commitment.Build (
   Input (Input, ekPowRho, messageBits),
   build,
  )
-import WBPS.Core.Session.Commitment.Scalars (
-  CommitmentScalars (CommitmentScalars, ekPowRho),
+import WBPS.Core.Session.Scalars (
+  Scalars (Scalars, ekPowRho),
  )
-import WBPS.Core.Session.Commitment.Scalars.Compute (compute)
+import WBPS.Core.Session.Scalars.Compute (compute)
 import WBPS.Core.ZK.Message (MessageBits (unMessageBits), messageToBits)
 import WBPS.Specs.Adapter.Fixture (
   CommitmentFixtures (CommitmentFixtures, commitmentFixture, messageBitsFixture, unsignedTxFixture),
@@ -60,7 +60,7 @@ commitmentMatchesCircuit = do
       CommitmentFixtures ->
       m ([Integer], ElGamal.AffinePoint)
     runCommitmentFlow CommitmentFixtures {unsignedTxFixture, messageBitsFixture, commitmentFixture} = do
-      CommitmentScalars {ekPowRho} <- compute sampleEncryptionKey sampleRho
+      Scalars {ekPowRho} <- compute sampleEncryptionKey sampleRho
       message <- liftIO (readFixture unsignedTxFixture)
       messageBitsFromFixture <- liftIO (readFixture messageBitsFixture)
       expectedCommitmentBits <- liftIO (readFixture commitmentFixture)

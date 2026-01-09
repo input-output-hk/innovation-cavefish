@@ -12,10 +12,9 @@ import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Account (AccountCreated)
 import WBPS.Core.Session.Challenge (Challenge)
 import WBPS.Core.Session.Commitment (CommitmentId)
-import WBPS.Core.Session.Create (Session)
 import WBPS.Core.Session.Proof (Proof)
 import WBPS.Core.Session.R (R)
-import WBPS.Core.Session.Session (CommitmentDemonstrated)
+import WBPS.Core.Session.Session (CommitmentDemonstrated, Session)
 
 data WBPS = WBPS
   { register ::

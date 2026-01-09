@@ -39,7 +39,7 @@ import WBPS.Core.Failure (
 import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Core.Registration.FetchAccounts qualified as Registration
 import WBPS.Core.Registration.Register qualified as Registration
-import WBPS.Core.Session.Create qualified as Session
+import WBPS.Core.Session.Demonstrate qualified as Session
 import WBPS.Core.Session.FetchSession qualified as SessionFetch
 import WBPS.Core.Session.Proof.Prove qualified as Proof
 import WBPS.WBPS (runWBPS)
@@ -69,7 +69,7 @@ mkServerContext
                     Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     Right x -> pure x
             , demonstrate = \userWalletPublicKey tx ->
-                liftIO (runWBPS wbpsScheme (Session.create userWalletPublicKey tx))
+                liftIO (runWBPS wbpsScheme (Session.demonstrate userWalletPublicKey tx))
                   >>= \case
                     (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     (Right x) -> pure x

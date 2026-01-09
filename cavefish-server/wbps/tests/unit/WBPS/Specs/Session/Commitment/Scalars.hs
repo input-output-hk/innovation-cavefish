@@ -4,10 +4,10 @@ import Test.QuickCheck (Property, counterexample, (.&&.), (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 import WBPS.Core.Keys.ElGamal (AffinePoint (AffinePoint, x, y), EncryptionKey (EncryptionKey), mkRho)
-import WBPS.Core.Session.Commitment.Scalars (
-  CommitmentScalars (CommitmentScalars, ekPowRho, gPowRho),
+import WBPS.Core.Session.Scalars (
+  Scalars (Scalars, ekPowRho, gPowRho),
  )
-import WBPS.Core.Session.Commitment.Scalars.Compute (compute)
+import WBPS.Core.Session.Scalars.Compute (compute)
 
 specs :: TestTree
 specs =
@@ -23,7 +23,7 @@ computeMatchesCircuit =
     Right rho ->
       case compute sampleEncryptionKey rho of
         Left err -> counterexample ("compute failed: " <> show err) False
-        Right CommitmentScalars {ekPowRho = ekPowRho', gPowRho = gPowRho'} ->
+        Right Scalars {ekPowRho = ekPowRho', gPowRho = gPowRho'} ->
           counterexample "ek^rho mismatch" (ekPowRho' === expectedEkPowRho)
             .&&. counterexample "g^rho mismatch" (gPowRho' === expectedGPowRho)
 

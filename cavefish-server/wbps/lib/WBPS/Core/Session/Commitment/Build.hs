@@ -33,13 +33,14 @@ import WBPS.Core.Failure (
  )
 import WBPS.Core.FileScheme (
   Account (session, shellLogs),
-  BuildCommitment (input, output, statementOutput),
+  BuildCommitmentInternals (input, output, statementOutput),
   BuildCommitmentSetup (BuildCommitmentSetup, r1cs, wasm),
   FileScheme (account, accounts, setup),
+  buildCommitmentInternals,
+  demonstration,
  )
 import WBPS.Core.FileScheme qualified as Filescheme
-import WBPS.Core.FileScheme qualified as Session (Session (commitment))
-import WBPS.Core.FileScheme qualified as Setup (Setup (commitment))
+import WBPS.Core.FileScheme qualified as Setup (Setup (buildCommitment))
 import WBPS.Core.Keys.ElGamal (AffinePoint (AffinePoint), x, y)
 import WBPS.Core.Primitives.Circom (
   compileBuildCommitmentForFileScheme,
@@ -81,8 +82,8 @@ data Context = Context
 instance Default Context where
   def =
     Context
-      { commitmentLimbSize = 252
-      , nbCommitmentLimbs = 522
+      { commitmentLimbSize = 254
+      , nbCommitmentLimbs = 27
       }
 
 newtype WitnessValues = WitnessValues [String]
@@ -102,8 +103,8 @@ runBuildCommitment ::
   m (Either String Output)
 runBuildCommitment params Input {ekPowRho = AffinePoint {x, y}, ..} = do
   scheme <- ask
-  setup <- asks (Setup.commitment . setup)
-  Filescheme.BuildCommitment {input, output, statementOutput} <- compileAndScheme setup
+  setup <- asks (Setup.buildCommitment . setup)
+  Filescheme.BuildCommitmentInternals {input, output, statementOutput} <- compileAndScheme setup
   let inputJson =
         Aeson.object
           [ "in_seed_x" Aeson..= x
@@ -130,7 +131,7 @@ runBuildCommitment params Input {ekPowRho = AffinePoint {x, y}, ..} = do
 compileAndScheme ::
   (MonadIO m, MonadReader FileScheme m) =>
   BuildCommitmentSetup ->
-  m BuildCommitment
+  m BuildCommitmentInternals
 compileAndScheme Filescheme.BuildCommitmentSetup {wasm, r1cs} = do
   let requiredArtifacts =
         [ wasm
@@ -142,7 +143,7 @@ compileAndScheme Filescheme.BuildCommitmentSetup {wasm, r1cs} = do
   unless artifactsPresent $ do
     compileProc <- compileBuildCommitmentForFileScheme
     liftIO $ compileProc &!> StdOut
-  asks (Session.commitment . session . account)
+  asks (buildCommitmentInternals . demonstration . session . account)
 
 parseOutputs :: Context -> BuildCommitmentSetup -> Path b t -> IO (Either String Output)
 parseOutputs params buildCommitmentSetup statementPath = do

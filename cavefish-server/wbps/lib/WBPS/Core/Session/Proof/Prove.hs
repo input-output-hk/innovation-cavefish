@@ -11,14 +11,7 @@ import Path (toFilePath, (</>))
 import Shh (Stream (Append, StdOut), (&!>), (&>))
 import WBPS.Adapter.Path (readFrom, writeTo)
 import WBPS.Core.Failure (RegistrationFailed)
-import WBPS.Core.FileScheme (
-  Account (Account, provingKey, session),
-  FileScheme,
-  ProofGeneration (ProofGeneration, proof, statement),
-  Session (Session, bigR, challenge, proof, witness),
-  WitnessGeneration (WitnessGeneration, output),
-  getShellLogsFilepath,
- )
+import WBPS.Core.FileScheme
 import WBPS.Core.FileScheme qualified as FileScheme
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
@@ -30,8 +23,9 @@ import WBPS.Core.Session.FetchSession (loadExistingCommitmentDemonstrationEvents
 import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
 import WBPS.Core.Session.Proof (Proof (Proof))
 import WBPS.Core.Session.R (R)
-import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, message))
+import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, preparedMessage))
 import WBPS.Core.Session.Witness qualified as Witness (generate)
+import WBPS.Core.ZK.Message (PreparedMessage (PreparedMessage, message))
 
 prove ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
@@ -40,7 +34,7 @@ prove ::
   R ->
   m (Challenge, Proof)
 prove userWalletPublicKey commitmentId bigR = do
-  (accountCreated, commitmentDemonstrated@CommitmentDemonstrated {message}) <-
+  (accountCreated, commitmentDemonstrated@CommitmentDemonstrated {preparedMessage = PreparedMessage {message}}) <-
     loadExistingCommitmentDemonstrationEvents userWalletPublicKey commitmentId
   let challenge = Challenge.computeByUsingTxId userWalletPublicKey message bigR
   Witness.generate accountCreated commitmentDemonstrated bigR challenge
@@ -56,11 +50,14 @@ generateProof userWalletPublicKey commitmentId = do
   sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId
   accountDirectory <- deriveAccountDirectoryFrom userWalletPublicKey
   Account
-    { provingKey
+    { registration = Registration {provingKey}
     , session =
       Session
-        { witness = WitnessGeneration {output = witnessOutput}
-        , proof = ProofGeneration {proof = proofOutput, statement = statementOutput}
+        { proving =
+          Proving
+            { witness = WitnessGeneration {output = witnessOutput}
+            , proof = ProofGeneration {proof = proofOutput, statement = statementOutput}
+            }
         }
     } <-
     asks FileScheme.account

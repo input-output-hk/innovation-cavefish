@@ -17,7 +17,7 @@ import WBPS.Core.FileScheme (
 import WBPS.Core.Keys.Ed25519 (KeyPair, userWalletPK)
 import WBPS.Core.Registration.FetchAccounts (loadAccounts)
 import WBPS.Core.Registration.Register (register)
-import WBPS.Core.Session.Create (create)
+import WBPS.Core.Session.Demonstrate (demonstrate)
 import WBPS.Core.Session.FetchSession (loadSessions)
 import WBPS.Specs.Adapter.Fixture (
   CommitmentFixtures (unsignedTxFixture),
@@ -59,7 +59,7 @@ specs =
               accountsCreated <- NL.toList <$> mapM (register . userWalletPK) userWalletKeyPairs
               accountsLoaded <- filter (`elem` accountsCreated) <$> loadAccounts
               anUnsignedTx <- liftIO (readFixture . unsignedTxFixture . commitmentFixtures $ rootFolders)
-              sessionsCreated <- NL.toList <$> mapM (flip create anUnsignedTx . userWalletPK) userWalletKeyPairs
+              sessionsCreated <- NL.toList <$> mapM (flip demonstrate anUnsignedTx . userWalletPK) userWalletKeyPairs
               sessionsLoaded <- filter (`elem` sessionsCreated) <$> loadSessions
               pure (accountsCreated, accountsLoaded, sessionsCreated, sessionsLoaded)
           )

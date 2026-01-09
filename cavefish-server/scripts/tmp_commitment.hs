@@ -12,7 +12,7 @@ import WBPS.Core.FileScheme (RootFolders (..), defaultFileScheme)
 import WBPS.Core.Keys.ElGamal (AffinePoint (..), EncryptionKey (..), mkRho)
 import WBPS.Core.Session.Commitment.Build (build)
 import WBPS.Core.Session.Commitment.Commitment (Message (..))
-import WBPS.Core.Session.Commitment.Scalars (CommitmentScalars (..), compute)
+import WBPS.Core.Session.Scalars (Scalars (..), compute)
 import WBPS.WBPS (runWBPS)
 
 main :: IO ()
