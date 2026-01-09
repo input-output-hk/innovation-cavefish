@@ -11,7 +11,7 @@ import GHC.Generics (Generic)
 import WBPS.Core.Groth16.Setup (Setup (Setup, encryptionKeys, publicVerificationContext), asJson)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal (EncryptionKey, KeyPair (KeyPair, ek))
-import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, setup, userWalletPublicKey))
+import WBPS.Core.Registration.Registered (Registered (Registered, setup, userWalletPublicKey))
 
 handle :: CavefishServerM Outputs
 handle = do
@@ -20,7 +20,7 @@ handle = do
   return
     . Outputs
     . map
-      ( \AccountCreated {userWalletPublicKey, setup = Setup {encryptionKeys = ElGamal.KeyPair {ek}, publicVerificationContext}} ->
+      ( \Registered {userWalletPublicKey, setup = Setup {encryptionKeys = ElGamal.KeyPair {ek}, publicVerificationContext}} ->
           Account {publicVerificationContext = asJson publicVerificationContext, ..}
       )
     $ accountsCreated

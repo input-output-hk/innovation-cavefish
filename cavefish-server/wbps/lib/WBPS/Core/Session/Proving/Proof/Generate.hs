@@ -1,5 +1,5 @@
-module WBPS.Core.Session.Proving.Proof.Prove (
-  prove,
+module WBPS.Core.Session.Proving.Proof.Generate (
+  generateProof,
 ) where
 
 import Control.Monad.Error.Class (MonadError)
@@ -9,37 +9,25 @@ import Control.Monad.Reader.Class (asks)
 import Data.Aeson (Value (Null))
 import Path (toFilePath, (</>))
 import Shh (Stream (Append, StdOut), (&!>), (&>))
-import WBPS.Adapter.Path (readFrom, writeTo)
+import WBPS.Adapter.Path (readFrom)
 import WBPS.Core.Failure (RegistrationFailed)
-import WBPS.Core.FileScheme
+import WBPS.Core.FileScheme (
+  Account (Account, registration, session),
+  FileScheme,
+  ProofGeneration (ProofGeneration, proof, statement),
+  Proving (Proving, proof, witness),
+  Registration (Registration, provingKey),
+  Session (Session, proving),
+  WitnessGeneration (WitnessGeneration, output),
+  getShellLogsFilepath,
+ )
 import WBPS.Core.FileScheme qualified as FileScheme
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Session.Demonstration.Commitment (CommitmentId)
-import WBPS.Core.Session.Demonstration.Message (PreparedMessage (PreparedMessage, message))
-import WBPS.Core.Session.Demonstration.R (R)
-import WBPS.Core.Session.FetchSession (loadExistingCommitmentDemonstrationEvents)
 import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
-import WBPS.Core.Session.Proving.Challenge (Challenge)
-import WBPS.Core.Session.Proving.Challenge qualified as Challenge
 import WBPS.Core.Session.Proving.Proof (Proof (Proof))
-import WBPS.Core.Session.Proving.Witness qualified as Witness (generate)
-import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, preparedMessage))
-
-prove ::
-  (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
-  UserWalletPublicKey ->
-  CommitmentId ->
-  R ->
-  m (Challenge, Proof)
-prove userWalletPublicKey commitmentId bigR = do
-  (accountCreated, commitmentDemonstrated@CommitmentDemonstrated {preparedMessage = PreparedMessage {message}}) <-
-    loadExistingCommitmentDemonstrationEvents userWalletPublicKey commitmentId
-  let challenge = Challenge.computeByUsingTxId userWalletPublicKey message bigR
-  Witness.generate accountCreated commitmentDemonstrated bigR challenge
-  proof <- generateProof userWalletPublicKey commitmentId
-  pure (challenge, proof)
 
 generateProof ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>

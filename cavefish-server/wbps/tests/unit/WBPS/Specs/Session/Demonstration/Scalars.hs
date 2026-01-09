@@ -1,4 +1,4 @@
-module WBPS.Specs.Session.Commitment.Scalars (specs) where
+module WBPS.Specs.Session.Demonstration.Scalars (specs) where
 
 import Test.QuickCheck (Property, counterexample, (.&&.), (===))
 import Test.Tasty (TestTree, testGroup)
@@ -12,7 +12,7 @@ import WBPS.Core.Session.Demonstration.Scalars.Compute (compute)
 specs :: TestTree
 specs =
   testGroup
-    "WBPS.Specs.Session.Commitment.Scalars"
+    "WBPS.Specs.Session.Demonstration.Scalars"
     [ testProperty "compute matches zk circuit for fixed key and rho" computeMatchesCircuit
     ]
 

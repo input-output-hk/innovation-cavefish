@@ -9,19 +9,19 @@ import Cardano.Api (
 import Servant.Server.Internal.ServerError (ServerError)
 import WBPS.Core.Cardano.UnsignedTx (UnsignedTx)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Registration.Account (AccountCreated)
+import WBPS.Core.Registration.Registered (Registered)
 import WBPS.Core.Session.Demonstration.Commitment (CommitmentId)
+import WBPS.Core.Session.Demonstration.Demonstrated (CommitmentDemonstrated)
 import WBPS.Core.Session.Demonstration.R (R)
-import WBPS.Core.Session.Proving.Challenge (Challenge)
-import WBPS.Core.Session.Proving.Proof (Proof)
-import WBPS.Core.Session.Session (CommitmentDemonstrated, Session)
+import WBPS.Core.Session.Proving.Proved (CommitmentProved)
+import WBPS.Core.Session.Session (Session)
 
 data WBPS = WBPS
   { register ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
       UserWalletPublicKey ->
-      m AccountCreated
+      m Registered
   , demonstrate ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
@@ -29,15 +29,15 @@ data WBPS = WBPS
   , prove ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      UserWalletPublicKey -> CommitmentId -> R -> m (Challenge, Proof)
+      UserWalletPublicKey -> CommitmentId -> R -> m CommitmentProved
   , loadAccount ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      UserWalletPublicKey -> m (Maybe AccountCreated)
+      UserWalletPublicKey -> m (Maybe Registered)
   , loadAccounts ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      m [AccountCreated]
+      m [Registered]
   , loadSession ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
@@ -45,5 +45,5 @@ data WBPS = WBPS
   , loadCommitmentDemonstrationEvents ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      UserWalletPublicKey -> CommitmentId -> m (AccountCreated, CommitmentDemonstrated)
+      UserWalletPublicKey -> CommitmentId -> m (Registered, CommitmentDemonstrated)
   }

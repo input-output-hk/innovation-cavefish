@@ -39,9 +39,9 @@ import WBPS.Core.Failure (
 import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Core.Registration.FetchAccounts qualified as Registration
 import WBPS.Core.Registration.Register qualified as Registration
-import WBPS.Core.Session.Demonstration.Demonstrate qualified as Session
+import WBPS.Core.Session.Demonstration.Demonstrate qualified as Demonstration
 import WBPS.Core.Session.FetchSession qualified as SessionFetch
-import WBPS.Core.Session.Proving.Proof.Prove qualified as Proof
+import WBPS.Core.Session.Proving.Prove qualified as Proving
 import WBPS.WBPS (runWBPS)
 
 mkServerContext ::
@@ -69,12 +69,12 @@ mkServerContext
                     Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     Right x -> pure x
             , demonstrate = \userWalletPublicKey tx ->
-                liftIO (runWBPS wbpsScheme (Session.demonstrate userWalletPublicKey tx))
+                liftIO (runWBPS wbpsScheme (Demonstration.demonstrate userWalletPublicKey tx))
                   >>= \case
                     (Left e) -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}
                     (Right x) -> pure x
             , prove = \userWalletPublicKey commitmentId bigR ->
-                liftIO (runWBPS wbpsScheme (Proof.prove userWalletPublicKey commitmentId bigR))
+                liftIO (runWBPS wbpsScheme (Proving.prove userWalletPublicKey commitmentId bigR))
                   >>= \case
                     Left [SessionNotFound _ _] -> throwError err404 {errBody = BL8.pack "Session Not Found"}
                     Left e -> throwError err500 {errBody = BL8.pack ("Unexpected event" ++ show e)}

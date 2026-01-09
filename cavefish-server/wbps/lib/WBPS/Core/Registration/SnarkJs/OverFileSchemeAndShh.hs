@@ -1,10 +1,12 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh (
   getGenerateProvingKeyProcess,
   getGenerateVerificationKeyProcess,
 ) where
 
 import Control.Monad.RWS (MonadReader, asks)
-import Path (toFilePath, (</>))
+import Path (reldir, toFilePath, (</>))
 import Shh (Proc)
 import WBPS.Core.FileScheme (
   Account (
@@ -41,12 +43,12 @@ toProvingKeyScheme
     Snarkjs.ProvingKeyScheme
       { powerOfTauPrepared = Path.toFilePath powerOfTauPrepared
       , relationR1CS = Path.toFilePath relationR1CS
-      , provingKeyOutput = Path.toFilePath (accountDirectory </> provingKey)
+      , provingKeyOutput = Path.toFilePath (accountDirectory </> [reldir|registered|] </> provingKey)
       }
 
 toVerificationKeyScheme :: Directory.Account -> FileScheme.Account -> Snarkjs.VerificationKeyScheme
 toVerificationKeyScheme accountDirectory FileScheme.Account {registration = Registration {..}} =
   Snarkjs.VerificationKeyScheme
-    { provingKey = Path.toFilePath (accountDirectory </> provingKey)
-    , verificationKeyOutput = Path.toFilePath (accountDirectory </> verificationContext)
+    { provingKey = Path.toFilePath (accountDirectory </> [reldir|registered|] </> provingKey)
+    , verificationKeyOutput = Path.toFilePath (accountDirectory </> [reldir|registered|] </> verificationContext)
     }

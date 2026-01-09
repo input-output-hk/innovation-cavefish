@@ -15,8 +15,8 @@ import WBPS.Core.Failure (
  )
 import WBPS.Core.FileScheme (FileScheme (FileScheme, accounts))
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Registration.Account (AccountId (AccountId), deriveId)
 import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
+import WBPS.Core.Registration.Registered (AccountId (AccountId), deriveId)
 
 -- | Derive the directory path for a user account based on their wallet public key.
 -- This function constructs the directory path by combining the base accounts directory

@@ -79,16 +79,17 @@ library
     WBPS.Core.Primitives.Circom
     WBPS.Core.Primitives.Snarkjs
     WBPS.Core.Primitives.SnarkjsOverFileScheme
-    WBPS.Core.Registration.Account
     WBPS.Core.Registration.FetchAccounts
     WBPS.Core.Registration.FileScheme
     WBPS.Core.Registration.FileScheme.Directories
     WBPS.Core.Registration.Register
+    WBPS.Core.Registration.Registered
     WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh
     WBPS.Core.Registration.SnarkJs.OverShh
     WBPS.Core.Session.Demonstration.Commitment
     WBPS.Core.Session.Demonstration.Commitment.Build
     WBPS.Core.Session.Demonstration.Demonstrate
+    WBPS.Core.Session.Demonstration.Demonstrated
     WBPS.Core.Session.Demonstration.Message
     WBPS.Core.Session.Demonstration.R
     WBPS.Core.Session.Demonstration.Scalars
@@ -98,7 +99,9 @@ library
     WBPS.Core.Session.FileScheme.Directories
     WBPS.Core.Session.Proving.Challenge
     WBPS.Core.Session.Proving.Proof
-    WBPS.Core.Session.Proving.Proof.Prove
+    WBPS.Core.Session.Proving.Proof.Generate
+    WBPS.Core.Session.Proving.Prove
+    WBPS.Core.Session.Proving.Proved
     WBPS.Core.Session.Proving.Witness
     WBPS.Core.Session.Session
     WBPS.WBPS
@@ -133,9 +136,10 @@ test-suite wbps-unit-tests
   type:           exitcode-stdio-1.0
   hs-source-dirs: tests/unit
   main-is:        Main.hs
+  ghc-options:    -Wno-unused-packages
   other-modules:
     WBPS.Specs.Core.Keys.Ed25519
-    WBPS.Specs.Session.Commitment.Scalars
+    WBPS.Specs.Session.Demonstration.Scalars
 
   build-depends:
     , aeson
@@ -150,12 +154,13 @@ test-suite wbps-integration-tests
   type:           exitcode-stdio-1.0
   hs-source-dirs: tests/integration
   main-is:        Main.hs
+  ghc-options:    -Wno-unused-packages
   other-modules:
     WBPS.Specs.Adapter.Fixture
     WBPS.Specs.Adapter.GenCardanoKeys
     WBPS.Specs.Adapter.Test
     WBPS.Specs.NominalCase
-    WBPS.Specs.Session.Commitment.Build
+    WBPS.Specs.Session.Demonstration.Commitment.Build
 
   build-depends:
     , aeson

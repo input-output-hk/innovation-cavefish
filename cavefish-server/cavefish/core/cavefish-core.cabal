@@ -81,14 +81,11 @@ library
     , async
     , bytestring
     , cardano-api
-    , cborg
     , containers
     , contra-tracer
     , cooked-validators
-    , crypton
     , data-default
     , exceptions
-    , memory
     , monad-time
     , mtl
     , plutus-ledger

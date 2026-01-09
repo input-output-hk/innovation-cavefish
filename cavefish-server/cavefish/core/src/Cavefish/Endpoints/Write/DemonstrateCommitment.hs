@@ -22,11 +22,11 @@ import Intent.Example.DSL (IntentDSL)
 import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Session.Demonstration.Commitment (Commitment)
-import WBPS.Core.Session.Demonstration.Message (PreparedMessage (PreparedMessage, publicMessage), PublicMessage (PublicMessage))
-import WBPS.Core.Session.Session (
+import WBPS.Core.Session.Demonstration.Demonstrated (
   CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage),
-  Session (commitmentDemonstrated),
  )
+import WBPS.Core.Session.Demonstration.Message (PreparedMessage (PreparedMessage, publicMessage), PublicMessage (PublicMessage))
+import WBPS.Core.Session.Session (Session (demonstrated))
 
 -- | Inputs for demonstrating a commitment.
 data Inputs = Inputs
@@ -60,5 +60,5 @@ handle Inputs {userWalletPublicKey, intent} = do
 
   unsignedTx <- build intent
   CommitmentDemonstrated {preparedMessage = PreparedMessage {publicMessage = PublicMessage txAbs}, commitment} <-
-    commitmentDemonstrated <$> demonstrate userWalletPublicKey unsignedTx
+    demonstrated <$> demonstrate userWalletPublicKey unsignedTx
   return Outputs {txAbs, commitment}

@@ -1,3 +1,4 @@
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Module      : WBPS.Core.Registration.Register
@@ -10,7 +11,7 @@ module WBPS.Core.Registration.Register (
 import Control.Monad.Error.Class (MonadError, throwError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ask)
-import Path ((</>))
+import Path (reldir, (</>))
 import Path.IO (ensureDir)
 import Shh (Stream (Append, StdOut), (&!>), (&>))
 import WBPS.Adapter.Path (writeTo)
@@ -23,22 +24,22 @@ import WBPS.Core.FileScheme (
  )
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
-import WBPS.Core.Registration.Account (
-  AccountCreated (AccountCreated, userWalletPublicKey),
- )
 import WBPS.Core.Registration.FetchAccounts (loadAccount, loadExistingAccount)
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
+import WBPS.Core.Registration.Registered (
+  Registered (Registered, userWalletPublicKey),
+ )
 import WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh (getGenerateProvingKeyProcess, getGenerateVerificationKeyProcess)
 
 register ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
   UserWalletPublicKey ->
-  m AccountCreated
+  m Registered
 register userWalletPublicKey =
   loadAccount userWalletPublicKey
     >>= \case
-      Just AccountCreated {userWalletPublicKey = existingUserWalletKey} -> throwError [AccountAlreadyRegistered existingUserWalletKey]
+      Just Registered {userWalletPublicKey = existingUserWalletKey} -> throwError [AccountAlreadyRegistered existingUserWalletKey]
       Nothing -> do
         register' =<< deriveAccountDirectoryFrom userWalletPublicKey
         loadExistingAccount userWalletPublicKey
@@ -50,7 +51,7 @@ register' ::
 register' accountDirectory = do
   FileScheme {account = Account {registration = Registration {encryptionKeys}}} <- ask
   ensureDir accountDirectory
-  ElGamal.generateKeyPair >>= writeTo (accountDirectory </> encryptionKeys)
+  ElGamal.generateKeyPair >>= writeTo (accountDirectory </> [reldir|registered|] </> encryptionKeys)
   generateProvingKeyProcess <- getGenerateProvingKeyProcess accountDirectory
   generateVerificationKeyProcess <- getGenerateVerificationKeyProcess accountDirectory
   shellLogsFilepath <- getShellLogsFilepath accountDirectory

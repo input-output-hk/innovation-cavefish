@@ -6,14 +6,15 @@ module WBPS.Core.Primitives.SnarkjsOverFileScheme (
 import Control.Monad.RWS (MonadReader, ask)
 import Path (toFilePath, (</>))
 import Shh (Proc)
-import WBPS.Core.FileScheme
 import WBPS.Core.FileScheme (
   Account (session),
   BuildCommitmentInternals (BuildCommitmentInternals, input, output),
   BuildCommitmentSetup (BuildCommitmentSetup, wasm),
+  Demonstration (buildCommitmentInternals),
   FileScheme (account, setup),
+  Session (demonstration),
+  Setup (buildCommitment),
  )
-import WBPS.Core.FileScheme qualified as Setup (Setup (buildCommitment))
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
 import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
 

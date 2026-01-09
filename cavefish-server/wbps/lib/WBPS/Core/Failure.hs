@@ -7,7 +7,7 @@ module WBPS.Core.Failure (
 
 import Control.Monad.Except (MonadError (throwError))
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Registration.Account (AccountId)
+import WBPS.Core.Registration.Registered (AccountId)
 import WBPS.Core.Session.Demonstration.Commitment (CommitmentId)
 import WBPS.Core.Session.Session (SessionId)
 

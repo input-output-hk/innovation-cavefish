@@ -101,7 +101,7 @@ defaultFileScheme RootFolders {..} =
                     Proving
                       { witness =
                           WitnessGeneration
-                            { input = [relfile|witness_input.json|]
+                            { input = [relfile|input.json|]
                             , output = [relfile|witness.wtns|]
                             }
                       , proof =

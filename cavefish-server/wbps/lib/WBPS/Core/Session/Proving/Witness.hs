@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module WBPS.Core.Session.Proving.Witness (
   generate,
   prepareInputs,
@@ -11,7 +13,7 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.Text (Text)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
-import Path (File, Path, toFilePath, (</>))
+import Path (File, Path, reldir, toFilePath, (</>))
 import Shh (Stream (Append, StdOut), (&!>), (&>))
 import WBPS.Adapter.Data.Aeson (jsonNumberToText)
 import WBPS.Adapter.Math.AffinePoint qualified as AffinePoint
@@ -21,8 +23,8 @@ import WBPS.Core.Failure (RegistrationFailed)
 import WBPS.Core.FileScheme (
   Account (Account, session),
   FileScheme (FileScheme, account, setup),
-  Proving (..),
-  Session (..),
+  Proving (Proving, bigR, challenge, witness),
+  Session (Session, proving),
   Setup (Setup, witness),
   WitnessGeneration (WitnessGeneration, input, output),
   WitnessGenerationSetup (WitnessGenerationSetup, wasm),
@@ -32,9 +34,10 @@ import WBPS.Core.Groth16.Setup qualified as Groth16
 import WBPS.Core.Keys.Ed25519 qualified as Ed25519
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
-import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, setup, userWalletPublicKey))
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
+import WBPS.Core.Registration.Registered (Registered (Registered, setup, userWalletPublicKey))
 import WBPS.Core.Session.Demonstration.Commitment (Commitment (Commitment, id, payload), CommitmentPayload (CommitmentPayload))
+import WBPS.Core.Session.Demonstration.Demonstrated (CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage, scalars))
 import WBPS.Core.Session.Demonstration.Message (
   MessageBits (MessageBits),
   PreparedMessage (PreparedMessage, messageBits, publicMessage),
@@ -46,7 +49,6 @@ import WBPS.Core.Session.Demonstration.Scalars (Scalars (Scalars, ekPowRho, rho)
 import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
 import WBPS.Core.Session.Proving.Challenge (Challenge)
 import WBPS.Core.Session.Proving.Challenge qualified as Challenge
-import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage, scalars))
 
 data CircuitInputs = CircuitInputs
   { signer_key :: [Word8]
@@ -63,13 +65,13 @@ data CircuitInputs = CircuitInputs
 
 generate ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
-  AccountCreated ->
+  Registered ->
   CommitmentDemonstrated ->
   R ->
   Challenge ->
   m ()
 generate
-  accountCreated@AccountCreated {userWalletPublicKey}
+  registered@Registered {userWalletPublicKey}
   commitmentDemonstrated@CommitmentDemonstrated {commitment = WBPS.Core.Session.Demonstration.Commitment.Commitment {id = commitmentId}}
   bigR
   challenge = do
@@ -88,32 +90,32 @@ generate
       } <-
       ask
 
-    writeTo (sessionDirectory </> bigRFile) bigR
-    writeTo (sessionDirectory </> challengeFile) challenge
+    writeTo (sessionDirectory </> [reldir|proved|] </> bigRFile) bigR
+    writeTo (sessionDirectory </> [reldir|proved|] </> challengeFile) challenge
 
     saveCircuitInputs
-      (sessionDirectory </> input)
-      (prepareInputs accountCreated commitmentDemonstrated bigR challenge)
+      (sessionDirectory </> [reldir|proved|] </> [reldir|witness|] </> input)
+      (prepareInputs registered commitmentDemonstrated bigR challenge)
 
     shellLogsFilepath <- getShellLogsFilepath accountDirectory
     liftIO $
       Snarkjs.generateWitness
         Snarkjs.WitnessScheme
           { wasm = toFilePath wasm
-          , input = toFilePath (sessionDirectory </> input)
-          , witnessOutput = toFilePath (sessionDirectory </> output)
+          , input = toFilePath (sessionDirectory </> [reldir|proved|] </> [reldir|witness|] </> input)
+          , witnessOutput = toFilePath (sessionDirectory </> [reldir|proved|] </> [reldir|witness|] </> output)
           }
         &!> StdOut
         &> Append shellLogsFilepath
 
 prepareInputs ::
-  AccountCreated ->
+  Registered ->
   CommitmentDemonstrated ->
   R ->
   Challenge ->
   CircuitInputs
 prepareInputs
-  AccountCreated
+  Registered
     { userWalletPublicKey
     , setup = Groth16.Setup {encryptionKeys = ElGamal.KeyPair {ek = ElGamal.EncryptionKey solverKeyPoint}}
     }

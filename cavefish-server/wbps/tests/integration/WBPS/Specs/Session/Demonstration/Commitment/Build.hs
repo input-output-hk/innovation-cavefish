@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-module WBPS.Specs.Session.Commitment.Build (specs) where
+module WBPS.Specs.Session.Demonstration.Commitment.Build (specs) where
 
 import Control.Monad.Except (MonadError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -45,7 +45,7 @@ specs =
 
 commitmentMatchesCircuit :: Assertion
 commitmentMatchesCircuit = do
-  commitmentRootFolders <- getRootFolder [reldir|WBPS-integration-specs-commitmentMatchesCircuit|]
+  commitmentRootFolders <- getRootFolder [reldir|integration-wpbs-demonstration-build-commitment|]
   let scheme = defaultFileScheme commitmentRootFolders
       fixtures = commitmentFixtures commitmentRootFolders
   runWBPS scheme (runCommitmentFlow fixtures) >>= \case

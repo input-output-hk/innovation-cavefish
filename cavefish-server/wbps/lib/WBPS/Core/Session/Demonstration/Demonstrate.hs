@@ -23,28 +23,28 @@ import WBPS.Core.FileScheme qualified as FileScheme
 import WBPS.Core.Groth16.Setup (Setup (Setup, encryptionKeys))
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
-import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, setup, userWalletPublicKey))
 import WBPS.Core.Registration.FetchAccounts (loadAccount)
+import WBPS.Core.Registration.Registered (Registered (Registered, setup, userWalletPublicKey))
 import WBPS.Core.Session.Demonstration.Commitment (Commitment (Commitment, id))
 import WBPS.Core.Session.Demonstration.Commitment.Build (Input (Input, ekPowRho, messageBits), build)
-import WBPS.Core.Session.Demonstration.Message (
-  PreparedMessage (..),
-  prepareMessage,
- )
-import WBPS.Core.Session.Demonstration.Scalars as Scalars (
-  Scalars (Scalars, ekPowRho, rho),
- )
-import WBPS.Core.Session.Demonstration.Scalars.Compute qualified as Scalars
-import WBPS.Core.Session.FileScheme (deriveSessionDirectoryFrom)
-import WBPS.Core.Session.Session (
+import WBPS.Core.Session.Demonstration.Demonstrated (
   CommitmentDemonstrated (
     CommitmentDemonstrated,
     commitment,
     preparedMessage,
     scalars
   ),
-  Session (SessionCreated),
  )
+import WBPS.Core.Session.Demonstration.Message (
+  PreparedMessage (PreparedMessage, messageBits),
+  prepareMessage,
+ )
+import WBPS.Core.Session.Demonstration.Scalars as Scalars (
+  Scalars (Scalars, ekPowRho),
+ )
+import WBPS.Core.Session.Demonstration.Scalars.Compute qualified as Scalars
+import WBPS.Core.Session.FileScheme (deriveSessionDirectoryFrom)
+import WBPS.Core.Session.Session (Session (Demonstrated))
 
 demonstrate ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
@@ -53,11 +53,11 @@ demonstrate userWalletPublicKey unsignedTx =
   loadAccount userWalletPublicKey
     >>= \case
       Nothing -> throwError [AccountNotFound userWalletPublicKey]
-      Just account@AccountCreated {setup = Setup {encryptionKeys = ElGamal.KeyPair {ek}}} -> do
+      Just account@Registered {setup = Setup {encryptionKeys = ElGamal.KeyPair {ek}}} -> do
         preparedMessage@PreparedMessage {messageBits} <- toWBPSFailure =<< prepareMessage unsignedTx
         scalars@Scalars {ekPowRho} <- Scalars.compute ek =<< ElGamal.generateElGamalExponent
         commitment <- build Input {ekPowRho, messageBits}
-        SessionCreated account
+        Demonstrated account
           <$> save
             account
             CommitmentDemonstrated
@@ -68,9 +68,9 @@ demonstrate userWalletPublicKey unsignedTx =
 
 save ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
-  AccountCreated -> CommitmentDemonstrated -> m CommitmentDemonstrated
+  Registered -> CommitmentDemonstrated -> m CommitmentDemonstrated
 save
-  AccountCreated {userWalletPublicKey}
+  Registered {userWalletPublicKey}
   event@CommitmentDemonstrated
     { preparedMessage
     , scalars

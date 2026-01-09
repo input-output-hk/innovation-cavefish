@@ -27,16 +27,14 @@ import WBPS.Core.Failure (RegistrationFailed (AccountNotFound, EncryptionKeysNot
 import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Core.FileScheme qualified as FileScheme
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, userWalletPublicKey))
 import WBPS.Core.Registration.FetchAccounts (loadAccount, loadAccounts)
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
+import WBPS.Core.Registration.Registered (Registered (Registered, userWalletPublicKey))
 import WBPS.Core.Session.Demonstration.Commitment (CommitmentId)
+import WBPS.Core.Session.Demonstration.Demonstrated (CommitmentDemonstrated (CommitmentDemonstrated))
 import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
 import WBPS.Core.Session.Session (
-  CommitmentDemonstrated (
-    CommitmentDemonstrated
-  ),
-  Session (SessionCreated),
+  Session (Demonstrated),
  )
 
 getRecordedCommitmentIds :: MonadIO m => Path b Dir -> m [CommitmentId]
@@ -49,7 +47,7 @@ loadSessions ::
 loadSessions = do
   ( loadAccounts
       >>= mapM
-        ( \AccountCreated {userWalletPublicKey} -> do
+        ( \Registered {userWalletPublicKey} -> do
             accountDir <- deriveAccountDirectoryFrom userWalletPublicKey
             FileScheme.Account {sessions} <- asks FileScheme.account
             recordedIds <- getRecordedCommitmentIds (accountDir </> sessions)
@@ -78,8 +76,7 @@ loadExistingSession userWalletPublicKey commitmentId =
       Just account -> do
         sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId
         demonstration <- asks (FileScheme.demonstration . FileScheme.session . FileScheme.account)
-
-        SessionCreated account
+        Demonstrated account
           <$> ( CommitmentDemonstrated
                   <$> ( readFrom (sessionDirectory </> [reldir|demonstrated|] </> FileScheme.preparedMessage demonstration)
                           >>= whenNothingThrow [SessionMessageNotFound userWalletPublicKey commitmentId]
@@ -94,15 +91,15 @@ loadExistingSession userWalletPublicKey commitmentId =
 
 loadExistingCommitmentDemonstrationEvents ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>
-  UserWalletPublicKey -> CommitmentId -> m (AccountCreated, CommitmentDemonstrated)
+  UserWalletPublicKey -> CommitmentId -> m (Registered, CommitmentDemonstrated)
 loadExistingCommitmentDemonstrationEvents userWalletPublicKey commitmentId =
   loadAccount userWalletPublicKey
     >>= \case
       Nothing -> throwError [AccountNotFound userWalletPublicKey]
-      Just accountCreated -> do
+      Just registered -> do
         sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId
         demonstration <- asks (FileScheme.demonstration . FileScheme.session . FileScheme.account)
-        (accountCreated,)
+        (registered,)
           <$> ( CommitmentDemonstrated
                   <$> ( readFrom (sessionDirectory </> [reldir|demonstrated|] </> FileScheme.preparedMessage demonstration)
                           >>= whenNothingThrow [SessionMessageNotFound userWalletPublicKey commitmentId]
