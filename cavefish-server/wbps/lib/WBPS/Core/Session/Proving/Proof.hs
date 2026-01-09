@@ -1,6 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 
-module WBPS.Core.Session.Proof (
+module WBPS.Core.Session.Proving.Proof (
   Proof (..),
 ) where
 

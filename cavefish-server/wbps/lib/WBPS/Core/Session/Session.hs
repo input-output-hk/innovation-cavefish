@@ -16,12 +16,12 @@ import Data.Text qualified as Text
 import GHC.Generics (Generic)
 import WBPS.Adapter.CardanoCryptoClass.Crypto (Codec (encode))
 import WBPS.Core.Registration.Account (AccountCreated)
-import WBPS.Core.Session.Challenge (Challenge)
-import WBPS.Core.Session.Commitment (Commitment (Commitment), CommitmentId (CommitmentId), id)
-import WBPS.Core.Session.Proof (Proof)
-import WBPS.Core.Session.R (R)
-import WBPS.Core.Session.Scalars (Scalars)
-import WBPS.Core.ZK.Message (PreparedMessage)
+import WBPS.Core.Session.Demonstration.Commitment (Commitment (Commitment), CommitmentId (CommitmentId), id)
+import WBPS.Core.Session.Demonstration.Message (PreparedMessage)
+import WBPS.Core.Session.Demonstration.R (R)
+import WBPS.Core.Session.Demonstration.Scalars (Scalars)
+import WBPS.Core.Session.Proving.Challenge (Challenge)
+import WBPS.Core.Session.Proving.Proof (Proof)
 
 newtype SessionId = SessionId String deriving (Show, Eq)
 

@@ -1,4 +1,4 @@
-module WBPS.Core.ZK.Message (
+module WBPS.Core.Session.Demonstration.Message (
   Message (..),
   PublicMessage (..),
   MessageBits (..),

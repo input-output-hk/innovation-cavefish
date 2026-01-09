@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module WBPS.Core.Session.Commitment (
+module WBPS.Core.Session.Demonstration.Commitment (
   mkCommitment,
   Commitment (..),
   CommitmentPayload (..),
@@ -18,7 +18,7 @@ import Data.Word (Word8)
 import GHC.Generics (Generic)
 import WBPS.Adapter.CardanoCryptoClass.Crypto (FromByteString (fromByteString), Hexadecimal)
 import WBPS.Adapter.Math.Integer qualified as AdapterInteger
-import WBPS.Core.ZK.Message (
+import WBPS.Core.Session.Demonstration.Message (
   MessageBits (MessageBits),
  )
 

@@ -1,4 +1,4 @@
-module WBPS.Core.Session.Witness (
+module WBPS.Core.Session.Proving.Witness (
   generate,
   prepareInputs,
   saveCircuitInputs,
@@ -34,19 +34,19 @@ import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
 import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, setup, userWalletPublicKey))
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
-import WBPS.Core.Session.Challenge (Challenge)
-import WBPS.Core.Session.Challenge qualified as Challenge
-import WBPS.Core.Session.Commitment (Commitment (Commitment, id, payload), CommitmentPayload (CommitmentPayload))
-import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
-import WBPS.Core.Session.R (R)
-import WBPS.Core.Session.Scalars (Scalars (Scalars, ekPowRho, rho))
-import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage, scalars))
-import WBPS.Core.ZK.Message (
+import WBPS.Core.Session.Demonstration.Commitment (Commitment (Commitment, id, payload), CommitmentPayload (CommitmentPayload))
+import WBPS.Core.Session.Demonstration.Message (
   MessageBits (MessageBits),
   PreparedMessage (PreparedMessage, messageBits, publicMessage),
   messageBitsToWord8s,
   publicMessageToMessageBits,
  )
+import WBPS.Core.Session.Demonstration.R (R)
+import WBPS.Core.Session.Demonstration.Scalars (Scalars (Scalars, ekPowRho, rho))
+import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
+import WBPS.Core.Session.Proving.Challenge (Challenge)
+import WBPS.Core.Session.Proving.Challenge qualified as Challenge
+import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage, scalars))
 
 data CircuitInputs = CircuitInputs
   { signer_key :: [Word8]
@@ -70,7 +70,7 @@ generate ::
   m ()
 generate
   accountCreated@AccountCreated {userWalletPublicKey}
-  commitmentDemonstrated@CommitmentDemonstrated {commitment = WBPS.Core.Session.Commitment.Commitment {id = commitmentId}}
+  commitmentDemonstrated@CommitmentDemonstrated {commitment = WBPS.Core.Session.Demonstration.Commitment.Commitment {id = commitmentId}}
   bigR
   challenge = do
     sessionDirectory <- deriveExistingSessionDirectoryFrom userWalletPublicKey commitmentId

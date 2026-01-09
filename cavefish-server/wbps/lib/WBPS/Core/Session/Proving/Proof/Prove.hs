@@ -1,4 +1,4 @@
-module WBPS.Core.Session.Proof.Prove (
+module WBPS.Core.Session.Proving.Proof.Prove (
   prove,
 ) where
 
@@ -16,16 +16,16 @@ import WBPS.Core.FileScheme qualified as FileScheme
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
-import WBPS.Core.Session.Challenge (Challenge)
-import WBPS.Core.Session.Challenge qualified as Challenge
-import WBPS.Core.Session.Commitment (CommitmentId)
+import WBPS.Core.Session.Demonstration.Commitment (CommitmentId)
+import WBPS.Core.Session.Demonstration.Message (PreparedMessage (PreparedMessage, message))
+import WBPS.Core.Session.Demonstration.R (R)
 import WBPS.Core.Session.FetchSession (loadExistingCommitmentDemonstrationEvents)
 import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
-import WBPS.Core.Session.Proof (Proof (Proof))
-import WBPS.Core.Session.R (R)
+import WBPS.Core.Session.Proving.Challenge (Challenge)
+import WBPS.Core.Session.Proving.Challenge qualified as Challenge
+import WBPS.Core.Session.Proving.Proof (Proof (Proof))
+import WBPS.Core.Session.Proving.Witness qualified as Witness (generate)
 import WBPS.Core.Session.Session (CommitmentDemonstrated (CommitmentDemonstrated, preparedMessage))
-import WBPS.Core.Session.Witness qualified as Witness (generate)
-import WBPS.Core.ZK.Message (PreparedMessage (PreparedMessage, message))
 
 prove ::
   (MonadIO m, MonadReader FileScheme m, MonadError [RegistrationFailed] m) =>

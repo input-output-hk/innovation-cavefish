@@ -37,8 +37,8 @@ import WBPS.Core.Keys.Ed25519 (
   publicKey,
   userWalletPK,
  )
-import WBPS.Core.Session.Commitment (Commitment (Commitment, id))
-import WBPS.Core.Session.R (R (R))
+import WBPS.Core.Session.Demonstration.Commitment (Commitment (Commitment, id))
+import WBPS.Core.Session.Demonstration.R (R (R))
 
 spec :: Spec
 spec = do

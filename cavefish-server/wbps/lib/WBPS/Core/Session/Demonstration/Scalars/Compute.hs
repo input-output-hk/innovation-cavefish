@@ -1,4 +1,4 @@
-module WBPS.Core.Session.Scalars.Compute (
+module WBPS.Core.Session.Demonstration.Scalars.Compute (
   compute,
 ) where
 
@@ -10,7 +10,7 @@ import WBPS.Core.Keys.ElGamal (
   encryptionKeyPowRho,
   generatorPowRho,
  )
-import WBPS.Core.Session.Scalars (Scalars (Scalars))
+import WBPS.Core.Session.Demonstration.Scalars (Scalars (Scalars))
 
 compute ::
   MonadError [RegistrationFailed] m => EncryptionKey -> Rho -> m Scalars

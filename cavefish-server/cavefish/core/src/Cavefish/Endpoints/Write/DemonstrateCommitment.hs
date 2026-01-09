@@ -21,12 +21,12 @@ import GHC.Generics (Generic)
 import Intent.Example.DSL (IntentDSL)
 import WBPS.Core.Cardano.UnsignedTx (AbstractUnsignedTx)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Session.Commitment (Commitment)
+import WBPS.Core.Session.Demonstration.Commitment (Commitment)
+import WBPS.Core.Session.Demonstration.Message (PreparedMessage (PreparedMessage, publicMessage), PublicMessage (PublicMessage))
 import WBPS.Core.Session.Session (
   CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage),
   Session (commitmentDemonstrated),
  )
-import WBPS.Core.ZK.Message (PreparedMessage (PreparedMessage, publicMessage), PublicMessage (PublicMessage))
 
 -- | Inputs for demonstrating a commitment.
 data Inputs = Inputs

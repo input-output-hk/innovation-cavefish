@@ -39,9 +39,9 @@ import WBPS.Core.Failure (
 import WBPS.Core.FileScheme (FileScheme)
 import WBPS.Core.Registration.FetchAccounts qualified as Registration
 import WBPS.Core.Registration.Register qualified as Registration
-import WBPS.Core.Session.Demonstrate qualified as Session
+import WBPS.Core.Session.Demonstration.Demonstrate qualified as Session
 import WBPS.Core.Session.FetchSession qualified as SessionFetch
-import WBPS.Core.Session.Proof.Prove qualified as Proof
+import WBPS.Core.Session.Proving.Proof.Prove qualified as Proof
 import WBPS.WBPS (runWBPS)
 
 mkServerContext ::

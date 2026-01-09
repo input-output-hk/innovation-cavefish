@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module WBPS.Core.Session.Commitment.Build (
+module WBPS.Core.Session.Demonstration.Commitment.Build (
   build,
   Context (..),
   Input (..),
@@ -47,12 +47,12 @@ import WBPS.Core.Primitives.Circom (
  )
 import WBPS.Core.Primitives.Snarkjs (exportStatementAsJSON)
 import WBPS.Core.Primitives.SnarkjsOverFileScheme (getGenerateBuildCommitmentWitnessProcess)
-import WBPS.Core.Session.Commitment (
+import WBPS.Core.Session.Demonstration.Commitment (
   Commitment,
   CommitmentPayload (CommitmentPayload),
   mkCommitment,
  )
-import WBPS.Core.ZK.Message (
+import WBPS.Core.Session.Demonstration.Message (
   MessageBits (MessageBits, unMessageBits),
  )
 

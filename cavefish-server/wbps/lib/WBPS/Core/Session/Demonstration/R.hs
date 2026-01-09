@@ -1,4 +1,4 @@
-module WBPS.Core.Session.R (
+module WBPS.Core.Session.Demonstration.R (
   R (..),
 ) where
 

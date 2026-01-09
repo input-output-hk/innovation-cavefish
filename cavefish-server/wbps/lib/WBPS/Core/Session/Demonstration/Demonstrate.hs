@@ -2,7 +2,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 
-module WBPS.Core.Session.Demonstrate (
+module WBPS.Core.Session.Demonstration.Demonstrate (
   demonstrate,
 ) where
 
@@ -25,13 +25,17 @@ import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.Account (AccountCreated (AccountCreated, setup, userWalletPublicKey))
 import WBPS.Core.Registration.FetchAccounts (loadAccount)
-import WBPS.Core.Session.Commitment (Commitment (Commitment, id))
-import WBPS.Core.Session.Commitment.Build (Input (Input, ekPowRho, messageBits), build)
-import WBPS.Core.Session.FileScheme (deriveSessionDirectoryFrom)
-import WBPS.Core.Session.Scalars as Scalars (
+import WBPS.Core.Session.Demonstration.Commitment (Commitment (Commitment, id))
+import WBPS.Core.Session.Demonstration.Commitment.Build (Input (Input, ekPowRho, messageBits), build)
+import WBPS.Core.Session.Demonstration.Message (
+  PreparedMessage (..),
+  prepareMessage,
+ )
+import WBPS.Core.Session.Demonstration.Scalars as Scalars (
   Scalars (Scalars, ekPowRho, rho),
  )
-import WBPS.Core.Session.Scalars.Compute qualified as Scalars
+import WBPS.Core.Session.Demonstration.Scalars.Compute qualified as Scalars
+import WBPS.Core.Session.FileScheme (deriveSessionDirectoryFrom)
 import WBPS.Core.Session.Session (
   CommitmentDemonstrated (
     CommitmentDemonstrated,
@@ -40,10 +44,6 @@ import WBPS.Core.Session.Session (
     scalars
   ),
   Session (SessionCreated),
- )
-import WBPS.Core.ZK.Message (
-  PreparedMessage (..),
-  prepareMessage,
  )
 
 demonstrate ::

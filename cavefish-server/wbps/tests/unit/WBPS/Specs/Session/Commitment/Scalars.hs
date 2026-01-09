@@ -4,10 +4,10 @@ import Test.QuickCheck (Property, counterexample, (.&&.), (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 import WBPS.Core.Keys.ElGamal (AffinePoint (AffinePoint, x, y), EncryptionKey (EncryptionKey), mkRho)
-import WBPS.Core.Session.Scalars (
+import WBPS.Core.Session.Demonstration.Scalars (
   Scalars (Scalars, ekPowRho, gPowRho),
  )
-import WBPS.Core.Session.Scalars.Compute (compute)
+import WBPS.Core.Session.Demonstration.Scalars.Compute (compute)
 
 specs :: TestTree
 specs =

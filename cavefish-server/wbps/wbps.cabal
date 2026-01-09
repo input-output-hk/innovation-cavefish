@@ -86,21 +86,21 @@ library
     WBPS.Core.Registration.Register
     WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh
     WBPS.Core.Registration.SnarkJs.OverShh
-    WBPS.Core.Session.Challenge
-    WBPS.Core.Session.Commitment
-    WBPS.Core.Session.Commitment.Build
-    WBPS.Core.Session.Demonstrate
+    WBPS.Core.Session.Demonstration.Commitment
+    WBPS.Core.Session.Demonstration.Commitment.Build
+    WBPS.Core.Session.Demonstration.Demonstrate
+    WBPS.Core.Session.Demonstration.Message
+    WBPS.Core.Session.Demonstration.R
+    WBPS.Core.Session.Demonstration.Scalars
+    WBPS.Core.Session.Demonstration.Scalars.Compute
     WBPS.Core.Session.FetchSession
     WBPS.Core.Session.FileScheme
     WBPS.Core.Session.FileScheme.Directories
-    WBPS.Core.Session.Proof
-    WBPS.Core.Session.Proof.Prove
-    WBPS.Core.Session.R
-    WBPS.Core.Session.Scalars
-    WBPS.Core.Session.Scalars.Compute
+    WBPS.Core.Session.Proving.Challenge
+    WBPS.Core.Session.Proving.Proof
+    WBPS.Core.Session.Proving.Proof.Prove
+    WBPS.Core.Session.Proving.Witness
     WBPS.Core.Session.Session
-    WBPS.Core.Session.Witness
-    WBPS.Core.ZK.Message
     WBPS.WBPS
 
   build-depends:

@@ -18,10 +18,10 @@ import Data.Text.Lazy qualified as TextLazy
 import Data.Text.Lazy.Encoding qualified as TextLazyEncoding
 import GHC.Generics (Generic)
 import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Session.Challenge (Challenge)
-import WBPS.Core.Session.Commitment (CommitmentId)
-import WBPS.Core.Session.Proof (Proof (Proof))
-import WBPS.Core.Session.R (R)
+import WBPS.Core.Session.Demonstration.Commitment (CommitmentId)
+import WBPS.Core.Session.Demonstration.R (R)
+import WBPS.Core.Session.Proving.Challenge (Challenge)
+import WBPS.Core.Session.Proving.Proof (Proof (Proof))
 
 data Inputs = Inputs
   { userWalletPublicKey :: UserWalletPublicKey
