@@ -56,7 +56,7 @@ common project-config
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wmissing-home-modules -Wpartial-fields
     -Wredundant-constraints -Wcompat -Wunused-packages
-    -Wmissing-import-lists
+    -Wmissing-import-lists -threaded
 
 library
   import:          base, project-config
