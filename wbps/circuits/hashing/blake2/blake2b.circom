@@ -147,7 +147,7 @@ template SingleRound(round_idx) {
   signal output out[16];
 
   var s[16];
-  s = Sigma(round_idx);
+  s = SigmaF(round_idx);
 
   component GS[8];
 
