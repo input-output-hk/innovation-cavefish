@@ -15,15 +15,16 @@ on:
 
 jobs:
   build:
-    name: GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest]
-        ghc-version: ['9.6.6']
+        ghc: ['9.6.6']
       fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
     env:
-      CABAL_CACHE_VERSION: "2025-10-23"
+      CABAL_CACHE_VERSION: "2026-01-15"
       SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
       SECP_CACHE_VERSION: "2022-12-30"
       WBPS_TEST_INPUT_ROOT: ${{ github.workspace }}/cavefish-server/wbps/setup
@@ -114,7 +115,7 @@ jobs:
         id: install-haskell
         uses: input-output-hk/actions/haskell@latest
         with:
-          ghc-version: ${{ matrix.ghc-version }}
+          ghc-version: ${{ matrix.ghc }}
           cabal-version: 3.12.1.0
 
       - name: Configure to use libsodium
@@ -128,6 +129,12 @@ jobs:
         working-directory: ./cavefish-server
         run: cabal update
 
+    # We create a dependencies.txt file that can be used to index the cabal
+    # store cache.
+    #
+    # We do not use plan.json directly because adding a dependency to our
+    # Cabal files which was already present somewhere else would result in a
+    # diferent plan, even though the set of dependencies is the same.
       - name: Record dependencies to be used as cache keys
         working-directory: ./cavefish-server
         id: record-deps
@@ -147,10 +154,20 @@ jobs:
         with:
           path: |
             ${{ steps.install-haskell.outputs.cabal-store }}
-          key: ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-${{ hashFiles('dependencies.txt') }}-${{ hashFiles('cabal.project*') }}
+        # A new cache is created upon a change to the cabal build plan,
+        # cabal.project (and/or cabal.project.local), or a bump to
+        # CABAL_CACHE_VERSION.
+          key: ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc }}-${{ env.CABAL_CACHE_VERSION }}-${{ hashFiles('dependencies.txt') }}-${{ hashFiles('cabal.project*') }}
           restore-keys: |
-            ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-${{ hashFiles('dependencies.txt') }}
-            ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc-version }}-${{ env.CABAL_CACHE_VERSION }}-
+        # Restoring attempts are from current branch then master. The key above
+        # is by default already a restore-key.
+            ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc }}-${{ env.CABAL_CACHE_VERSION }}-${{ hashFiles('dependencies.txt') }}
+            ${{ env.cache-name }}-${{ runner.os }}-${{ matrix.ghc }}-${{ env.CABAL_CACHE_VERSION }}-
+
+      - name: Install build tools and helpers
+        run: |
+          cabal install doctest --flag cabal-doctest --ignore-project --overwrite-policy=always
+          cabal path --installdir >> "$GITHUB_PATH"
 
       - name: Check workflow test matrix
         working-directory: ./cavefish-server
@@ -164,6 +181,9 @@ jobs:
       - name: Save cache
         uses: actions/cache/save@v4
         id: save-cabal-cache
+      # Note: cache-hit will be set to true only when cache hit occurs for the
+      # exact key match. For a partial key match via restore-keys or a cache
+      # miss, it will be set to false.
         if: steps.build-dependencies.outcome == 'success' && steps.restore-cabal-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.install-haskell.outputs.cabal-store }}
