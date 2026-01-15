@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module WBPS.Core.Session.Demonstration.Commitment.Build (
@@ -10,7 +11,8 @@ module WBPS.Core.Session.Demonstration.Commitment.Build (
 import Control.Monad (unless)
 import Control.Monad.Except (MonadError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader, ask, asks, runReader)
+import Control.Monad.Reader (MonadReader, ask, asks)
+import Crypto.Random (getRandomBytes)
 import Data.Aeson ((.:))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types qualified as AesonTypes
@@ -22,11 +24,14 @@ import Data.Maybe (mapMaybe)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Vector qualified as V
-import Path (Path, toFilePath, (</>))
-import Path.IO (doesFileExist, ensureDir, withTempDir)
-import Shh (Stream (Append, StdOut), (&!>), (&>))
+import Path (Abs, Dir, File, Path, Rel, reldir, toFilePath, (</>))
+import Path.IO (createTempDir, doesFileExist, ensureDir, renameDir)
+import Shh (Proc, Stream (Append, StdOut), (&!>), (&>))
 import System.FilePath qualified as FP
+import Text.Hex (encodeHex)
 import Text.Read (readMaybe)
+import WBPS.Adapter.Monad.Control (allM)
+import WBPS.Adapter.Path (writeTo)
 import WBPS.Core.Failure (
   WBPSFailure,
   toWBPSFailure,
@@ -35,33 +40,46 @@ import WBPS.Core.FileScheme (
   Account (session, shellLogs),
   BuildCommitmentInternals (input, output, statementOutput),
   BuildCommitmentSetup (BuildCommitmentSetup, r1cs, wasm),
-  FileScheme (account, accounts, setup),
+  FileScheme (account, setup),
   buildCommitmentInternals,
   demonstration,
  )
 import WBPS.Core.FileScheme qualified as Filescheme
 import WBPS.Core.FileScheme qualified as Setup (Setup (buildCommitment))
+import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Keys.ElGamal (AffinePoint (AffinePoint), x, y)
 import WBPS.Core.Primitives.Circom (
   compileBuildCommitmentForFileScheme,
  )
-import WBPS.Core.Primitives.Snarkjs (exportStatementAsJSON)
+import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
 import WBPS.Core.Primitives.SnarkjsOverFileScheme (getGenerateBuildCommitmentWitnessProcess)
+import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Session.Demonstration.Commitment (
-  Commitment,
+  Commitment (Commitment, id),
   CommitmentPayload (CommitmentPayload),
   MessageLimbs (MessageLimbs),
   mkCommitment,
  )
 import WBPS.Core.Session.Demonstration.PreparedMessage (MessageBits)
+import WBPS.Core.Session.FileScheme (deriveSessionDirectoryFrom)
 
 build ::
   (MonadIO m, MonadReader FileScheme m, MonadError [WBPSFailure] m) =>
+  UserWalletPublicKey ->
   Input ->
   m Commitment
-build input = do
-  Output {maskedChunks} <- toWBPSFailure =<< runBuildCommitment def input
-  return $ mkCommitment (CommitmentPayload maskedChunks)
+build userWalletPublicKey input = do
+  accountDirectory <- deriveAccountDirectoryFrom userWalletPublicKey
+  ensureDir accountDirectory
+  randSuffix <- liftIO (encodeHex <$> getRandomBytes 16)
+  let tmpPrefix = "build-commitment-tmp-" <> T.unpack randSuffix <> "-"
+  tmpRoot <- createTempDir accountDirectory tmpPrefix
+  Output {maskedChunks} <- toWBPSFailure =<< runBuildCommitment def tmpRoot input
+  let commitment@Commitment {id = commitmentId} = mkCommitment (CommitmentPayload maskedChunks)
+  sessionDirectory <- deriveSessionDirectoryFrom userWalletPublicKey commitmentId
+  ensureDir sessionDirectory
+  renameDir tmpRoot (sessionDirectory </> [reldir|build-commitment-traces|])
+  return commitment
 
 data Input = Input
   { ekPowRho :: AffinePoint
@@ -92,15 +110,13 @@ instance Aeson.FromJSON WitnessValues where
   parseJSON (Aeson.Array arr) = WitnessValues <$> traverse Aeson.parseJSON (V.toList arr)
   parseJSON v = AesonTypes.typeMismatch "Array or witness object" v
 
-allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-allM p = fmap and . mapM p
-
 runBuildCommitment ::
   (MonadIO m, MonadReader FileScheme m) =>
   Context ->
+  Path Abs Dir ->
   Input ->
   m (Either String Output)
-runBuildCommitment params Input {ekPowRho = AffinePoint {x, y}, ..} = do
+runBuildCommitment params tmpRoot Input {ekPowRho = AffinePoint {x, y}, ..} = do
   scheme <- ask
   setup <- asks (Setup.buildCommitment . setup)
   Filescheme.BuildCommitmentInternals {input, output, statementOutput} <- compileAndScheme setup
@@ -110,22 +126,23 @@ runBuildCommitment params Input {ekPowRho = AffinePoint {x, y}, ..} = do
           , "in_seed_y" Aeson..= y
           , "in_message" Aeson..= messageBits
           ]
-  let accountsDir = accounts scheme
 
-  liftIO $ do
-    ensureDir accountsDir
-    withTempDir accountsDir "build-commitment" $ \accountDir -> do
-      let inputPath = accountDir </> input
-          witnessPath = accountDir </> output
-          statementPath = accountDir </> statementOutput
-          shellLogsFilepath = BL8.pack $ Path.toFilePath (accountDir </> (shellLogs . account $ scheme))
-      ensureDir accountDir
-      BL.writeFile (toFilePath inputPath) (Aeson.encode inputJson)
-      let witnessProc = runReader (getGenerateBuildCommitmentWitnessProcess accountDir) scheme
-      witnessProc &!> StdOut &> Append shellLogsFilepath
-      exportStatementAsJSON (toFilePath witnessPath) (toFilePath statementPath)
+  let inputPath = tmpRoot </> input
+      statementPath = tmpRoot </> statementOutput
+      shellLogsFilepath = BL8.pack $ Path.toFilePath (tmpRoot </> (shellLogs . account $ scheme))
+  writeTo inputPath inputJson
+  witnessProc <- getGenerateBuildCommitmentWitnessProcess tmpRoot
+  liftIO $
+    witnessProc
+      &!> StdOut
+      &> Append shellLogsFilepath
+      >> exportStatementAsJSON tmpRoot output statementOutput
         &!> StdOut
-      parseOutputs params setup statementPath
+  parseOutputs params setup statementPath
+
+exportStatementAsJSON :: Path Abs Dir -> Path Rel File -> Path Rel File -> Proc ()
+exportStatementAsJSON directory witness statement =
+  Snarkjs.exportStatementAsJSON (toFilePath (directory </> witness)) (toFilePath (directory </> statement))
 
 compileAndScheme ::
   (MonadIO m, MonadReader FileScheme m) =>
@@ -144,9 +161,9 @@ compileAndScheme Filescheme.BuildCommitmentSetup {wasm, r1cs} = do
     liftIO $ compileProc &!> StdOut
   asks (buildCommitmentInternals . demonstration . session . account)
 
-parseOutputs :: Context -> BuildCommitmentSetup -> Path b t -> IO (Either String Output)
+parseOutputs :: MonadIO m => Context -> BuildCommitmentSetup -> Path b t -> m (Either String Output)
 parseOutputs params buildCommitmentSetup statementPath = do
-  bytes <- BL.readFile (toFilePath statementPath)
+  bytes <- liftIO $ BL.readFile (toFilePath statementPath)
   case Aeson.eitherDecode bytes of
     Left err -> pure (Left err)
     Right (WitnessValues wVals) -> do

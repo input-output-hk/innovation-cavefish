@@ -11,6 +11,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import WBPS.Core.Failure (WBPSFailure)
 import WBPS.Core.FileScheme (FileScheme, defaultFileScheme)
+import WBPS.Core.Keys.Ed25519 (generateKeyPair, userWalletPK)
 import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Session.Demonstration.Commitment (
   CommitmentPayload (unPayload),
@@ -22,7 +23,6 @@ import WBPS.Core.Session.Demonstration.Commitment.Build (
   Input (Input, ekPowRho, messageBits),
   build,
  )
-import WBPS.Core.Session.Demonstration.PreparedMessage (MessageBits)
 import WBPS.Core.Session.Demonstration.PreparedMessage.Prepare (toBitsPaddedToMaxSize)
 import WBPS.Core.Session.Demonstration.Scalars (
   Scalars (Scalars, ekPowRho),
@@ -65,6 +65,7 @@ commitmentMatchesCircuit = do
       CommitmentFixtures ->
       m ([Integer], ElGamal.AffinePoint)
     runCommitmentFlow CommitmentFixtures {unsignedTxFixture, messageBitsFixture, commitmentFixture} = do
+      userWalletPublicKey <- liftIO (userWalletPK <$> generateKeyPair)
       Scalars {ekPowRho} <- compute sampleEncryptionKey sampleRho
       message <- liftIO (readFixture unsignedTxFixture)
       messageBitsFromFixture <- liftIO (readFixture messageBitsFixture)
@@ -72,7 +73,9 @@ commitmentMatchesCircuit = do
 
       whenMismatch "UnsignedTx fixture -> message bits" (toBitsPaddedToMaxSize def message == messageBitsFromFixture)
 
-      commitmentPayload <- unPayload . payload <$> build Input {ekPowRho, messageBits = messageBitsFromFixture}
+      commitmentPayload <-
+        unPayload . payload
+          <$> build userWalletPublicKey Input {ekPowRho, messageBits = messageBitsFromFixture}
 
       whenMismatch "Commitment payload fixture" (commitmentPayload == expectedCommitmentBits)
 

@@ -54,7 +54,7 @@ demonstrate userWalletPublicKey unsignedTx =
       Just account@Registered {setup = Setup {encryptionKeys = ElGamal.KeyPair {ek}}} -> do
         preparedMessage <- prepare def unsignedTx
         scalars@Scalars {ekPowRho} <- Scalars.compute ek =<< ElGamal.generateElGamalExponent
-        commitment <- build . Input ekPowRho . message . circuit $ preparedMessage
+        commitment <- build userWalletPublicKey . Input ekPowRho . message . circuit $ preparedMessage
         Demonstrated account
           <$> save
             account

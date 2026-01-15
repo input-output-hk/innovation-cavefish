@@ -15,7 +15,6 @@ import WBPS.Core.Session.Demonstration.Scalars (Scalars (Scalars))
 compute ::
   MonadError [WBPSFailure] m => EncryptionKey -> Rho -> m Scalars
 compute ek rho =
-  Scalars
-    <$> pure rho
-    <*> toWBPSFailure (encryptionKeyPowRho ek rho)
+  Scalars rho
+    <$> toWBPSFailure (encryptionKeyPowRho ek rho)
     <*> toWBPSFailure (generatorPowRho rho)
