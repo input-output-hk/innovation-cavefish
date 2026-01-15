@@ -17,7 +17,7 @@ import Control.Monad ((>=>))
 import Cooked (InitialDistribution (InitialDistribution), Payable (Value), receives)
 import Data.Default (Default (def))
 import Data.Foldable (foldl')
-import Network.HTTP.Client (defaultManagerSettings, newManager)
+import Network.HTTP.Client (defaultManagerSettings, managerResponseTimeout, newManager, responseTimeoutMicro)
 import Network.Wai.Handler.Warp qualified as Warp
 import Path (Dir, Path, Rel)
 import Plutus.Script.Utils.Value (ada)
@@ -34,7 +34,7 @@ import WBPS.Core.Keys.Ed25519 (Wallet (Wallet, paymentAddress), generateWallet)
 
 getServiceProviderAPI :: ServiceFee -> Int -> IO ServiceProviderAPI
 getServiceProviderAPI fee port = do
-  manager <- newManager defaultManagerSettings
+  manager <- newManager defaultManagerSettings {managerResponseTimeout = responseTimeoutMicro 60000000}
   let baseUrl = BaseUrl SC.Http "127.0.0.1" port ""
       ( register
           :<|> demonstrateCommitment
