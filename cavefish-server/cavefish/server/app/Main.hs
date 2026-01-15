@@ -20,7 +20,7 @@ import Path.IO (getCurrentDir)
 import Paths_cavefish_server (getDataFileName)
 import Sp.Emulator (mkServerContext)
 import Sp.Middleware (cavefishMiddleware)
-import Sp.Server (mkServer)
+import Sp.Server (mkServer, mkSettings)
 import System.FilePath (isAbsolute)
 import System.IO (hPutStrLn, stderr)
 import WBPS.Core.FileScheme (mkFileSchemeFromRoot)
@@ -59,6 +59,6 @@ main = withTracer (Verbose "SP.Server") $ \tr -> do
           config
 
   liftIO $
-    Warp.run
-      port
+    Warp.runSettings
+      (mkSettings port)
       (mkServer cavefishMiddleware env)

@@ -78,6 +78,7 @@ library
     , text
     , wai
     , wai-cors
+    , warp
     , wbps
 
   if flag(ide-stub)
