@@ -24,6 +24,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     env:
+      # Modify this value to "invalidate" the cabal cache.
       CABAL_CACHE_VERSION: "2026-01-15"
       SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
       SECP_CACHE_VERSION: "2022-12-30"

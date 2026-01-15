@@ -64,7 +64,7 @@ cavefishApi = Proxy
 
 mkSettings :: Port -> Settings
 mkSettings port =
-  (setTimeout 120) $ (setPort port) defaultSettings
+  setTimeout 120 $ setPort port defaultSettings
 
 mkServer :: Middleware -> CavefishServices -> Application
 mkServer cavefishMiddleware env =
