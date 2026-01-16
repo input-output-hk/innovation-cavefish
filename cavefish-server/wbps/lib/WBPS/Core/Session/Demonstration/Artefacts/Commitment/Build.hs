@@ -37,22 +37,12 @@ import WBPS.Core.Failure (
   WBPSFailure,
   toWBPSFailure,
  )
-import WBPS.Core.FileScheme (
-  Account (session, shellLogs),
-  BuildCommitmentInternals (input, output, statementOutput),
-  BuildCommitmentSetup (BuildCommitmentSetup, r1cs, wasm),
-  FileScheme (account, setup),
-  buildCommitmentInternals,
-  demonstration,
- )
-import WBPS.Core.FileScheme qualified as Filescheme
-import WBPS.Core.FileScheme qualified as Setup (Setup (buildCommitment))
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Primitives.Circom (
   compileBuildCommitmentForFileScheme,
  )
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
 import WBPS.Core.Primitives.SnarkjsOverFileScheme (getGenerateBuildCommitmentWitnessProcess)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Session.Demonstration.Artefacts.Commitment (
   Commitment (Commitment, id),
@@ -62,6 +52,16 @@ import WBPS.Core.Session.Demonstration.Artefacts.Commitment (
  )
 import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (MessageBits)
 import WBPS.Core.Session.FileScheme (deriveSessionDirectoryFrom)
+import WBPS.Core.Setup.Circuit.FileScheme (
+  Account (session, shellLogs),
+  BuildCommitmentInternals (input, output, statementOutput),
+  BuildCommitmentSetup (BuildCommitmentSetup, r1cs, wasm),
+  FileScheme (account, setup),
+  buildCommitmentInternals,
+  demonstration,
+ )
+import WBPS.Core.Setup.Circuit.FileScheme qualified as Filescheme
+import WBPS.Core.Setup.Circuit.FileScheme qualified as Setup (Setup (buildCommitment))
 
 build ::
   (MonadIO m, MonadReader FileScheme m, MonadError [WBPSFailure] m) =>

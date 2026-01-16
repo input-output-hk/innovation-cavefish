@@ -7,7 +7,7 @@ import Data.Aeson (Value)
 import Data.Aeson.Types (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 import Path (Abs, File, Path)
-import WBPS.Core.Keys.ElGamal qualified as ElGamal
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal
 
 data PublicVerificationContext = PublicVerificationContext {filePath :: Path Abs File, asJson :: Value}
   deriving (Eq, Show, Ord, Generic, FromJSON, ToJSON)

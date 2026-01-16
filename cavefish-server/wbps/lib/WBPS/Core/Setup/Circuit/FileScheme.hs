@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-module WBPS.Core.FileScheme (
+module WBPS.Core.Setup.Circuit.FileScheme (
   defaultFileScheme,
   getShellLogsFilepath,
   mkFileSchemeFromRoot,

@@ -7,7 +7,7 @@ import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader, runReaderT)
 import WBPS.Core.Failure (WBPSFailure)
-import WBPS.Core.FileScheme (FileScheme)
+import WBPS.Core.Setup.Circuit.FileScheme (FileScheme)
 
 runWBPS ::
   FileScheme ->

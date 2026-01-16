@@ -16,14 +16,8 @@ import Path.IO (ensureDir)
 import Shh (Stream (Append, StdOut), (&!>), (&>))
 import WBPS.Adapter.Path (writeTo)
 import WBPS.Core.Failure (WBPSFailure (AccountAlreadyRegistered))
-import WBPS.Core.FileScheme (
-  Account (Account, registration),
-  FileScheme (FileScheme, account),
-  Registration (Registration, encryptionKeys),
-  getShellLogsFilepath,
- )
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Keys.ElGamal qualified as ElGamal
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.FetchAccounts (loadAccount, loadExistingAccount)
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
@@ -31,6 +25,12 @@ import WBPS.Core.Registration.Registered (
   Registered (Registered, userWalletPublicKey),
  )
 import WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh (getGenerateProvingKeyProcess, getGenerateVerificationKeyProcess)
+import WBPS.Core.Setup.Circuit.FileScheme (
+  Account (Account, registration),
+  FileScheme (FileScheme, account),
+  Registration (Registration, encryptionKeys),
+  getShellLogsFilepath,
+ )
 
 register ::
   (MonadIO m, MonadReader FileScheme m, MonadError [WBPSFailure] m) =>

@@ -68,15 +68,13 @@ library
     WBPS.Adapter.Math.Integer
     WBPS.Adapter.Monad.Control
     WBPS.Adapter.Path
-    WBPS.Core.Circuit.Parameters
     WBPS.Core.Failure
-    WBPS.Core.FileScheme
-    WBPS.Core.Keys.Ed25519
-    WBPS.Core.Keys.ElGamal
     WBPS.Core.Primitives.Circom
     WBPS.Core.Primitives.Snarkjs
     WBPS.Core.Primitives.SnarkjsOverFileScheme
     WBPS.Core.Registration.Artefacts.Groth16.Setup
+    WBPS.Core.Registration.Artefacts.Keys.Ed25519
+    WBPS.Core.Registration.Artefacts.Keys.ElGamal
     WBPS.Core.Registration.FetchAccounts
     WBPS.Core.Registration.FileScheme
     WBPS.Core.Registration.FileScheme.Directories
@@ -105,6 +103,8 @@ library
     WBPS.Core.Session.Proving.Prove
     WBPS.Core.Session.Proving.Proved
     WBPS.Core.Session.Session
+    WBPS.Core.Setup.Circuit.FileScheme
+    WBPS.Core.Setup.Circuit.Parameters
     WBPS.WBPS
 
   build-depends:

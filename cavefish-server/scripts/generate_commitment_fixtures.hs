@@ -14,13 +14,13 @@ import qualified Path
 import qualified Path.IO as P
 import System.Random (mkStdGen)
 import WBPS.Adapter.Math.AffinePoint (AffinePoint (..))
-import WBPS.Core.FileScheme (RootFolders (..), defaultFileScheme)
-import WBPS.Core.Keys.ElGamal (EncryptionKey (..))
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey (..))
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx (UnsignedTx))
 import WBPS.Core.Session.Demonstration.Artefacts.Commitment.Build (Commitment (..), CommitmentPayload (..), Input (..), build)
 import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (Message (Message), toBitsPaddedToMaxSize)
 import WBPS.Core.Session.Demonstration.Artefacts.Rho (mkRho)
 import WBPS.Core.Session.Demonstration.Artefacts.Scalars (Scalars (Scalars, ekPowRho), compute)
+import WBPS.Core.Setup.Circuit.FileScheme (RootFolders (..), defaultFileScheme)
 import WBPS.WBPS (runWBPS)
 
 main :: IO ()

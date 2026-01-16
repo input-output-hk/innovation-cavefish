@@ -8,7 +8,9 @@ module WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh (
 import Control.Monad.RWS (MonadReader, asks)
 import Path (reldir, toFilePath, (</>))
 import Shh (Proc)
-import WBPS.Core.FileScheme (
+import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
+import WBPS.Core.Registration.SnarkJs.OverShh qualified as Snarkjs
+import WBPS.Core.Setup.Circuit.FileScheme (
   Account (
     Account,
     registration
@@ -23,9 +25,7 @@ import WBPS.Core.FileScheme (
   ),
   Setup (Setup, powerOfTauPrepared, relationR1CS),
  )
-import WBPS.Core.FileScheme qualified as FileScheme
-import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
-import WBPS.Core.Registration.SnarkJs.OverShh qualified as Snarkjs
+import WBPS.Core.Setup.Circuit.FileScheme qualified as FileScheme
 
 getGenerateProvingKeyProcess :: MonadReader FileScheme m => Directory.Account -> m (Proc ())
 getGenerateProvingKeyProcess accountDirectory = asks (Snarkjs.generateProvingKey . toProvingKeyScheme accountDirectory)

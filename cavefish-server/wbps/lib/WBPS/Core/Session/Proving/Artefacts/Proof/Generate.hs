@@ -13,7 +13,14 @@ import Shh (Stream (Append, StdOut), (&!>), (&>))
 import WBPS.Adapter.Monad.Control (whenNothingThrow)
 import WBPS.Adapter.Path (readFrom)
 import WBPS.Core.Failure (WBPSFailure (SessionProofNotFound))
-import WBPS.Core.FileScheme (
+import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
+import WBPS.Core.Session.Demonstration.Artefacts.Commitment (CommitmentId)
+import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
+import WBPS.Core.Session.Proving.Artefacts.Proof (Proof (Proof))
+import WBPS.Core.Session.Session (deriveId, unSessionId)
+import WBPS.Core.Setup.Circuit.FileScheme (
   Account (Account, registration, session),
   FileScheme,
   ProofGeneration (ProofGeneration, proof, statement),
@@ -23,14 +30,7 @@ import WBPS.Core.FileScheme (
   WitnessGeneration (WitnessGeneration, output),
   getShellLogsFilepath,
  )
-import WBPS.Core.FileScheme qualified as FileScheme
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
-import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment (CommitmentId)
-import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
-import WBPS.Core.Session.Proving.Artefacts.Proof (Proof (Proof))
-import WBPS.Core.Session.Session (deriveId, unSessionId)
+import WBPS.Core.Setup.Circuit.FileScheme qualified as FileScheme
 
 generateProof ::
   (MonadIO m, MonadReader FileScheme m, MonadError [WBPSFailure] m) =>

@@ -17,11 +17,9 @@ import WBPS.Adapter.Path (writeTo)
 import WBPS.Core.Failure (
   WBPSFailure (AccountNotFound),
  )
-import WBPS.Core.FileScheme (FileScheme)
-import WBPS.Core.FileScheme qualified as FileScheme
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.Artefacts.Groth16.Setup (Setup (Setup, encryptionKeys))
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.FetchAccounts (loadAccount)
 import WBPS.Core.Registration.Registered (Registered (Registered, setup, userWalletPublicKey))
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx)
@@ -44,6 +42,8 @@ import WBPS.Core.Session.Demonstration.Demonstrated (
  )
 import WBPS.Core.Session.FileScheme (deriveSessionDirectoryFrom)
 import WBPS.Core.Session.Session (Session (Demonstrated))
+import WBPS.Core.Setup.Circuit.FileScheme (FileScheme)
+import WBPS.Core.Setup.Circuit.FileScheme qualified as FileScheme
 
 demonstrate ::
   (MonadIO m, MonadReader FileScheme m, MonadError [WBPSFailure] m) =>
