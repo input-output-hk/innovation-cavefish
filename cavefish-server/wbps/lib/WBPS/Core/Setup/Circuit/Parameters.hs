@@ -2,7 +2,7 @@
 --   with the Circom relation and the CBOR layout of Cardano transactions.
 --   This module centralizes those invariants to avoid drift between
 --   Haskell code and `wbps/setup/relation/relation.circom`.
-module WBPS.Core.Circuit.Parameters (
+module WBPS.Core.Setup.Circuit.Parameters (
   CircuitParameters (..),
   CircuitMessageMaxSize (..),
   CircuitTxInputSize (..),

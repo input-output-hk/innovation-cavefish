@@ -19,7 +19,7 @@ import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 import Intent.Example.DSL (IntentDSL)
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (AbstractUnsignedTx)
 import WBPS.Core.Session.Demonstration.Artefacts.Commitment (Commitment)
 import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
@@ -61,8 +61,8 @@ handle Inputs {userWalletPublicKey, intent} = do
     , wbpsService = WbpsService.WBPS {demonstrate}
     } <-
     ask
+  toOuput . demonstrated <$> (demonstrate userWalletPublicKey =<< build intent)
 
-  unsignedTx <- build intent
-  CommitmentDemonstrated {preparedMessage = PreparedMessage {parts = MessageParts {public = PublicMessage txAbs}}, commitment} <-
-    demonstrated <$> demonstrate userWalletPublicKey unsignedTx
-  return Outputs {txAbs, commitment}
+toOuput :: CommitmentDemonstrated -> Outputs
+toOuput CommitmentDemonstrated {preparedMessage = PreparedMessage {parts = MessageParts {public = PublicMessage txAbs}}, commitment} =
+  Outputs {txAbs, commitment}

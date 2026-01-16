@@ -16,13 +16,13 @@ import Cavefish.Services.WBPS qualified as Service (WBPS (WBPS, register))
 import Control.Monad.Reader (MonadReader (ask))
 import Data.Aeson (FromJSON, ToJSON, Value)
 import GHC.Generics (Generic)
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Keys.ElGamal (EncryptionKey)
-import WBPS.Core.Keys.ElGamal qualified as ElGamal (KeyPair (KeyPair, ek))
 import WBPS.Core.Registration.Artefacts.Groth16.Setup (
   PublicVerificationContext (PublicVerificationContext, asJson),
   Setup (Setup, encryptionKeys, publicVerificationContext),
  )
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey)
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal (KeyPair (KeyPair, ek))
 import WBPS.Core.Registration.Registered (Registered (Registered, setup))
 
 newtype Inputs = Inputs
@@ -39,12 +39,14 @@ data Outputs = Outputs
 handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey} = do
   CavefishServices {wbpsService = Service.WBPS {register}} <- ask
+  toOutputs <$> register userWalletPublicKey
+
+toOutputs :: Registered -> Outputs
+toOutputs
   Registered
     { setup =
       Setup
         { publicVerificationContext = PublicVerificationContext {asJson = publicVerificationContext}
         , encryptionKeys = ElGamal.KeyPair {ek}
         }
-    } <-
-    register userWalletPublicKey
-  pure Outputs {..}
+    } = Outputs {..}

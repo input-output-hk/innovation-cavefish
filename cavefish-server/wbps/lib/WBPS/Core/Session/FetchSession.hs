@@ -24,9 +24,7 @@ import Path.IO (doesDirExist, listDirRel)
 import WBPS.Adapter.Monad.Control (ifM, whenNothingThrow)
 import WBPS.Adapter.Path (readFrom)
 import WBPS.Core.Failure (WBPSFailure (AccountNotFound, EncryptionKeysNotFound, SessionMessageNotFound))
-import WBPS.Core.FileScheme (FileScheme)
-import WBPS.Core.FileScheme qualified as FileScheme
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.FetchAccounts (loadAccount, loadAccounts)
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Registration.Registered (Registered (Registered, userWalletPublicKey))
@@ -38,6 +36,8 @@ import WBPS.Core.Session.Session (
   SessionId (SessionId),
   deriveId,
  )
+import WBPS.Core.Setup.Circuit.FileScheme (FileScheme)
+import WBPS.Core.Setup.Circuit.FileScheme qualified as FileScheme
 
 getRecordedCommitmentIds :: MonadIO m => Path b Dir -> m [CommitmentId]
 getRecordedCommitmentIds p = do

@@ -11,8 +11,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import WBPS.Adapter.Math.AffinePoint (AffinePoint)
 import WBPS.Core.Failure (WBPSFailure)
-import WBPS.Core.FileScheme (FileScheme, defaultFileScheme)
-import WBPS.Core.Keys.Ed25519 (generateKeyPair, userWalletPK)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (generateKeyPair, userWalletPK)
 import WBPS.Core.Session.Demonstration.Artefacts.Commitment (
   CommitmentPayload (unPayload),
   MessageLimbs (unMessageLimbs),
@@ -28,6 +27,7 @@ import WBPS.Core.Session.Demonstration.Artefacts.Scalars (
   Scalars (Scalars, ekPowRho),
  )
 import WBPS.Core.Session.Demonstration.Artefacts.Scalars.Compute (compute)
+import WBPS.Core.Setup.Circuit.FileScheme (FileScheme, defaultFileScheme)
 import WBPS.Specs.Adapter.Fixture (
   CommitmentFixtures (CommitmentFixtures, commitmentFixture, messageBitsFixture, unsignedTxFixture),
   commitmentFixtures,

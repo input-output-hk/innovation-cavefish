@@ -4,7 +4,7 @@ import Test.QuickCheck (Property, counterexample, (.&&.), (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 import WBPS.Adapter.Math.AffinePoint (AffinePoint (AffinePoint, x, y))
-import WBPS.Core.Keys.ElGamal (EncryptionKey (EncryptionKey))
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey (EncryptionKey))
 import WBPS.Core.Session.Demonstration.Artefacts.Rho (mkRho)
 import WBPS.Core.Session.Demonstration.Artefacts.Scalars (
   Scalars (Scalars, ekPowRho, gPowRho),

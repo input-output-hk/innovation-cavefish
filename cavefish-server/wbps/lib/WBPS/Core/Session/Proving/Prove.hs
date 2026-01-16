@@ -6,10 +6,7 @@ import Control.Monad.Error.Class (MonadError)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader)
 import WBPS.Core.Failure (WBPSFailure)
-import WBPS.Core.FileScheme (
-  FileScheme,
- )
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Session.Demonstration.Artefacts.Commitment (CommitmentId)
 import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
   CircuitMessage (CircuitMessage, message),
@@ -22,6 +19,9 @@ import WBPS.Core.Session.Proving.Artefacts.Challenge qualified as Challenge
 import WBPS.Core.Session.Proving.Artefacts.Proof.Generate (generateProof)
 import WBPS.Core.Session.Proving.Artefacts.Witness qualified as Witness (generate)
 import WBPS.Core.Session.Proving.Proved (CommitmentProved (CommitmentProved, bigR, challenge, proof))
+import WBPS.Core.Setup.Circuit.FileScheme (
+  FileScheme,
+ )
 
 prove ::
   (MonadIO m, MonadReader FileScheme m, MonadError [WBPSFailure] m) =>

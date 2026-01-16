@@ -10,8 +10,8 @@ import Intent.Example.DSL (
   unAdressConwayEra,
  )
 import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
-import WBPS.Core.Keys.Ed25519 (PaymentAddess (PaymentAddess), Wallet (Wallet, paymentAddress))
-import WBPS.Core.Keys.Ed25519 qualified as Ed25519 (generateWallet)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (PaymentAddess (PaymentAddess), Wallet (Wallet, paymentAddress))
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 qualified as Ed25519 (generateWallet)
 
 spec :: Spec
 spec =

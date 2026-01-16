@@ -14,7 +14,7 @@ import Cavefish.Services.WBPS qualified as WbpsService
 import Control.Monad.Reader (ask)
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Session.Demonstration.Artefacts.Commitment (CommitmentId)
 import WBPS.Core.Session.Demonstration.Artefacts.R (R)
 import WBPS.Core.Session.Proving.Artefacts.Challenge (Challenge)
@@ -37,6 +37,8 @@ data Outputs = Outputs
 handle :: Inputs -> CavefishServerM Outputs
 handle Inputs {userWalletPublicKey, commitmentId, bigR} = do
   CavefishServices {wbpsService = WbpsService.WBPS {prove}} <- ask
-  CommitmentProved {challenge = provedChallenge, proof = provedProof} <-
-    prove userWalletPublicKey commitmentId bigR
-  pure Outputs {challenge = provedChallenge, proof = provedProof}
+  toOutputs <$> prove userWalletPublicKey commitmentId bigR
+
+toOutputs :: CommitmentProved -> Outputs
+toOutputs CommitmentProved {challenge = provedChallenge, proof = provedProof} =
+  Outputs {challenge = provedChallenge, proof = provedProof}

@@ -13,10 +13,10 @@ import Path (parseRelDir, (</>))
 import WBPS.Core.Failure (
   WBPSFailure (AccountIdInvalidToCreateAFolder),
  )
-import WBPS.Core.FileScheme (FileScheme (FileScheme, accounts))
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
 import WBPS.Core.Registration.Registered (AccountId (AccountId), deriveId)
+import WBPS.Core.Setup.Circuit.FileScheme (FileScheme (FileScheme, accounts))
 
 -- | Derive the directory path for a user account based on their wallet public key.
 -- This function constructs the directory path by combining the base accounts directory

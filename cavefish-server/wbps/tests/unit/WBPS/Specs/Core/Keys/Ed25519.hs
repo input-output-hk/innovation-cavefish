@@ -5,12 +5,12 @@ import Data.ByteString.Lazy.Char8 qualified as BL8
 import Test.QuickCheck (Property, counterexample, ioProperty, (===))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
-import WBPS.Core.Keys.Ed25519 qualified as Ed25519
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 qualified as Ed25519
 
 specs :: TestTree
 specs =
   testGroup
-    "WBPS.Core.Keys.Ed25519"
+    "WBPS.Core.Registration.Artefacts.Keys.Ed25519"
     [ testProperty "PublicKey JSON roundtrips" publicKeyJsonRoundtrips
     ]
 

@@ -29,8 +29,8 @@ import Sp.Emulator (mkServerContext)
 import Sp.Middleware (errStatusTraceMiddleware)
 import Sp.Server (Cavefish, mkServer)
 import Test.Hspec (expectationFailure)
-import WBPS.Core.FileScheme (FileScheme, mkFileSchemeFromRoot)
-import WBPS.Core.Keys.Ed25519 (Wallet (Wallet, paymentAddress), generateWallet)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (Wallet (Wallet, paymentAddress), generateWallet)
+import WBPS.Core.Setup.Circuit.FileScheme (FileScheme, mkFileSchemeFromRoot)
 
 getServiceProviderAPI :: ServiceFee -> Int -> IO ServiceProviderAPI
 getServiceProviderAPI fee port = do

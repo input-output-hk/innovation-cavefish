@@ -3,7 +3,7 @@ module WBPS.Specs.Adapter.Test (getRootFolder) where
 import Path (Abs, Dir, Path, Rel, parseAbsDir, (</>))
 import Path.IO (ensureDir, listDir, removeDirRecur, removeFile)
 import System.Environment (getEnv)
-import WBPS.Core.FileScheme (RootFolders (RootFolders, input, output))
+import WBPS.Core.Setup.Circuit.FileScheme (RootFolders (RootFolders, input, output))
 
 getRootFolder :: Path Rel Dir -> IO RootFolders
 getRootFolder dirLabel = do

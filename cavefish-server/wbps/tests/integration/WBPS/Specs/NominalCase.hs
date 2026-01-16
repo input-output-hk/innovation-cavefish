@@ -11,14 +11,14 @@ import Path (reldir)
 import Test.QuickCheck (Gen, counterexample, forAll, ioProperty, property, (.&&.), (===))
 import Test.Tasty (TestTree)
 import Test.Tasty.QuickCheck (testProperty)
-import WBPS.Core.FileScheme (
-  defaultFileScheme,
- )
-import WBPS.Core.Keys.Ed25519 (KeyPair, userWalletPK)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (KeyPair, userWalletPK)
 import WBPS.Core.Registration.FetchAccounts (loadAccounts)
 import WBPS.Core.Registration.Register (register)
 import WBPS.Core.Session.Demonstration.Demonstrate (demonstrate)
 import WBPS.Core.Session.FetchSession (loadSessions)
+import WBPS.Core.Setup.Circuit.FileScheme (
+  defaultFileScheme,
+ )
 import WBPS.Specs.Adapter.Fixture (
   CommitmentFixtures (unsignedTxFixture),
   commitmentFixtures,

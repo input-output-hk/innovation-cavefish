@@ -18,20 +18,10 @@ import Shh (Stream (Append, StdOut), (&!>), (&>))
 import WBPS.Adapter.Math.AffinePoint qualified as AffinePoint
 import WBPS.Adapter.Path (writeTo)
 import WBPS.Core.Failure (WBPSFailure)
-import WBPS.Core.FileScheme (
-  Account (Account, session),
-  FileScheme (FileScheme, account, setup),
-  Proving (Proving, bigR, challenge, witness),
-  Session (Session, proving),
-  Setup (Setup, witness),
-  WitnessGeneration (WitnessGeneration, input, output),
-  WitnessGenerationSetup (WitnessGenerationSetup, wasm),
-  getShellLogsFilepath,
- )
-import WBPS.Core.Keys.Ed25519 qualified as Ed25519
-import WBPS.Core.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
 import WBPS.Core.Registration.Artefacts.Groth16.Setup qualified as Groth16
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 qualified as Ed25519
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Registration.Registered (Registered (Registered, setup, userWalletPublicKey))
 import WBPS.Core.Session.Demonstration.Artefacts.Commitment (
@@ -49,6 +39,16 @@ import WBPS.Core.Session.Demonstration.Artefacts.Scalars (Scalars (Scalars, ekPo
 import WBPS.Core.Session.Demonstration.Demonstrated (CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage, scalars))
 import WBPS.Core.Session.FileScheme (deriveExistingSessionDirectoryFrom)
 import WBPS.Core.Session.Proving.Artefacts.Challenge (Challenge)
+import WBPS.Core.Setup.Circuit.FileScheme (
+  Account (Account, session),
+  FileScheme (FileScheme, account, setup),
+  Proving (Proving, bigR, challenge, witness),
+  Session (Session, proving),
+  Setup (Setup, witness),
+  WitnessGeneration (WitnessGeneration, input, output),
+  WitnessGenerationSetup (WitnessGenerationSetup, wasm),
+  getShellLogsFilepath,
+ )
 
 data CircuitInputs = CircuitInputs
   { signer_key :: [Word8]
