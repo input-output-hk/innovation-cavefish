@@ -2,6 +2,7 @@
 
 module WBPS.Core.Session.Demonstration.Artefacts.Commitment (
   mkCommitment,
+  commitmentPayloadToText,
   Commitment (..),
   CommitmentPayload (..),
   MessageLimbs (..),
@@ -15,6 +16,7 @@ import Data.Aeson.Types (Parser)
 import Data.ByteArray qualified as BA
 import Data.ByteString qualified as BS
 import Data.String (IsString)
+import Data.Text (Text)
 import Data.Vector qualified as V
 import Data.Word (Word8)
 import GHC.Generics (Generic)
@@ -65,6 +67,10 @@ mkCommitment payload =
     commitmentId = CommitmentId . fromByteString @Hexadecimal $ (BA.convert digest :: ByteString)
    in
     Commitment {id = commitmentId, payload}
+
+commitmentPayloadToText :: CommitmentPayload -> [Text]
+commitmentPayloadToText (CommitmentPayload (MessageLimbs limbs)) =
+  map AdapterInteger.toText limbs
 
 integerToWords :: Integer -> [Word8]
 integerToWords = AdapterInteger.toBytesBigEndian
