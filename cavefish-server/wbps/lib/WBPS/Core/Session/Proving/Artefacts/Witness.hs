@@ -33,7 +33,8 @@ import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
   MessageBits,
   PreparedMessage (PreparedMessage, circuit),
  )
-import WBPS.Core.Session.Demonstration.Artefacts.R (R (R))
+import WBPS.Core.Session.Demonstration.Artefacts.R (R)
+import WBPS.Core.Session.Demonstration.Artefacts.R qualified as R
 import WBPS.Core.Session.Demonstration.Artefacts.Rho (Rho)
 import WBPS.Core.Session.Demonstration.Artefacts.Scalars (Scalars (Scalars, ekPowRho, gPowRho, rho))
 import WBPS.Core.Session.Demonstration.Demonstrated (CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage, scalars))
@@ -131,7 +132,7 @@ prepareInputs
       { signer_key = Ed25519.userWalletPublicKeyToWord8s userWalletPublicKey
       , solver_encryption_key = AffinePoint.toText solverKeyPoint
       , solver_encryption_key_pow_rho = AffinePoint.toText ekPowRho
-      , commitment_point_bits = rToBits bigR
+      , commitment_point_bits = R.toWord8s bigR
       , commitment_point_affine = AffinePoint.toText gPowRho
       , commitment_randomizer_rho = rho
       , commitment_payload = payload
@@ -139,9 +140,6 @@ prepareInputs
       , message_public_part = public
       , message_private_part = private
       }
-    where
-      rToBits (R rPk) =
-        Ed25519.userWalletPublicKeyToWord8s (Ed25519.UserWalletPublicKey rPk)
 
 saveCircuitInputs :: MonadIO m => Path b File -> CircuitInputs -> m ()
 saveCircuitInputs = writeTo

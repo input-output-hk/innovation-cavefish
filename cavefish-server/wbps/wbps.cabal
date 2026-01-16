@@ -64,6 +64,7 @@ library
     WBPS.Adapter.Data
     WBPS.Adapter.Data.Aeson
     WBPS.Adapter.Data.ByteString
+    WBPS.Adapter.Data.Word8
     WBPS.Adapter.Math.AffinePoint
     WBPS.Adapter.Math.Integer
     WBPS.Adapter.Monad.Control
@@ -82,6 +83,7 @@ library
     WBPS.Core.Registration.Registered
     WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh
     WBPS.Core.Registration.SnarkJs.OverShh
+    WBPS.Core.Session.BlindSigning.ThetaStatement
     WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx
     WBPS.Core.Session.Demonstration.Artefacts.Commitment
     WBPS.Core.Session.Demonstration.Artefacts.Commitment.Build
@@ -165,6 +167,7 @@ test-suite wbps-integration-tests
     WBPS.Specs.Adapter.GenCardanoKeys
     WBPS.Specs.Adapter.Test
     WBPS.Specs.NominalCase
+    WBPS.Specs.Session.BlindSigning.ThetaStatement
     WBPS.Specs.Session.Demonstration.Commitment.Build
 
   build-depends:
@@ -173,6 +176,8 @@ test-suite wbps-integration-tests
     , cardano-crypto-class
     , containers
     , data-default
+    , directory
+    , filepath
     , mtl
     , path
     , path-io
@@ -180,4 +185,5 @@ test-suite wbps-integration-tests
     , tasty
     , tasty-hunit
     , tasty-quickcheck
+    , text
     , wbps

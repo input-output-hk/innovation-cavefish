@@ -8,6 +8,7 @@ module WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
   PrivateMessage (..),
   CircuitMessage (..),
   MessageBits (..),
+  messageBitsToText,
 ) where
 
 import Control.Monad (unless)
@@ -15,9 +16,11 @@ import Data.Aeson (FromJSON (parseJSON), ToJSON (toJSON), withArray)
 import Data.Aeson.Types (Parser)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
+import Data.Text (Text)
 import Data.Vector qualified as V
 import Data.Word (Word8)
 import GHC.Generics (Generic)
+import WBPS.Adapter.Data.Word8 (word8sToText)
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (
   AbstractUnsignedTx (AbstractUnsignedTx),
   PrivateTxInputs,
@@ -78,3 +81,7 @@ instance FromJSON MessageBits where
     pure (MessageBits (BS.pack bits))
     where
       isBit b = b == 0 || b == 1
+
+messageBitsToText :: MessageBits -> [Text]
+messageBitsToText (MessageBits bits) =
+  word8sToText (BS.unpack bits)
