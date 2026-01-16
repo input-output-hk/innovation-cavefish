@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module WBPS.Core.Keys.ElGamal (
+module WBPS.Core.Registration.Artefacts.Keys.ElGamal (
   KeyPair (..),
   EncryptionKey (..),
   DecryptionKey (..),

@@ -1,4 +1,4 @@
-module WBPS.Core.Keys.Ed25519 (
+module WBPS.Core.Registration.Artefacts.Keys.Ed25519 (
   UserWalletPublicKey (..),
   KeyPair (..),
   PublicKey (..),

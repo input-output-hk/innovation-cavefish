@@ -25,7 +25,7 @@ import Data.Vector qualified as V
 import Data.Word (Word64, Word8)
 import WBPS.Adapter.CardanoCryptoClass.Crypto qualified as Crypto
 import WBPS.Adapter.Data.ByteString (bytesToBitsLE)
-import WBPS.Core.Keys.Ed25519 (PublicKey (PublicKey), UserWalletPublicKey (UserWalletPublicKey))
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (PublicKey (PublicKey), UserWalletPublicKey (UserWalletPublicKey))
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx (txUnsigned))
 import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
   Message (Message),

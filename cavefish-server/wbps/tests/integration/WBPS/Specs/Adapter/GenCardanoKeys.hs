@@ -25,7 +25,7 @@ import WBPS.Adapter.CardanoCryptoClass.Crypto as Adapter (
   PrivateKey (PrivateKey),
   PublicKey (PublicKey),
  )
-import WBPS.Core.Keys.Ed25519 as Ed25519 (KeyPair (KeyPair))
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 as Ed25519 (KeyPair (KeyPair))
 
 -- | Generate a DSIGN seed of the correct size for Ed25519 (pure).
 genEd25519Seed :: Gen Seed

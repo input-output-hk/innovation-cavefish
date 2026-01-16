@@ -6,7 +6,9 @@ module WBPS.Core.Primitives.SnarkjsOverFileScheme (
 import Control.Monad.RWS (MonadReader, ask)
 import Path (toFilePath, (</>))
 import Shh (Proc)
-import WBPS.Core.FileScheme (
+import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
+import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
+import WBPS.Core.Setup.Circuit.FileScheme (
   Account (session),
   BuildCommitmentInternals (BuildCommitmentInternals, input, output),
   BuildCommitmentSetup (BuildCommitmentSetup, wasm),
@@ -15,8 +17,6 @@ import WBPS.Core.FileScheme (
   Session (demonstration),
   Setup (buildCommitment),
  )
-import WBPS.Core.Primitives.Snarkjs qualified as Snarkjs
-import WBPS.Core.Registration.FileScheme.Directories qualified as Directory
 
 getGenerateBuildCommitmentWitnessProcess :: MonadReader FileScheme m => Directory.Account -> m (Proc ())
 getGenerateBuildCommitmentWitnessProcess accountDirectory =

@@ -29,7 +29,7 @@ import Data.List.NonEmpty qualified as NE
 import Intent.Example.DSL (AddressW (AddressW), IntentDSL (AndExpsW, PayToW, SpendFromW), satisfies)
 import Path (reldir)
 import Test.Hspec (Spec, describe, it, shouldBe)
-import WBPS.Core.Keys.Ed25519 (
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (
   PaymentAddess (PaymentAddess),
   generateKeyTuple,
   paymentAddress,

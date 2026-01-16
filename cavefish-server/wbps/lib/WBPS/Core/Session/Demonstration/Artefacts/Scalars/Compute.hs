@@ -4,7 +4,7 @@ module WBPS.Core.Session.Demonstration.Artefacts.Scalars.Compute (
 
 import Control.Monad.Except (MonadError)
 import WBPS.Core.Failure (WBPSFailure, toWBPSFailure)
-import WBPS.Core.Keys.ElGamal (EncryptionKey)
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey)
 import WBPS.Core.Session.Demonstration.Artefacts.Rho (
   Rho,
   encryptionKeyPowRho,

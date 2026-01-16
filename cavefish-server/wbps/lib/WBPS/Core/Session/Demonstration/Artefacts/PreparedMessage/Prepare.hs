@@ -16,15 +16,6 @@ import Data.ByteString qualified as BS
 import Data.List (foldl')
 import Data.Word (Word8)
 import GHC.Bits (testBit)
-import WBPS.Core.Circuit.Parameters (
-  CircuitMessageMaxSize (CircuitMessageMaxSize),
-  CircuitParameters (CircuitParameters, messageSize, txInputSize),
-  MessagePrivatePartOffsetBits (MessagePrivatePartOffsetBits),
-  MessagePrivatePartSizeBits (MessagePrivatePartSizeBits),
-  assertFitsCircuitParameters,
-  messagePrivatePartOffset,
-  messagePrivatePartSize,
- )
 import WBPS.Core.Failure (WBPSFailure (CircuitMessageDecodeFailed))
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (
   UnsignedTx (UnsignedTx, txUnsigned),
@@ -39,6 +30,15 @@ import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
   PreparedMessage (PreparedMessage, circuit, parts),
   PrivateMessage (PrivateMessage),
   PublicMessage (PublicMessage),
+ )
+import WBPS.Core.Setup.Circuit.Parameters (
+  CircuitMessageMaxSize (CircuitMessageMaxSize),
+  CircuitParameters (CircuitParameters, messageSize, txInputSize),
+  MessagePrivatePartOffsetBits (MessagePrivatePartOffsetBits),
+  MessagePrivatePartSizeBits (MessagePrivatePartSizeBits),
+  assertFitsCircuitParameters,
+  messagePrivatePartOffset,
+  messagePrivatePartSize,
  )
 
 prepare ::

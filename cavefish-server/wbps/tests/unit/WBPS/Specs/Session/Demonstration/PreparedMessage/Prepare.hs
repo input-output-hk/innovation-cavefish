@@ -8,11 +8,6 @@ import Data.ByteString.Lazy.Char8 qualified as BL8
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertFailure, testCase)
 import Test.Tasty.QuickCheck (Gen, Property, counterexample, elements, forAll, ioProperty, testProperty, (===))
-import WBPS.Core.Circuit.Parameters (
-  CircuitMessageMaxSize (CircuitMessageMaxSize),
-  CircuitParameters (CircuitParameters, messageSize, txInputSize),
-  mkCircuitTxInputSize,
- )
 import WBPS.Core.Failure (WBPSFailure (TxBuiltTooLarge, TxInputsCountMismatch))
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (PrivateTxInputs (PrivateTxInputs), UnsignedTx, extractPrivateElements)
 import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
@@ -21,6 +16,11 @@ import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
 import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage.Prepare (
   prepare,
   recompose,
+ )
+import WBPS.Core.Setup.Circuit.Parameters (
+  CircuitMessageMaxSize (CircuitMessageMaxSize),
+  CircuitParameters (CircuitParameters, messageSize, txInputSize),
+  mkCircuitTxInputSize,
  )
 
 specs :: TestTree
