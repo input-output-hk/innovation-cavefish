@@ -62,20 +62,47 @@ library
   import:          base, project-config
   hs-source-dirs:  src
   exposed-modules:
+    Adapter.Logging
+    Cavefish
+    Cavefish.Api.ServerConfiguration
+    Cavefish.Endpoints.Read.FetchAccount
+    Cavefish.Endpoints.Read.FetchAccounts
+    Cavefish.Endpoints.Write.AskCommitmentProof
+    Cavefish.Endpoints.Write.DemonstrateCommitment
+    Cavefish.Endpoints.Write.Register
+    Cavefish.Performance.LogEvent
+    Cavefish.Services.TxBuilding
+    Cavefish.Services.WBPS
+    Intent.Example.DSL
+    Intent.Example.TxBuilder
     Sp.Emulator
     Sp.Middleware
     Sp.Server
 
   build-depends:
+    , aeson
+    , async
     , bytestring
-    , cavefish-core
+    , cardano-api
     , clock
+    , containers
+    , contra-tracer
     , cooked-validators
+    , data-default
+    , exceptions
     , http-types
+    , monad-time
+    , mtl
     , path
+    , plutus-ledger
+    , plutus-script-utils
+    , say
     , servant
     , servant-server
+    , stm
     , text
+    , time
+    , toml-parser
     , wai
     , wai-cors
     , wbps
@@ -90,7 +117,6 @@ executable cavefish-server
   other-modules:   Paths_cavefish_server
   autogen-modules: Paths_cavefish_server
   build-depends:
-    , cavefish-core
     , cavefish-server
     , data-default
     , filepath
@@ -107,5 +133,13 @@ test-suite test
   type:           exitcode-stdio-1.0
   main-is:        Main.hs
   hs-source-dirs: test
-  other-modules:  Spec
-  build-depends:  hspec
+  other-modules:
+    Core.IntentSpecs
+    Spec
+
+  build-depends:
+    , cardano-api
+    , cavefish-server
+    , hspec
+    , text
+    , wbps

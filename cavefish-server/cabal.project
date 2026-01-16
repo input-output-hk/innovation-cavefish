@@ -1,6 +1,5 @@
 packages:
   wbps/wbps.cabal
-  cavefish/core/cavefish-core.cabal
   cavefish/server/cavefish-server.cabal
   cavefish/tests/cavefish-tests.cabal
 
