@@ -90,6 +90,11 @@ let
     tools.cabal-fmt
     tools.hlint
 
+    pkgs.cargo
+    pkgs.rust-script
+
+    pkgs.act
+
     pkgs.nixfmt-rfc-style
     pkgs.shellcheck
     pkgs.github-cli
@@ -110,6 +115,7 @@ let
     # Additions for gen-tags.sh
     pkgs.haskellPackages.fast-tags
     pkgs.haskellPackages.hie-bios
+    pkgs.haskellPackages.implicit-hie
     pkgs.jq
 
     # wbps and ZKsnark dependencies
