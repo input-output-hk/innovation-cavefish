@@ -9,9 +9,6 @@ module Intent.Example.DSL (
   AddressW (..),
   AdressConwayEra (..),
   ChangeDelta,
-  emptyIntent,
-  normalizeIntent,
-  toIntentExpr,
   toCanonicalIntent,
   satisfies,
   outExactly,
@@ -20,6 +17,10 @@ module Intent.Example.DSL (
 
 import Cardano.Api (FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
+import Control.Applicative (Alternative ((<|>)))
+import Control.Monad.Except (ExceptT, runExceptT, throwError)
+import Control.Monad.Writer (Writer, runWriter, tell)
+import Data.Default (Default (def))
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map qualified as Map
 import Data.Text (Text)
@@ -93,21 +94,6 @@ data IntentDSL
 
     We don't really need this type anymore, but I'm keeping it around for parity with the paper.
  -}
-data InternalIntentDSL
-  = -- | Must mint this value
-    MustMint Value
-  | -- | Spend from this source
-    SpendFrom AdressConwayEra
-  | -- | Maximum validity interval in slots
-    MaxInterval Slot
-  | -- | Pay this value to this address
-    PayTo Value AdressConwayEra
-  | -- | Send change to this address
-    ChangeTo AdressConwayEra
-  | -- | Maximum fee
-    MaxFee Integer
-  | AndExps (NonEmpty InternalIntentDSL)
-  deriving (Eq, Show, Generic)
 
 data CanonicalIntent = CanonicalIntent
   { spendFrom :: [AdressConwayEra]
@@ -125,59 +111,55 @@ data CanonicalIntent = CanonicalIntent
   }
   deriving (Show)
 
-emptyIntent :: CanonicalIntent
-emptyIntent =
-  CanonicalIntent
-    { spendFrom = []
-    , payTo = []
-    , mustMint = []
-    , changeTo = Nothing
-    , maxFee = Nothing
-    , maxInterval = Nothing
-    }
+instance Semigroup CanonicalIntent where
+  CanonicalIntent _spendFrom _payTo _mustMint _changeTo _maxFee _maxInterval
+    <> CanonicalIntent _spendFrom' _payTo' _mustMint' _changeTo' _maxFee' _maxInterval' =
+      CanonicalIntent
+        (_spendFrom <> _spendFrom')
+        (_payTo <> _payTo')
+        (_mustMint <> _mustMint')
+        (_changeTo' <|> _changeTo)
+        (min _maxFee _maxFee')
+        (min _maxInterval _maxInterval')
 
--- | Normalize an InternalIntentDSL into a Canonical Intent
-normalizeIntent :: InternalIntentDSL -> CanonicalIntent
-normalizeIntent = go emptyIntent
-  where
-    go acc = \case
-      MustMint v -> acc {mustMint = v : mustMint acc}
-      SpendFrom s -> acc {spendFrom = s : spendFrom acc}
-      MaxInterval i -> acc {maxInterval = Just (maybe i (min i) (maxInterval acc))}
-      PayTo v a -> acc {payTo = (v, a) : payTo acc}
-      ChangeTo a -> acc {changeTo = Just a}
-      MaxFee f -> acc {maxFee = Just (maybe f (min f) (maxFee acc))}
-      AndExps xs -> foldl go acc xs
+instance Monoid CanonicalIntent where
+  mempty = def
 
-toIntentExpr :: IntentDSL -> Either Text InternalIntentDSL
-toIntentExpr = \case
-  MustMintW v -> Right (MustMint v)
-  SpendFromW walletAddr -> SpendFrom <$> parseAddr walletAddr
-  MaxIntervalW w -> Right (MaxInterval (fromInteger w))
-  PayToW v a -> PayTo v <$> parseAddr a
-  ChangeToW a -> ChangeTo <$> parseAddr a
-  MaxFeeW i -> Right (MaxFee i)
-  AndExpsW xs -> AndExps <$> traverse toInt xs
-  where
-    parseAddr :: AddressW -> Either Text AdressConwayEra
-    parseAddr (AddressW addr) =
-      maybe
-        (Left ("invalid address : " <> addr))
-        (Right . AdressConwayEra)
-        (Api.deserialiseAddress (Api.AsAddressInEra Api.AsConwayEra) addr)
-    toInt :: IntentDSL -> Either Text InternalIntentDSL
-    toInt = \case
-      MustMintW v -> Right (MustMint v)
-      SpendFromW walletAddr -> SpendFrom <$> parseAddr walletAddr
-      MaxIntervalW w -> Right (MaxInterval (fromInteger w))
-      PayToW v a -> PayTo v <$> parseAddr a
-      ChangeToW a -> ChangeTo <$> parseAddr a
-      MaxFeeW i -> Right (MaxFee i)
-      AndExpsW ys -> AndExps <$> traverse toInt ys
+instance Default CanonicalIntent where
+  def = CanonicalIntent def def def def def def
+
+type EvalMonad a = ExceptT Text (Writer CanonicalIntent) a
+
+runApp :: IntentDSL -> (Either Text (), CanonicalIntent)
+runApp dsl = runWriter (runExceptT (evalIntentDSL dsl))
 
 toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent
-toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent =
-  fmap normalizeIntent . toIntentExpr
+toCanonicalIntent dsl = case runApp dsl of
+  (Left e, _) -> Left e
+  (Right (), intent) -> Right intent
+
+evalIntentDSL :: IntentDSL -> EvalMonad ()
+evalIntentDSL dsl = do
+  case dsl of
+    MustMintW v -> tell mempty {mustMint = [v]}
+    SpendFromW w@(AddressW walletAddr) -> case parseAddr w of
+      Nothing ->
+        throwError $ "invalid address : " <> walletAddr
+      Just addr -> tell mempty {spendFrom = [addr]}
+    MaxIntervalW w -> tell mempty {maxInterval = Just $ fromInteger w}
+    PayToW value w@(AddressW walletAddr) -> case parseAddr w of
+      Nothing ->
+        throwError $ "invalid address : " <> walletAddr
+      Just addr -> tell mempty {payTo = [(value, addr)]}
+    ChangeToW a -> tell mempty {changeTo = parseAddr a}
+    MaxFeeW i -> tell mempty {maxFee = Just i}
+    AndExpsW ys -> mapM_ evalIntentDSL ys
+  where
+    parseAddr :: AddressW -> Maybe AdressConwayEra
+    parseAddr (AddressW addr) =
+      fmap
+        AdressConwayEra
+        (Api.deserialiseAddress (Api.AsAddressInEra Api.AsConwayEra) addr)
 
 satisfies :: IntentDSL -> AbstractUnsignedTx -> Bool
 satisfies _ _ = True
