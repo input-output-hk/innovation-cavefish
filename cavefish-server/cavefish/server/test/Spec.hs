@@ -1,9 +1,7 @@
 module Spec (spec) where
 
-import Test.Hspec (Spec, describe, it, shouldBe)
+import Core.IntentSpecs qualified as IntentSpecs
+import Test.Hspec (Spec)
 
 spec :: Spec
-spec = do
-  describe "cavefish-core specs" $ do
-    it "tests are under development" $ do
-      True `shouldBe` True
+spec = IntentSpecs.spec

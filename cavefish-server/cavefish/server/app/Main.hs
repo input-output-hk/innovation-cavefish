@@ -23,7 +23,7 @@ import Sp.Middleware (cavefishMiddleware)
 import Sp.Server (mkServer)
 import System.FilePath (isAbsolute)
 import System.IO (hPutStrLn, stderr)
-import WBPS.Core.FileScheme (mkFileSchemeFromRoot)
+import WBPS.Core.Setup.Circuit.FileScheme (mkFileSchemeFromRoot)
 
 -- | The name of the configuration file
 -- See relevant `data-files` entry in the .cabal file for more details.

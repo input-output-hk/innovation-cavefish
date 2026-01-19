@@ -37,4 +37,6 @@ data WBPSFailure
   | SessionScalarsNotFound UserWalletPublicKey CommitmentId
   | SessionCommitmentNotFound UserWalletPublicKey CommitmentId
   | SessionProofNotFound UserWalletPublicKey CommitmentId
+  | ProofVerificationFailed String
+  | BlindSignatureFailed String
   deriving (Show, Eq)

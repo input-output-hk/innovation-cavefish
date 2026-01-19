@@ -17,9 +17,7 @@ import WBPS.Adapter.Monad.Control (ifM)
 import WBPS.Core.Failure (
   WBPSFailure (SessionIdInvalidToCreateAFolder, SessionNotFound),
  )
-import WBPS.Core.FileScheme (FileScheme)
-import WBPS.Core.FileScheme qualified as FileScheme
-import WBPS.Core.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Session.Demonstration.Artefacts.Commitment (CommitmentId)
 import WBPS.Core.Session.FileScheme.Directories qualified as Directory
@@ -27,6 +25,8 @@ import WBPS.Core.Session.Session (
   SessionId (SessionId),
   deriveId,
  )
+import WBPS.Core.Setup.Circuit.FileScheme (FileScheme)
+import WBPS.Core.Setup.Circuit.FileScheme qualified as FileScheme
 
 deriveExistingSessionDirectoryFrom ::
   (MonadIO m, MonadReader FileScheme m, MonadError [WBPSFailure] m) =>

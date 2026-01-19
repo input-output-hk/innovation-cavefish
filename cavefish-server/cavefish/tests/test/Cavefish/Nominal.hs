@@ -10,7 +10,8 @@ module Cavefish.Nominal (spec) where
 import Adapter.Cavefish.Client (
   ReadAPI (ReadAPI, fetchAccount),
   ServiceProviderAPI (ServiceProviderAPI, read, write),
-  Setup (Setup, alice, bob, serviceProvider),
+  Setup (Setup, alice, bob, serviceProvider, userToolkit),
+  UserToolkitAPI (UserToolkitAPI, assertProofIsValid, signBlindly),
   WriteAPI (
     WriteAPI,
     askCommitmentProof,
@@ -29,14 +30,16 @@ import Data.List.NonEmpty qualified as NE
 import Intent.Example.DSL (AddressW (AddressW), IntentDSL (AndExpsW, PayToW, SpendFromW), satisfies)
 import Path (reldir)
 import Test.Hspec (Spec, describe, it, shouldBe)
-import WBPS.Core.Keys.Ed25519 (
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (
   PaymentAddess (PaymentAddess),
-  generateKeyTuple,
+  keyPair,
   paymentAddress,
   publicKey,
  )
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment (Commitment (Commitment, id))
-import WBPS.Core.Session.Demonstration.Artefacts.R (R (R))
+import WBPS.Core.Session.BlindSigning.ThetaStatement (rebuildThetaStatement)
+import WBPS.Core.Session.Demonstration.Artefacts.Commitment (Commitment (Commitment, id, payload))
+import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (PublicMessage (PublicMessage))
+import WBPS.Core.Session.Demonstration.Artefacts.R qualified as R
 
 spec :: Spec
 spec = do
@@ -53,6 +56,7 @@ spec = do
                    { write = WriteAPI {register, demonstrateCommitment, askCommitmentProof}
                    , read = ReadAPI {fetchAccount}
                    }
+               , userToolkit = UserToolkitAPI {assertProofIsValid, signBlindly}
                , alice
                , bob
                } -> do
@@ -65,22 +69,29 @@ spec = do
                         )
                 Register.Outputs {publicVerificationContext, ek} <- register . Register.Inputs . publicKey $ alice
 
-                DemonstrateCommitment.Outputs {commitment = commitment@Commitment {id = commitmentId}, txAbs} <-
+                DemonstrateCommitment.Outputs {commitment = commitment@Commitment {id = commitmentId, payload}, txAbs} <-
                   demonstrateCommitment
                     . DemonstrateCommitment.Inputs (publicKey alice)
                     $ intent
 
                 satisfies intent txAbs `shouldBe` True
 
-                (r, bigR) <- generateKeyTuple
+                (r, bigR) <- R.generateKeyTuple
 
-                _ <-
+                AskCommitmentProof.Outputs {challenge, proof} <-
                   askCommitmentProof
                     AskCommitmentProof.Inputs
                       { userWalletPublicKey = publicKey alice
                       , commitmentId
-                      , bigR = R bigR
+                      , bigR = bigR
                       }
+
+                assertProofIsValid
+                  publicVerificationContext
+                  (rebuildThetaStatement (publicKey alice) bigR challenge payload (PublicMessage txAbs))
+                  proof
+
+                signature <- signBlindly (keyPair alice) r challenge
 
                 FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs . publicKey $ alice
 

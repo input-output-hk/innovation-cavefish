@@ -66,13 +66,12 @@ data VerifyScheme = VerifyScheme {verificationKey :: FilePath, statement :: File
 
 verify :: VerifyScheme -> Proc ()
 verify VerifyScheme {..} =
-  liftIO $
-    snarkjs
-      ("groth16" :: String)
-      ("verify" :: String)
-      verificationKey
-      statement
-      proof
+  snarkjs
+    ("groth16" :: String)
+    ("verify" :: String)
+    verificationKey
+    statement
+    proof
 
 exportStatementAsJSON :: FilePath -> FilePath -> Proc ()
 exportStatementAsJSON witness statementOutput =

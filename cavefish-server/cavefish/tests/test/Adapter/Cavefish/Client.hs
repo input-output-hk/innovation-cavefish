@@ -2,6 +2,7 @@ module Adapter.Cavefish.Client (
   setupCavefish,
   Setup (..),
   ServiceProviderAPI (..),
+  UserToolkitAPI (..),
   WriteAPI (..),
   ReadAPI (..),
 ) where
@@ -29,8 +30,16 @@ import Sp.Emulator (mkServerContext)
 import Sp.Middleware (errStatusTraceMiddleware)
 import Sp.Server (Cavefish, mkServer)
 import Test.Hspec (expectationFailure)
-import WBPS.Core.FileScheme (FileScheme, mkFileSchemeFromRoot)
-import WBPS.Core.Keys.Ed25519 (Wallet (Wallet, paymentAddress), generateWallet)
+import WBPS.Core.Registration.Artefacts.Groth16.Setup (PublicVerificationContextAsJSON)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (KeyPair, Wallet (Wallet, paymentAddress), generateWallet)
+import WBPS.Core.Session.BlindSigning.Sign (BlindSignature, sign)
+import WBPS.Core.Session.BlindSigning.ThetaStatement (ThetaStatement)
+import WBPS.Core.Session.BlindSigning.VerifyProof qualified as VerifyProof
+import WBPS.Core.Session.Demonstration.Artefacts.R (RSecret)
+import WBPS.Core.Session.Proving.Artefacts.Challenge (Challenge)
+import WBPS.Core.Session.Proving.Artefacts.Proof (Proof)
+import WBPS.Core.Setup.Circuit.FileScheme (FileScheme, mkFileSchemeFromRoot)
+import WBPS.WBPS (runWBPS)
 
 getServiceProviderAPI :: ServiceFee -> Int -> IO ServiceProviderAPI
 getServiceProviderAPI fee port = do
@@ -57,6 +66,12 @@ getServiceProviderAPI fee port = do
             , fetchAccounts = runClientOrFail (SC.mkClientEnv manager baseUrl) fetchAccounts
             }
       }
+
+data UserToolkitAPI
+  = UserToolkitAPI
+  { assertProofIsValid :: PublicVerificationContextAsJSON -> ThetaStatement -> Proof -> IO ()
+  , signBlindly :: KeyPair -> RSecret -> Challenge -> IO BlindSignature
+  }
 
 data ServiceProviderAPI
   = ServiceProviderAPI
@@ -102,6 +117,23 @@ setupCavefish folderLabel actions = do
   bob <- generateWallet
   provider@Wallet {paymentAddress} <- generateWallet
   let servicefee = ServiceFee {amount = 10_000_000, paidTo = paymentAddress}
+      userToolkit =
+        UserToolkitAPI
+          { assertProofIsValid = \publicVerificationContext statement proof ->
+              runWBPS wbpsScheme (VerifyProof.assertProofIsValid publicVerificationContext statement proof)
+                >>= \case
+                  Left err ->
+                    expectationFailure ("Proof verification failed: " <> show err)
+                      >> fail "proof verification failed"
+                  Right _ -> pure ()
+          , signBlindly = \keyPair rSecret challenge ->
+              runWBPS wbpsScheme (sign keyPair rSecret challenge)
+                >>= \case
+                  Left err ->
+                    expectationFailure ("Blind signing failed: " <> show err)
+                      >> fail "blind signing failed"
+                  Right signature -> pure signature
+          }
   Warp.testWithApplication
     ( pure $
         mkTestCavefishMonad
@@ -128,6 +160,7 @@ distributionFromList =
 
 data Setup = Setup
   { serviceProvider :: ServiceProviderAPI
+  , userToolkit :: UserToolkitAPI
   , alice :: Wallet
   , bob :: Wallet
   , provider :: Wallet

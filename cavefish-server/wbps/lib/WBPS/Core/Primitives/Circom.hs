@@ -17,8 +17,8 @@ import Control.Monad.Reader (MonadReader, asks)
 import Path qualified (parent, toFilePath)
 import Shh (ExecReference (SearchPath), Proc, load)
 import System.FilePath (dropTrailingPathSeparator, takeDirectory, (</>))
-import WBPS.Core.FileScheme qualified as FileScheme
-import WBPS.Core.FileScheme qualified as Setup (Setup (buildCommitment))
+import WBPS.Core.Setup.Circuit.FileScheme qualified as FileScheme
+import WBPS.Core.Setup.Circuit.FileScheme qualified as Setup (Setup (buildCommitment))
 
 load
   SearchPath

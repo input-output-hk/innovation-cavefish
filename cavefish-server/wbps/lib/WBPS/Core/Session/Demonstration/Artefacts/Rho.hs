@@ -18,7 +18,7 @@ import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import WBPS.Adapter.Math.AffinePoint (AffinePoint (AffinePoint, x, y), parseIntegerValue)
 import WBPS.Adapter.Math.Integer qualified as Integer
-import WBPS.Core.Keys.ElGamal (EncryptionKey (EncryptionKey))
+import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey (EncryptionKey))
 
 newtype Rho = Rho Integer
   deriving newtype (Eq, Show)

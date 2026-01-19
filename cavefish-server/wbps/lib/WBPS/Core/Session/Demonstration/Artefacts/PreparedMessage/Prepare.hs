@@ -1,6 +1,7 @@
 module WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage.Prepare (
   prepare,
   recompose,
+  publicMessageToPublicPartBits,
   splitMessageBits,
   combineMessageBits,
   toBitsPaddedToMaxSize,
@@ -16,17 +17,9 @@ import Data.ByteString qualified as BS
 import Data.List (foldl')
 import Data.Word (Word8)
 import GHC.Bits (testBit)
-import WBPS.Core.Circuit.Parameters (
-  CircuitMessageMaxSize (CircuitMessageMaxSize),
-  CircuitParameters (CircuitParameters, messageSize, txInputSize),
-  MessagePrivatePartOffsetBits (MessagePrivatePartOffsetBits),
-  MessagePrivatePartSizeBits (MessagePrivatePartSizeBits),
-  assertFitsCircuitParameters,
-  messagePrivatePartOffset,
-  messagePrivatePartSize,
- )
 import WBPS.Core.Failure (WBPSFailure (CircuitMessageDecodeFailed))
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (
+  AbstractUnsignedTx (AbstractUnsignedTx),
   UnsignedTx (UnsignedTx, txUnsigned),
   extractPrivateElements,
   randomizeTx,
@@ -39,6 +32,15 @@ import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
   PreparedMessage (PreparedMessage, circuit, parts),
   PrivateMessage (PrivateMessage),
   PublicMessage (PublicMessage),
+ )
+import WBPS.Core.Setup.Circuit.Parameters (
+  CircuitMessageMaxSize (CircuitMessageMaxSize),
+  CircuitParameters (CircuitParameters, messageSize, txInputSize),
+  MessagePrivatePartOffsetBits (MessagePrivatePartOffsetBits),
+  MessagePrivatePartSizeBits (MessagePrivatePartSizeBits),
+  assertFitsCircuitParameters,
+  messagePrivatePartOffset,
+  messagePrivatePartSize,
  )
 
 prepare ::
@@ -84,6 +86,24 @@ toCircuitMessage CircuitParameters {messageSize, txInputSize} MessageParts {..} 
         , public = publicBits
         , private = privateBits
         }
+
+publicMessageToPublicPartBits ::
+  CircuitParameters ->
+  PublicMessage ->
+  MessageBits
+publicMessageToPublicPartBits params (PublicMessage (AbstractUnsignedTx unsignedTx)) =
+  let MessageBits publicBits = toBitsPaddedToMaxSize (messageSize params) (Message unsignedTx)
+      MessagePrivatePartOffsetBits offsetBits = messagePrivatePartOffset
+      MessagePrivatePartSizeBits privatePartBits = messagePrivatePartSize (txInputSize params)
+      prefix = BS.take offsetBits publicBits
+      suffix = BS.drop (offsetBits + emptyInputsBits) publicBits
+      expanded = prefix <> BS.replicate privatePartBits 0 <> suffix
+   in MessageBits (BS.take (BS.length publicBits) expanded)
+
+emptyInputsBits :: Int
+emptyInputsBits =
+  -- CBOR set tag (3B) + empty array header (1B).
+  4 * 8
 
 -- The private overlay window is defined by circuit parameters (bit offset/size).
 -- Keep these values in sync with the parameters used to compile

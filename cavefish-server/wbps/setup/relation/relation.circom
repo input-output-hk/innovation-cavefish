@@ -21,7 +21,6 @@
 //  solver_encryption_key_pow_rho        |  ek^ρ   — ElGamal encryption key raised to ρ
 //  commitment_randomizer_rho            |  ρ      — Random scalar used for commitment
 //  commitment_point_bits                     |  R      — g^ρ (bit representation for transcript)
-//  f                     |  C₀=g^ρ — Commitment base (curve point)
 //  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, μ; ρ)
 //  message_public_part                  |  m_pub  — Public portion of μ
 //  message_private_part                 |  m_priv — Private overlay portion of μ
@@ -51,8 +50,7 @@
 //  solver_encryption_key                |  ek     — ElGamal encryption key of the SP
 //  solver_encryption_key_pow_rho        |  ek^ρ   — ElGamal encryption key raised to ρ
 //  commitment_randomizer_rho            |  ρ      — Random scalar used for commitment
-//  commitment_point_bits                |  C₀ = g^ρ — Commitment base (BabyJub affine point (x,y))
-//  commitment_point_affine              |  C₀=g^ρ — Commitment base (curve point)
+//  commitment_point_bits                |  R      — g^ρ (bit representation for transcript)
 //  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, μ; ρ)
 //  message_public_part                  |  m_pub  — Public portion of μ
 //  message_private_part                 |  m_priv — Private overlay portion of μ
@@ -64,7 +62,6 @@
 //        (a) ρ is range-checked to [0, 2^251)
 //        (b) g^ρ is computed from the fixed BabyJub base g
 //        (c) ek^ρ is computed from the encryption key ek
-//        (d) The public commitment C₀ must equal g^ρ
 //
 //   P2 – Ciphertext Binding Consistency
 //        Rebuilds the commitment ciphertext Cmsg and verifies its correctness.
@@ -150,7 +147,7 @@ template RebuildMessage(message_size, message_private_part_size, message_private
 //   out_commitment_g_rho[2]                       : g^ρ
 //
 // Property (P1):
-//   Scalars(ek, ρ) → (ek^ρ, g^ρ) and top-level asserts commitment_point_affine == g^ρ
+//   Scalars(ek, ρ) → (ek^ρ, g^ρ)
 //   (range-limit ρ via Num2Bits(251); compute ek^ρ via EscalarMulAny; g^ρ via EscalarMulFix)
 // ======================================================================
 template Scalars() {
@@ -318,7 +315,7 @@ template RebuildChallenge(message_size) {
 // ----------------------------------------------------------------------
 // Orchestration (explicit):
 //   - P0: RebuildMessage(m_pub, m_priv) → μ
-//   - P1: Scalars(ek, ρ) → (ek^ρ, g^ρ) and assert commitment_point_affine == g^ρ
+//   - P1: Scalars(ek, ρ) → (ek^ρ, g^ρ)
 //   - P2: RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF) and assert Cmsg[i] == μ̂[i] + PRF[i]
 //   - P3: RebuildChallenge(R, X, μ) → digest and assert challenge == digest
 // ======================================================================
@@ -331,9 +328,8 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
     signal input signer_key[256];
     signal input solver_encryption_key[2];
 
-    // R = g^ρ (bits for transcript), C0 = g^ρ (affine), payload limbs, challenge
+    // R = g^ρ (bits for transcript), payload limbs, challenge
     signal input commitment_point_bits[256];
-    signal input commitment_point_affine[2];
     signal input solver_encryption_key_pow_rho[2];
     signal input commitment_randomizer_rho;
     signal input commitment_payload[nb_commitment_limbs];
@@ -361,8 +357,6 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
     log(900012); log(commitmentScalars.out_solver_encryption_key_pow_rho[0]);
     log(900013); log(commitmentScalars.out_solver_encryption_key_pow_rho[1]);
 
-    commitment_point_affine[0] === commitmentScalars.out_commitment_g_rho[0];
-    commitment_point_affine[1] === commitmentScalars.out_commitment_g_rho[1];
     solver_encryption_key_pow_rho[0] === commitmentScalars.out_solver_encryption_key_pow_rho[0];
     solver_encryption_key_pow_rho[1] === commitmentScalars.out_solver_encryption_key_pow_rho[1];
 
@@ -415,7 +409,6 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
 component main { public [
     signer_key, // X
     commitment_point_bits, // R
-    commitment_point_affine, // C₀=g^ρ
     commitment_payload, // Com_tx
     challenge, // c
     message_public_part // TxAbs
