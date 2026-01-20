@@ -95,6 +95,7 @@ library
     , mtl
     , path
     , plutus-ledger
+    , plutus-ledger-api
     , plutus-script-utils
     , say
     , servant
