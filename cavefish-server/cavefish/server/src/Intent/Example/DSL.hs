@@ -130,11 +130,11 @@ instance Default CanonicalIntent where
 
 type EvalDSL a = ExceptT Text (Writer CanonicalIntent) a
 
-runDSL :: IntentDSL -> (Either Text (), CanonicalIntent)
-runDSL dsl = runWriter (runExceptT (evalIntentDSL dsl))
+runDSLTransformer :: IntentDSL -> (Either Text (), CanonicalIntent)
+runDSLTransformer dsl = runWriter (runExceptT (evalIntentDSL dsl))
 
 toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent
-toCanonicalIntent dsl = case runDSL dsl of
+toCanonicalIntent dsl = case runDSLTransformer dsl of
   (Left e, _) -> Left e
   (Right (), intent) -> Right intent
 
