@@ -151,20 +151,21 @@ toCanonicalIntent dsl = case runDSLTransformer dsl of
   (Right (), intent) -> Right intent
 
 evalIntentDSL :: IntentDSL -> EvalDSL ()
-evalIntentDSL dsl = case dsl of
-  MustMintW v -> tell mempty {mustMint = [v]}
-  SpendFromW w@(AddressW walletAddr) -> case parseAddr w of
-    Nothing ->
-      throwError $ "invalid address : " <> walletAddr
-    Just addr -> tell mempty {spendFrom = [addr]}
-  MaxIntervalW w -> tell mempty {maxInterval = Just $ fromInteger w}
-  PayToW value w@(AddressW walletAddr) -> case parseAddr w of
-    Nothing ->
-      throwError $ "invalid address : " <> walletAddr
-    Just addr -> tell mempty {payTo = [(value, addr)]}
-  ChangeToW a -> tell mempty {changeTo = parseAddr a}
-  MaxFeeW i -> tell mempty {maxFee = Just i}
-  AndExpsW ys -> mapM_ evalIntentDSL ys
+evalIntentDSL dsl = do
+  case dsl of
+    MustMintW v -> tell mempty {mustMint = [v]}
+    SpendFromW w@(AddressW walletAddr) -> case parseAddr w of
+      Nothing ->
+        throwError $ "invalid address : " <> walletAddr
+      Just addr -> tell mempty {spendFrom = [addr]}
+    MaxIntervalW w -> tell mempty {maxInterval = Just $ fromInteger w}
+    PayToW value w@(AddressW walletAddr) -> case parseAddr w of
+      Nothing ->
+        throwError $ "invalid address : " <> walletAddr
+      Just addr -> tell mempty {payTo = [(value, addr)]}
+    ChangeToW a -> tell mempty {changeTo = parseAddr a}
+    MaxFeeW i -> tell mempty {maxFee = Just i}
+    AndExpsW ys -> mapM_ evalIntentDSL ys
   where
     parseAddr :: AddressW -> Maybe AdressConwayEra
     parseAddr (AddressW addr) =
