@@ -115,7 +115,6 @@ let
     # Additions for gen-tags.sh
     pkgs.haskellPackages.fast-tags
     pkgs.haskellPackages.hie-bios
-    pkgs.haskellPackages.implicit-hie
     pkgs.jq
 
     # wbps and ZKsnark dependencies

@@ -32,7 +32,6 @@ spec =
         Right canonicalIntent ->
           case payTo canonicalIntent of
             [(outValue, outAddr)] -> do
-              print canonicalIntent
               outValue `shouldBe` lovelaceToValue 10_000_000
               serialiseAddress (unAdressConwayEra outAddr) `shouldBe` expectedPaymentVerificationKey
             other -> expectationFailure ("unexpected payTo entries: " <> show other)
