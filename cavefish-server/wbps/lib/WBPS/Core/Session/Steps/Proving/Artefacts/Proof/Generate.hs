@@ -14,11 +14,9 @@ import WBPS.Adapter.CLI.Wrapped.Snarkjs qualified as Snarkjs
 import WBPS.Adapter.Monad.Control (whenNothingThrow)
 import WBPS.Adapter.Path (readFrom)
 import WBPS.Core.Failure (WBPSFailure (SessionProofNotFound))
-import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Persistence.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Session.Persistence.FileScheme (deriveExistingSessionDirectoryFrom)
-import WBPS.Core.Session.SessionId
-import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (CommitmentId)
+import WBPS.Core.Session.SessionId (SessionId (SessionId, registrationId))
 import WBPS.Core.Session.Steps.Proving.Artefacts.Proof (Proof (Proof))
 import WBPS.Core.Setup.Circuit.FileScheme (
   Account (Account, registration, session),

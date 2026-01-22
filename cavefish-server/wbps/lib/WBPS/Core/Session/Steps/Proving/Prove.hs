@@ -6,11 +6,9 @@ import Control.Monad.Error.Class (MonadError)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader)
 import WBPS.Core.Failure (WBPSFailure)
-import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Registered (Registered)
 import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId, userWalletPublicKey))
-import WBPS.Core.Session.SessionId (SessionId (..))
-import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (CommitmentId)
+import WBPS.Core.Session.SessionId (SessionId (SessionId, registrationId))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (
   CircuitMessage (CircuitMessage, message),
   MessageBits,
@@ -23,7 +21,7 @@ import WBPS.Core.Session.Steps.Demonstration.Persistence.Events qualified as Pre
 import WBPS.Core.Session.Steps.Proving.Artefacts.Challenge qualified as Challenge
 import WBPS.Core.Session.Steps.Proving.Artefacts.Proof.Generate (generateProof)
 import WBPS.Core.Session.Steps.Proving.Artefacts.Witness qualified as Witness (generate)
-import WBPS.Core.Session.Steps.Proving.Persistence.Events (EventHistory (..))
+import WBPS.Core.Session.Steps.Proving.Persistence.Events (EventHistory (EventHistory))
 import WBPS.Core.Session.Steps.Proving.Proved (CommitmentProved (CommitmentProved, bigR, challenge, proof))
 import WBPS.Core.Setup.Circuit.FileScheme (
   FileScheme,

@@ -22,8 +22,8 @@ import WBPS.Core.Registration.FetchAccounts (loadExistingRegistered, loadRegiste
 import WBPS.Core.Registration.Persistence.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Registration.Persistence.FileScheme.Directories qualified as Directory
 import WBPS.Core.Registration.Persistence.SnarkJs.OverFileSchemeAndShh (getGenerateProvingKeyProcess, getGenerateVerificationKeyProcess)
-import WBPS.Core.Registration.Registered
-import WBPS.Core.Registration.RegistrationId (RegistrationId (..))
+import WBPS.Core.Registration.Registered (Registered (Registered, registrationId))
+import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId))
 import WBPS.Core.Setup.Circuit.FileScheme (
   Account (Account, registration),
   FileScheme (FileScheme, account),

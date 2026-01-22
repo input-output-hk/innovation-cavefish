@@ -32,7 +32,6 @@ import WBPS.Core.Registration.Artefacts.Groth16.Setup (
   PublicVerificationContextAsJSON (PublicVerificationContextAsJSON),
   Setup (Setup),
  )
-import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Persistence.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Registration.Registered (Registered (Registered))
 import WBPS.Core.Registration.RegistrationId (RegistrationId)

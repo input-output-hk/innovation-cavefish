@@ -39,7 +39,7 @@ import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (
   publicKey,
  )
 import WBPS.Core.Session.Steps.BlindSigning.ThetaStatement (rebuildThetaStatement)
-import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (Commitment (Commitment, id, payload))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (Commitment (Commitment, payload))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (PublicMessage (PublicMessage))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.R qualified as R
 

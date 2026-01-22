@@ -16,7 +16,7 @@ import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.FetchAccounts (loadRegistered)
 import WBPS.Core.Registration.Registered (Registered (Registered, setup))
 import WBPS.Core.Registration.RegistrationId (RegistrationId)
-import WBPS.Core.Session.SessionId (SessionId (..))
+import WBPS.Core.Session.SessionId (SessionId (SessionId, commitmentId, registrationId))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx)
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (
   Commitment (Commitment, id),

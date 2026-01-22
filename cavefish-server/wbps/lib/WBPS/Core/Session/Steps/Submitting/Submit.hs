@@ -18,8 +18,8 @@ import WBPS.Adapter.CardanoCryptoClass.Crypto qualified as Adapter
 import WBPS.Core.Failure (WBPSFailure (BlindSignatureFailed))
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey (UserWalletPublicKey))
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 qualified as Ed25519
-import WBPS.Core.Registration.RegistrationId (RegistrationId (..))
-import WBPS.Core.Session.SessionId (SessionId (..))
+import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId, userWalletPublicKey))
+import WBPS.Core.Session.SessionId (SessionId (SessionId, registrationId))
 import WBPS.Core.Session.Steps.BlindSigning.BlindSignature (BlindSignature, signatureBytes)
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx (UnsignedTx))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (

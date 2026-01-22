@@ -15,13 +15,12 @@ import Path (Dir, Path, reldir, (</>))
 import Path.IO (ensureDir)
 import WBPS.Adapter.Monad.Control (whenNothingThrow)
 import WBPS.Adapter.Path (readFrom, writeTo)
-import WBPS.Core.Failure (WBPSFailure (EncryptionKeysNotFound, SessionCommitmentNotFound, SessionPreparedMessageNotFound, SessionScalarsNotFound))
-import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
+import WBPS.Core.Failure (WBPSFailure (SessionCommitmentNotFound, SessionPreparedMessageNotFound, SessionScalarsNotFound))
 import WBPS.Core.Registration.FetchAccounts (loadRegistered)
-import WBPS.Core.Registration.Registered
+import WBPS.Core.Registration.Registered (Registered (Registered, registrationId))
 import WBPS.Core.Session.Persistence.FileScheme (deriveExistingSessionDirectoryFrom, deriveSessionDirectoryFrom)
-import WBPS.Core.Session.SessionId
-import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (Commitment (Commitment, id), CommitmentId)
+import WBPS.Core.Session.SessionId (SessionId (SessionId, registrationId))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (Commitment (Commitment, id))
 import WBPS.Core.Session.Steps.Demonstration.Demonstrated (
   CommitmentDemonstrated (
     CommitmentDemonstrated,

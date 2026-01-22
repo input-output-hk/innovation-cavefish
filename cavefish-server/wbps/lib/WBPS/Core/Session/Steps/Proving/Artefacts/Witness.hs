@@ -23,10 +23,10 @@ import WBPS.Core.Registration.Artefacts.Groth16.Setup qualified as Groth16
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 qualified as Ed25519
 import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal
 import WBPS.Core.Registration.Persistence.FileScheme (deriveAccountDirectoryFrom)
-import WBPS.Core.Registration.Registered (Registered (..))
-import WBPS.Core.Registration.RegistrationId (RegistrationId (..))
+import WBPS.Core.Registration.Registered (Registered (Registered, registrationId, setup))
+import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId, userWalletPublicKey))
 import WBPS.Core.Session.Persistence.FileScheme (deriveExistingSessionDirectoryFrom)
-import WBPS.Core.Session.SessionId (SessionId (..))
+import WBPS.Core.Session.SessionId (SessionId (SessionId, commitmentId, registrationId))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (
   Commitment (Commitment, id, payload),
   CommitmentPayload,

@@ -20,7 +20,7 @@ import WBPS.Core.Failure (
 import WBPS.Core.Registration.Persistence.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Session.Persistence.FileScheme.Directories qualified as Directory
 import WBPS.Core.Session.SessionId (
-  SessionId (..),
+  SessionId (SessionId, registrationId),
   toString,
  )
 import WBPS.Core.Setup.Circuit.FileScheme (FileScheme)

@@ -22,7 +22,7 @@ import WBPS.Core.Registration.Registered (
   Registered (Registered, registrationId),
  )
 import WBPS.Core.Session.Persistence.FileScheme (deriveExistingSessionDirectoryFrom, deriveSessionDirectoryFrom)
-import WBPS.Core.Session.SessionId (SessionId (..))
+import WBPS.Core.Session.SessionId (SessionId (SessionId, commitmentId, registrationId))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (Commitment (Commitment, id))
 import WBPS.Core.Session.Steps.Demonstration.Demonstrated (CommitmentDemonstrated (CommitmentDemonstrated, commitment))
 import WBPS.Core.Session.Steps.Demonstration.Persistence.Events qualified as Demonstrated

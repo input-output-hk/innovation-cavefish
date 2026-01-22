@@ -13,7 +13,6 @@ import Path (parseRelDir, (</>))
 import WBPS.Core.Failure (
   WBPSFailure (RegistrationIdInvalid),
  )
-import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Persistence.FileScheme.Directories qualified as Directory
 import WBPS.Core.Registration.RegistrationId (RegistrationId)
 import WBPS.Core.Setup.Circuit.FileScheme (FileScheme (FileScheme, accounts))

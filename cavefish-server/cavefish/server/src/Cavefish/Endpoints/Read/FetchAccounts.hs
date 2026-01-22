@@ -13,9 +13,8 @@ import WBPS.Core.Registration.Artefacts.Groth16.Setup (
   Setup (Setup, encryptionKeys, publicVerificationContext),
   asJson,
  )
-import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal (EncryptionKey, KeyPair (KeyPair, ek))
-import WBPS.Core.Registration.Registered
+import WBPS.Core.Registration.Registered (Registered (Registered, registrationId, setup))
 import WBPS.Core.Registration.RegistrationId (RegistrationId)
 import WBPS.Core.Setup.Circuit.FileScheme ()
 

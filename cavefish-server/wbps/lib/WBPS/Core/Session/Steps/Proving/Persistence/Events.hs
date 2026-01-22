@@ -17,7 +17,7 @@ import WBPS.Core.Failure (WBPSFailure (SessionProofNotFound))
 import WBPS.Core.Registration.FetchAccounts (loadRegistered)
 import WBPS.Core.Registration.Registered (Registered)
 import WBPS.Core.Session.Persistence.FileScheme (deriveExistingSessionDirectoryFrom)
-import WBPS.Core.Session.SessionId
+import WBPS.Core.Session.SessionId (SessionId (SessionId, registrationId))
 import WBPS.Core.Session.Steps.Demonstration.Demonstrated (CommitmentDemonstrated)
 import WBPS.Core.Session.Steps.Demonstration.Persistence.Events qualified as Demonstrated
 import WBPS.Core.Session.Steps.Proving.Proved (CommitmentProved (CommitmentProved))

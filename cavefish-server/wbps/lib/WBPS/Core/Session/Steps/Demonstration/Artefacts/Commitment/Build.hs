@@ -41,12 +41,11 @@ import WBPS.Core.Failure (
   WBPSFailure,
   toWBPSFailure,
  )
-import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Persistence.FileScheme (deriveAccountDirectoryFrom)
 import WBPS.Core.Registration.Persistence.FileScheme.Directories qualified as Directory
 import WBPS.Core.Registration.RegistrationId (RegistrationId)
 import WBPS.Core.Session.Persistence.FileScheme (deriveSessionDirectoryFrom)
-import WBPS.Core.Session.SessionId (SessionId (..))
+import WBPS.Core.Session.SessionId (SessionId (SessionId))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (
   Commitment (Commitment, id),
   CommitmentPayload (CommitmentPayload),
