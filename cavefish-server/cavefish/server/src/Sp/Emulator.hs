@@ -6,6 +6,7 @@
 --    mock chain state.
 module Sp.Emulator (
   mkServerContext,
+  buildWithCooked,
 ) where
 
 import Cavefish (CavefishServices (CavefishServices, txBuildingService, wbpsService))

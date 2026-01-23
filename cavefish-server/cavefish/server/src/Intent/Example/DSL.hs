@@ -28,6 +28,7 @@ import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Data.Text (Text)
+import Debug.Trace qualified as Debug
 import GHC.Generics (Generic)
 import GHC.IsList qualified
 import GHC.List qualified
@@ -156,12 +157,12 @@ evalIntentDSL dsl = do
     MustMintW v -> tell mempty {mustMint = [v]}
     SpendFromW w@(AddressW walletAddr) -> case parseAddr w of
       Nothing ->
-        throwError $ "invalid address : " <> walletAddr
+        throwError $ "invalid SpendFromW address for SpendFromW : " <> walletAddr
       Just addr -> tell mempty {spendFrom = [addr]}
     MaxIntervalW w -> tell mempty {maxInterval = Just $ fromInteger w}
     PayToW value w@(AddressW walletAddr) -> case parseAddr w of
       Nothing ->
-        throwError $ "invalid address : " <> walletAddr
+        throwError $ "invalid PayToW address : " <> walletAddr
       Just addr -> tell mempty {payTo = [(value, addr)]}
     ChangeToW a -> tell mempty {changeTo = parseAddr a}
     MaxFeeW i -> tell mempty {maxFee = Just i}
@@ -182,7 +183,7 @@ satisfies dsl txAbs =
     txBody = Api.getTxBodyContent (txUnsigned . abstractTxUnsigned $ txAbs)
    in
     case toCanonicalIntent dsl of
-      Left _ -> False
+      Left e -> Debug.trace ("**** error: " <> show e) False
       Right intent ->
         and
           [ satisfiesMaxFee intent (Api.txFee txBody)
@@ -190,6 +191,7 @@ satisfies dsl txAbs =
           , satisfiesMint intent (Api.txMintValue txBody)
           , satisfiesMaxInterval intent txBody
           , satisfiesSpendFrom intent (Api.txOuts txBody)
+          , satisfiesChangeTo intent (Api.txOuts txBody)
           ]
 
 -- | Convert an interval to a closed finite interval, if possible.
@@ -219,6 +221,12 @@ satisfiesSpendFrom CanonicalIntent {spendFrom} txout =
   case fmap Set.fromList (traverse txOutPubKey txout) of
     Nothing -> False
     Just keys -> hasSigners keys (unAdressConwayEra <$> spendFrom)
+
+satisfiesChangeTo :: CanonicalIntent -> [Api.TxOut Api.CtxTx Api.ConwayEra] -> Bool
+satisfiesChangeTo CanonicalIntent {changeTo} txouts = case changeTo of
+  Nothing -> False
+  Just (AdressConwayEra address) ->
+    address `elem` fmap (\(Api.TxOut aie _ _ _) -> aie) txouts
 
 txOutPubKey :: Api.TxOut ctx era -> Maybe PlutusLedgerApi.V1.PubKeyHash
 txOutPubKey (Api.TxOut aie _ _ _) = cardanoPubKeyHash aie
@@ -250,18 +258,12 @@ valueLeq need have =
     (Map.fromList (GHC.IsList.toList need))
     (Map.fromList (GHC.IsList.toList have))
 
-valueEq :: Api.Value -> Api.Value -> Bool
-valueEq a b = valueLeq a b && valueLeq b a
-
 valuePositive :: Api.Value -> Bool
 valuePositive = any (\(_, Api.Quantity q) -> q > 0) . GHC.IsList.toList
 
 outExactly :: AdressConwayEra -> Api.Value -> Api.TxOut Api.CtxTx Api.ConwayEra -> Bool
 outExactly addrReq vReq (Api.TxOut addr vOut _ _) =
   addrReq == AdressConwayEra addr && valueLeq vReq (Api.txOutValueToValue vOut)
-
-valueIsPlaceholder :: Api.Value -> Bool
-valueIsPlaceholder = valueEq mempty
 
 satisfiesMaxFee :: CanonicalIntent -> Api.TxFee era -> Bool
 satisfiesMaxFee CanonicalIntent {maxFee} (Api.TxFeeExplicit _ (Api.Coin coin)) =
