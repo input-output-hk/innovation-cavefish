@@ -39,5 +39,5 @@ data WBPSFailure
   | SessionSubmittedTxNotFound SessionId
   | -- Proof/signature failures
     ProofVerificationFailed String
-  | BlindSignatureFailed String
+  | SessionSubmittingFailed String
   deriving (Show, Eq)

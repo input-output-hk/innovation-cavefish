@@ -10,9 +10,9 @@ import WBPS.Core.Registration.Registered (Registered)
 import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId, userWalletPublicKey))
 import WBPS.Core.Session.SessionId (SessionId (SessionId, registrationId))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (
-  CircuitMessage (CircuitMessage, message),
-  MessageBits,
-  PreparedMessage (PreparedMessage, circuit),
+  Message (Message),
+  MessageParts (MessageParts, message),
+  PreparedMessage (PreparedMessage, parts),
  )
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.R (R)
 import WBPS.Core.Session.Steps.Demonstration.Demonstrated (CommitmentDemonstrated (CommitmentDemonstrated, preparedMessage))
@@ -33,8 +33,8 @@ prove ::
   R ->
   m EventHistory
 prove sessionId@SessionId {registrationId = RegistrationId {userWalletPublicKey}} bigR = do
-  (registered, demonstrated, messageBits) <- project sessionId
-  let challenge = Challenge.compute userWalletPublicKey messageBits bigR
+  (registered, demonstrated, message) <- project sessionId
+  let challenge = Challenge.computeByUsingTxId userWalletPublicKey message bigR
   Witness.generate registered demonstrated bigR challenge
   proof <- generateProof sessionId
   return $
@@ -46,7 +46,7 @@ prove sessionId@SessionId {registrationId = RegistrationId {userWalletPublicKey}
 project ::
   (MonadIO m, MonadReader FileScheme m, MonadError [WBPSFailure] m) =>
   SessionId ->
-  m (Registered, CommitmentDemonstrated, MessageBits)
+  m (Registered, CommitmentDemonstrated, Message)
 project sessionId =
   Demonstrated.loadHistory sessionId
     >>= \Previous.EventHistory
@@ -55,7 +55,7 @@ project sessionId =
              demonstrated@CommitmentDemonstrated
                { preparedMessage =
                  PreparedMessage
-                   { circuit = CircuitMessage {message = messageBits}
+                   { parts = MessageParts {message}
                    }
                }
-           } -> return (registered, demonstrated, messageBits)
+           } -> return (registered, demonstrated, message)

@@ -16,6 +16,7 @@ import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 import WBPS.Core.Session.SessionId (SessionId)
 import WBPS.Core.Session.Steps.BlindSigning.BlindSignature (BlindSignature)
+import WBPS.Core.Session.Steps.Submitting.Artefacts.SubmittedTx (unSignedTx)
 import WBPS.Core.Session.Steps.Submitting.Submitted (CommitmentSubmitted (CommitmentSubmitted, txId))
 
 data Inputs = Inputs
@@ -36,7 +37,7 @@ handle Inputs {sessionId, signature} = do
     , txBuildingService = TxService.TxBuilding {submit = submitTx}
     } <-
     ask
-  toOutputs <$> submit sessionId submitTx signature
+  toOutputs <$> submit sessionId (submitTx . unSignedTx) signature
 
 toOutputs :: CommitmentSubmitted -> Outputs
 toOutputs CommitmentSubmitted {txId} =

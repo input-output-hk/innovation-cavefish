@@ -8,7 +8,7 @@ import Data.Word (Word8)
 import Path (reldir)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertFailure, testCase)
-import WBPS.Core.Failure (WBPSFailure (BlindSignatureFailed))
+import WBPS.Core.Failure (WBPSFailure (SessionSubmittingFailed))
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (generateKeyPair, userWalletPK)
 import WBPS.Core.Registration.Register (register)
 import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId))
@@ -58,7 +58,7 @@ submitValidatesSignature = do
     Right Nothing ->
       assertFailure "expected submit to reject a tampered signature"
     Right (Just failures) ->
-      assertBool "expected BlindSignatureFailed" (any isBlindSignatureFailed failures)
+      assertBool "expected SessionSubmittingFailed" (any isSessionSubmittingFailed failures)
 
 tamperSignature :: BlindSignature -> BlindSignature
 tamperSignature (BlindSignature bytes) =
@@ -69,8 +69,8 @@ tamperSignature (BlindSignature bytes) =
     flipBit :: Word8 -> Word8
     flipBit byte = byte `xor` 1
 
-isBlindSignatureFailed :: WBPSFailure -> Bool
-isBlindSignatureFailed failure =
+isSessionSubmittingFailed :: WBPSFailure -> Bool
+isSessionSubmittingFailed failure =
   case failure of
-    BlindSignatureFailed _ -> True
+    SessionSubmittingFailed _ -> True
     _ -> False

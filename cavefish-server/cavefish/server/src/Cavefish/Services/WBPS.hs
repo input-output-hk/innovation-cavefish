@@ -6,7 +6,6 @@ import Cardano.Api (
   MonadError,
   MonadIO,
  )
-import Cardano.Api qualified as Api
 import Servant.Server.Internal.ServerError (ServerError)
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Registered (Registered)
@@ -18,6 +17,7 @@ import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (Unsig
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.R (R)
 import WBPS.Core.Session.Steps.Demonstration.Demonstrated (CommitmentDemonstrated)
 import WBPS.Core.Session.Steps.Proving.Proved (CommitmentProved)
+import WBPS.Core.Session.Steps.Submitting.Artefacts.SubmittedTx (SubmitTx)
 import WBPS.Core.Session.Steps.Submitting.Submitted (CommitmentSubmitted)
 
 data WBPS = WBPS
@@ -37,7 +37,7 @@ data WBPS = WBPS
   , submit ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      SessionId -> (Api.Tx Api.ConwayEra -> m ()) -> BlindSignature -> m CommitmentSubmitted
+      SessionId -> SubmitTx m -> BlindSignature -> m CommitmentSubmitted
   , loadRegisteredMaybe ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
