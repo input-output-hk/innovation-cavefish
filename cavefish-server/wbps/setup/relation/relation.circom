@@ -452,9 +452,9 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
 // ======================================================================
 // Public exposure (unchanged API; sizing parameters below)
 // ----------------------------------------------------------------------
-// Message sizing targets the mean tx_body size observed on Cardano mainnet
-// (mean ~785B, rounded to 800B):
-//   (800B + 32B) * 8 = 6,656 bits -> 27 * 254 = 6,858 bits (202 bits padding).
+// Message sizing targets the mean tx_body size observed on Cardano mainnet.
+// Mean is ~785B; we bump the tx_body target to 857B so that
+// (857B + 32B) * 8 = 7,112 bits = 28 * 254 (byte-aligned, no limb padding).
 // See wbps/README.md for the full size distribution stats.
 // ======================================================================
 component main { public [
@@ -463,4 +463,4 @@ component main { public [
     commitment_payload, // Com_tx
     challenge, // c
     message_public_part // TxAbs
-] } = CardanoWBPS(27*254, 320, 24);
+] } = CardanoWBPS(28*254, 320, 24);

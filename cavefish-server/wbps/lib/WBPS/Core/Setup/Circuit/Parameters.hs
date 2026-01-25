@@ -38,9 +38,9 @@ newtype CircuitMessageMaxSize = CircuitMessageMaxSize {unCircuitMessageMaxSize :
 
 instance Default CircuitMessageMaxSize where
   def =
-    -- Sized for 800B tx_body + 32B nonce, padded to 27 * 254 bits.
+    -- Sized for 857B tx_body + 32B nonce, aligned to 28 * 254 bits.
     -- See wbps/README.md for mainnet size distribution stats.
-    CircuitMessageMaxSize (27 * 254)
+    CircuitMessageMaxSize (28 * 254)
 
 -- | Count of tx inputs supported by the circuit.
 --   This is constrained to the design limit (currently <= 23).
