@@ -10,7 +10,7 @@ import WBPS.Core.Registration.Registered (Registered)
 import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId, userWalletPublicKey))
 import WBPS.Core.Session.SessionId (SessionId (SessionId, registrationId))
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (
-  Message (Message),
+  Message,
   MessageParts (MessageParts, message),
   PreparedMessage (PreparedMessage, parts),
  )

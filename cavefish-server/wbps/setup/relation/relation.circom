@@ -20,8 +20,8 @@
 //  solver_encryption_key                |  ek     — ElGamal encryption key of the SP
 //  solver_encryption_key_pow_rho        |  ek^ρ   — ElGamal encryption key raised to ρ
 //  commitment_randomizer_rho            |  ρ      — Random scalar used for commitment
-//  commitment_point_bits                     |  R      — g^ρ (bit representation for transcript)
-//  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, μ; ρ)
+//  commitment_point_bits                |  R      — g^ρ (bit representation for transcript)
+//  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, txId; ρ)
 //  message_public_part                  |  m_pub  — Public portion of μ
 //  message_private_part                 |  m_priv — Private overlay portion of μ
 //  rebuildMessage.out_message           |  μ      — Full reconstructed message bits
@@ -51,7 +51,7 @@
 //  solver_encryption_key_pow_rho        |  ek^ρ   — ElGamal encryption key raised to ρ
 //  commitment_randomizer_rho            |  ρ      — Random scalar used for commitment
 //  commitment_point_bits                |  R      — g^ρ (bit representation for transcript)
-//  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, μ; ρ)
+//  commitment_payload                   |  Cmsg   — Ciphertext limbs Enc(ek, txId; ρ)
 //  message_public_part                  |  m_pub  — Public portion of μ
 //  message_private_part                 |  m_priv — Private overlay portion of μ
 //  rebuildMessage.out_message           |  μ      — Full reconstructed message bits
@@ -69,14 +69,14 @@
 //            μ̂[i] = Bits2Num_i(μ)
 //            PRF[i] = PoseidonStream_i(ek^ρ)
 //            Enforce:  Cmsg[i] = μ̂[i] + PRF[i]   (mod p)
-//        This guarantees that Cmsg encrypts μ under ek using ρ.
+//        This guarantees that Cmsg encrypts txId under ek using ρ.
 //
 //   P3 – Transcript Integrity
 //        Recomputes the Schnorr transcript challenge used in EdDSA verification:
-//            c = SHA-512(R || X || μ_bits)
+//            c = SHA-512(R || X || txId)
 //        and enforces equality with the provided challenge input.
 //        This binds together the nonce R = g^ρ, the signer key X, and the
-//        message μ, ensuring the proof is non-malleable and self-consistent.
+//        txId, ensuring the proof is non-malleable and self-consistent.
 // ======================================================================
 // Parameters (top-level):
 //   message_size                    : |μ| (must be a multiple of 254 bits)
@@ -105,6 +105,7 @@ include "../../../../wbps/vendor/circomlib/circuits/bitify.circom";
 
 // Cardano EdDSA SHA-512 (bitwise, shared single copy)
 include "../../../../wbps/circuits/hashing/sha2/sha512/sha512_hash_bits.circom";
+include "../../../../wbps/circuits/hashing/blake2/blake2b.circom";
 
 // ======================================================================
 // 1) RebuildMessage — P0
@@ -147,7 +148,7 @@ template RebuildMessage(message_size, message_private_part_size, message_private
 //   out_commitment_g_rho[2]                       : g^ρ
 //
 // Property (P1):
-//   Scalars(ek, ρ) → (ek^ρ, g^ρ)
+//   Scalars(ek, ρ) → (ek^ρ, g^ρ) 
 //   (range-limit ρ via Num2Bits(251); compute ek^ρ via EscalarMulAny; g^ρ via EscalarMulFix)
 // ======================================================================
 template Scalars() {
@@ -274,21 +275,22 @@ template RebuildCommitment(message_size, commitment_limb_size, nb_commitment_lim
 // Inputs:
 //   in_commitment_point[256] : R bits (nonce commitment g^ρ), byte-wise bit-reversed per EdDSA
 //   in_signer_key[256]       : X bits (signer key), byte-wise bit-reversed per EdDSA
-//   in_message[message_size]   : μ_bits
+//   txId[256]                : txId bits (256 bits as the Blake2b-256 hash of tx_body_cbor)
 // Output:
 //   out_challenge[64]        : digest
 //
 // Property (P3):
-//   RebuildChallenge(R, X, μ) → digest and assert challenge == digest
-//   (digest = SHA512(R || X || μ_bits) with per-byte bit-reversal for R, X)
+//   RebuildChallenge(R, X, txId) → digest and assert challenge == digest
+//   (digest = SHA512(R || X || txId) with per-byte bit-reversal for R, X)
 // ======================================================================
 template RebuildChallenge(message_size) {
     signal input  in_commitment_point[256];
     signal input  in_signer_key[256];
-    signal input  in_message[message_size];
+    signal input  txId[256];
     signal output out_challenge[64];
 
-    component hash = Sha512_hash_bits_digest(message_size + 512);
+    // Compute EdDSA challenge with Sha512. Input len = 512 bits for (R || X) and 256 bits for (txId)
+    component hash = Sha512_hash_bits_digest(512 + 256);
 
     var i;
     var j;
@@ -299,8 +301,8 @@ template RebuildChallenge(message_size) {
             hash.inp_bits[256 + i + j] <== in_signer_key[i + (7 - j)];
         }
     }
-    for (i = 0; i < message_size; i++) {
-        in_message[i] ==> hash.inp_bits[512 + i];
+    for (i = 0; i < 256; i++) {
+        txId[i] ==> hash.inp_bits[512 + i];
     }
 
     for (i = 0; i < 64; i++) {
@@ -311,26 +313,67 @@ template RebuildChallenge(message_size) {
 }
 
 // ======================================================================
+// X) ComputeTxId
+// ----------------------------------------------------------------------
+// Inputs:
+//   in_message[message_size]   : μ_bits
+// Output:
+//   txId[256]        : Blake2b-256 digest
+//
+// Property (P3):
+//   ComputeTxId(μ) → txId
+//   (txId = Blake2b-256(μ_bytes))
+// ======================================================================
+template ComputeTxId(message_size) {
+    signal input in_message[message_size];
+    signal output txId[256];
+
+    // Convert message (tx_body) from bits to bytes
+    assert(message_size % 8 == 0);
+    var message_size_bytes = message_size \ 8;
+
+    component to_bytes[message_size_bytes];
+    signal in_message_bytes[message_size_bytes];
+
+    for (var i = 0; i < message_size_bytes; i++) {
+        to_bytes[i] = Bits2Num(8);
+        for (var j = 0; j < 8; j++) {
+            to_bytes[i].in[j] <== in_message[i*8 + j];
+        }
+        to_bytes[i].out ==> in_message_bytes[i];
+    }
+
+    // Compute txId = Blake2b-256(tx_body_cbor)
+    component blake2b_hash = Blake2b_bytes(message_size_bytes);
+    blake2b_hash.inp_bytes <== in_message_bytes;
+
+    txId <== blake2b_hash.hash_bits;
+}
+
+
+// ======================================================================
 // 5) Top-level — CardanoWBPS(message_size, message_private_part_size, message_private_part_offset)
 // ----------------------------------------------------------------------
 // Orchestration (explicit):
 //   - P0: RebuildMessage(m_pub, m_priv) → μ
 //   - P1: Scalars(ek, ρ) → (ek^ρ, g^ρ)
 //   - P2: RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF) and assert Cmsg[i] == μ̂[i] + PRF[i]
-//   - P3: RebuildChallenge(R, X, μ) → digest and assert challenge == digest
+//   - P3: RebuildChallenge(R, X, txId) → digest and assert challenge == digest
 // ======================================================================
 template CardanoWBPS(message_size, message_private_part_size, message_private_part_offset) {
     var commitment_limb_size = 254;
     assert(message_size % commitment_limb_size == 0);
     var nb_commitment_limbs = message_size \ commitment_limb_size;
+   
 
     // External inputs
     signal input signer_key[256];
     signal input solver_encryption_key[2];
 
-    // R = g^ρ (bits for transcript), payload limbs, challenge
+    // R = g^ρ (bits for transcript), C0 = g^ρ (affine), payload limbs, challenge
     signal input commitment_point_bits[256];
     signal input solver_encryption_key_pow_rho[2];
+   
     signal input commitment_randomizer_rho;
     signal input commitment_payload[nb_commitment_limbs];
     signal input challenge[64];
@@ -346,6 +389,10 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
         rebuildMessage.in_message_private_part[j] <== message_private_part[j];
     }
 
+    // PX
+    component computeTxId = ComputeTxId(message_size);
+    computeTxId.in_message <== rebuildMessage.out_message;
+
     // P1
     component commitmentScalars = Scalars();
     commitmentScalars.in_solver_encryption_key[0] <== solver_encryption_key[0];
@@ -359,7 +406,6 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
 
     solver_encryption_key_pow_rho[0] === commitmentScalars.out_solver_encryption_key_pow_rho[0];
     solver_encryption_key_pow_rho[1] === commitmentScalars.out_solver_encryption_key_pow_rho[1];
-
     component poseidonDebug = PoseidonEx(2, 1);
     poseidonDebug.initialState <== 0;
     poseidonDebug.inputs[0] <== commitmentScalars.out_solver_encryption_key_pow_rho[0];
@@ -387,9 +433,8 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
         rebuildChallenge.in_commitment_point[r] <== commitment_point_bits[r];
         rebuildChallenge.in_signer_key[r]       <== signer_key[r];
     }
-    for (var m = 0; m < message_size; m++) {
-        rebuildChallenge.in_message[m] <== rebuildMessage.out_message[m];
-    }
+
+    rebuildChallenge.txId <== computeTxId.txId;
 
     for (var d = 0; d < 64; d++) {
         log(900500 + d); log(challenge[d]);

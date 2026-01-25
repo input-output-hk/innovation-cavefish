@@ -140,6 +140,15 @@ Average tx parts (bytes / share):
 
 ---
 
+## Circuit changelog (recent)
+
+- Challenge input now uses `txId = Blake2b-256(tx_body)` and hashes `R || X || txId` instead of raw `mu` bits.
+- Commitment payload still encrypts the full `mu` packed into 254-bit limbs (P2 unchanged).
+- `solver_encryption_key_pow_rho` remains an input and is checked against the internally computed `ek^rho` value.
+- Top-level `main` parameters remain `message_size = 27*254`, `message_private_part_size = 320`, `message_private_part_offset = 24`.
+
+---
+
 ## 🏰 Manual Flow (Debug Mode)
 
 If you prefer explicit commands:
