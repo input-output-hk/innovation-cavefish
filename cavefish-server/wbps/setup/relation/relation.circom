@@ -348,6 +348,12 @@ template ComputeTxId(message_size) {
     blake2b_hash.inp_bytes <== in_message_bytes;
 
     txId <== blake2b_hash.hash_bits;
+
+    // Debug txId bits
+    for (var k = 0; k < 256; k++) {
+        log(900700 + k);
+        log(txId[k]);
+    }
 }
 
 
