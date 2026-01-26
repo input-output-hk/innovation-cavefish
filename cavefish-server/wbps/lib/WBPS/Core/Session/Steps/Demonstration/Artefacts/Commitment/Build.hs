@@ -102,7 +102,7 @@ instance Default Context where
   def =
     Context
       { commitmentLimbSize = 254
-      , nbCommitmentLimbs = 28
+      , nbCommitmentLimbs = 8
       }
 
 newtype WitnessValues = WitnessValues [String]

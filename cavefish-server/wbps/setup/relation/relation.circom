@@ -301,8 +301,12 @@ template RebuildChallenge(message_size) {
             hash.inp_bits[256 + i + j] <== in_signer_key[i + (7 - j)];
         }
     }
-    for (i = 0; i < 256; i++) {
-        txId[i] ==> hash.inp_bits[512 + i];
+    // txId bits are LSB-first per byte from Blake2b_bytes, so reverse per byte
+    // before feeding into SHA-512.
+    for (i = 0; i < 256; i += 8) {
+        for (j = 0; j < 8; j++) {
+            hash.inp_bits[512 + i + j] <== txId[i + (7 - j)];
+        }
     }
 
     for (i = 0; i < 64; i++) {
@@ -328,7 +332,7 @@ template ComputeTxId(message_size) {
     signal input in_message[message_size];
     signal output txId[256];
 
-    // Convert message (tx_body) from bits to bytes
+    // Convert message bits (TxBody wrapper) to bytes.
     assert(message_size % 8 == 0);
     var message_size_bytes = message_size \ 8;
 
@@ -343,9 +347,18 @@ template ComputeTxId(message_size) {
         to_bytes[i].out ==> in_message_bytes[i];
     }
 
-    // Compute txId = Blake2b-256(tx_body_cbor)
-    component blake2b_hash = Blake2b_bytes(message_size_bytes);
-    blake2b_hash.inp_bytes <== in_message_bytes;
+    // Compute txId = Blake2b-256(tx_body_cbor).
+    // The message encodes a 4-item CBOR list; the tx body map is the first
+    // element, so skip the 1-byte list header and the final 3 empty elements.
+    var tx_body_size_bytes = message_size_bytes - 4;
+    assert(tx_body_size_bytes > 0);
+
+    component blake2b_hash = Blake2b_bytes(tx_body_size_bytes);
+    signal tx_body_bytes[tx_body_size_bytes];
+    for (var i = 0; i < tx_body_size_bytes; i++) {
+        tx_body_bytes[i] <== in_message_bytes[i + 1];
+    }
+    blake2b_hash.inp_bytes <== tx_body_bytes;
 
     txId <== blake2b_hash.hash_bits;
 
@@ -454,7 +467,7 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
 // ----------------------------------------------------------------------
 // Message sizing targets the mean tx_body size observed on Cardano mainnet.
 // Mean is ~785B; we bump the tx_body target to 857B so that
-// (857B + 32B) * 8 = 7,112 bits = 28 * 254 (byte-aligned, no limb padding).
+// 254B * 8 = 2,032 bits = 8 * 254 (byte-aligned, no limb padding).
 // See wbps/README.md for the full size distribution stats.
 // ======================================================================
 component main { public [
@@ -463,4 +476,4 @@ component main { public [
     commitment_payload, // Com_tx
     challenge, // c
     message_public_part // TxAbs
-] } = CardanoWBPS(28*254, 320, 24);
+] } = CardanoWBPS(8*254, 320, 24);

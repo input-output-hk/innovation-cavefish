@@ -22,7 +22,7 @@ import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (
   AbstractUnsignedTx (AbstractUnsignedTx),
   UnsignedTx (UnsignedTx, txUnsigned),
   extractPrivateElements,
-  randomizeTx,
+  randomizeTxAndPadItToCircuitMessageSize,
  )
 import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (
   CircuitMessage (CircuitMessage, message, private, public),
@@ -50,7 +50,9 @@ prepare ::
   m PreparedMessage
 prepare params =
   fmap (mkPreparedMessage params . toMessageParts)
-    . (assertFitsCircuitParameters params <=< randomizeTx)
+    . (assertFitsCircuitParameters params <=< randomizeTxAndPadItToCircuitMessageSize maxBits)
+  where
+    CircuitMessageMaxSize maxBits = messageSize params
 
 recompose ::
   MonadError [WBPSFailure] m =>

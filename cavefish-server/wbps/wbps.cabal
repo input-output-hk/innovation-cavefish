@@ -123,9 +123,11 @@ library
     , aeson
     , bytestring
     , cardano-api
+    , cardano-binary
     , cardano-crypto-class
     , cardano-ledger-api
-    , cardano-ledger-core   ^>=1.17.0.0
+    , cardano-ledger-core        ^>=1.17.0.0
+    , cardano-strict-containers
     , containers
     , cooked-validators
     , cryptonite
@@ -133,6 +135,7 @@ library
     , filepath
     , hex-text
     , memory
+    , microlens
     , mtl
     , path
     , path-io
@@ -159,6 +162,7 @@ test-suite wbps-unit-tests
   build-depends:
     , aeson
     , bytestring
+    , data-default
     , mtl
     , QuickCheck
     , tasty

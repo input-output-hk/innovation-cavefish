@@ -59,8 +59,8 @@ compute (UserWalletPublicKey userPk) (MessageBits messageBits) (R rPk) =
     xBits = reverseBitsPerByte (bytesToBitsLE (publicKeyBytes userPk))
 
 -- | Recompute the transcript challenge using the transaction id instead of the
---   full message bits. The tx id bytes are bit-reversed per byte to match the
---   circuit's LSB-first bit ordering.
+--   full message bits. The tx id bytes are reversed per byte so the SHA-512
+--   input matches the byte ordering used by Ed25519.
 computeByUsingTxId :: UserWalletPublicKey -> Message -> R -> Challenge
 computeByUsingTxId (UserWalletPublicKey userPk) message (R rPk) =
   Challenge (digestFromBitsOrFail (rBits ++ xBits ++ txIdBits))

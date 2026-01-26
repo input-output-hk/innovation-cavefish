@@ -22,7 +22,9 @@ import Control.Monad.IO.Class (MonadIO)
 import Data.ByteString qualified as BS
 import Data.Default (Default (def))
 import WBPS.Core.Failure (WBPSFailure (TxBuiltTooLarge, TxInputsCountMismatch))
-import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx (txUnsigned))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (
+  UnsignedTx (txUnsigned),
+ )
 
 data CircuitParameters = CircuitParameters
   { messageSize :: CircuitMessageMaxSize
@@ -38,9 +40,8 @@ newtype CircuitMessageMaxSize = CircuitMessageMaxSize {unCircuitMessageMaxSize :
 
 instance Default CircuitMessageMaxSize where
   def =
-    -- Sized for 857B tx_body + 32B nonce, aligned to 28 * 254 bits.
-    -- See wbps/README.md for mainnet size distribution stats.
-    CircuitMessageMaxSize (28 * 254)
+    -- Sized for 254B messages, aligned to 8 * 254 bits.
+    CircuitMessageMaxSize (8 * 254)
 
 -- | Count of tx inputs supported by the circuit.
 --   This is constrained to the design limit (currently <= 23).
@@ -155,16 +156,16 @@ assertFitsCircuitMessageMaxSize ::
   m UnsignedTx
 assertFitsCircuitMessageMaxSize (CircuitMessageMaxSize maxBits) tx = do
   let actualBits = txPayloadBitLength tx
-  when (actualBits > maxBits) $
-    throwError [TxBuiltTooLarge (txBuiltTooLargeMessage actualBits maxBits)]
+  when (actualBits /= maxBits) $
+    throwError [TxBuiltTooLarge (txBuiltSizeMismatchMessage actualBits maxBits)]
   pure tx
 
-txBuiltTooLargeMessage :: Int -> Int -> String
-txBuiltTooLargeMessage actualBits maxBits =
-  "TxBuilt is above the maximum sized handled by the configured circuit (tx bits: "
+txBuiltSizeMismatchMessage :: Int -> Int -> String
+txBuiltSizeMismatchMessage actualBits expectedBits =
+  "TxBuilt size does not match the configured circuit (tx bits: "
     <> show actualBits
-    <> ", max bits: "
-    <> show maxBits
+    <> ", expected bits: "
+    <> show expectedBits
     <> ")."
 
 txInputsCountMismatchMessage :: Int -> Int -> String
