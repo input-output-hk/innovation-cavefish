@@ -40,7 +40,9 @@ import Cooked (
  )
 import Cooked.MockChain.GenerateTx.Body (txSkelToTxBody)
 import Data.Map.Strict qualified as Map (fromList)
+import Data.Maybe (fromJust)
 import Data.Text qualified as Text (unpack)
+import Debug.Trace qualified as Debug
 import Intent.Example.DSL (
   AdressConwayEra (AdressConwayEra),
   CanonicalIntent (CanonicalIntent, changeTo, maxFee, maxInterval, mustMint, payTo, spendFrom),
@@ -59,7 +61,6 @@ buildTx CanonicalIntent {..} serviceFee = do
   when (null spendFrom) $ fail "No source address defined to spend from"
   utxos <- join <$> mapM (runUtxoSearch . onlyValueOutputsAtSearch) spendFrom
   let inputs = Map.fromList [(oref, emptyTxSkelRedeemer) | (oref, _) <- utxos]
-
   payOuts <- traverse buildPayTo payTo
   feeOuts <- buildServiceFee serviceFee
   validityRange <- buildValidity maxInterval
@@ -73,8 +74,10 @@ buildTx CanonicalIntent {..} serviceFee = do
           { txSkelIns = inputs
           , txSkelOuts = payOuts <> feeOuts
           , txSkelMints = mempty -- N.H todo
-          , txSkelSignatories = map signatoryPubKey spendFrom
-          , txSkelValidityRange = validityRange
+          -- Balance with 1st signer is default. See [BlancingPolicy](https://github.com/tweag/cooked-validators/blob/main/doc/BALANCING.md#balancing-policy)
+          , txSkelSignatories = map signatoryPubKey (fromJust changeTo : spendFrom)
+          , -- , txSkelSignatories = map signatoryPubKey spendFrom
+            txSkelValidityRange = validityRange
           , txSkelOpts = opts
           }
 
@@ -105,7 +108,7 @@ buildPayTo (val, addr) = do
 
 buildServiceFee :: MonadFail f => ServiceFee -> f [TxSkelOut]
 buildServiceFee ServiceFee {..}
-  | amount <= 0 = pure []
+  | amount <= 0 = Debug.trace ("service fee is <= 0" <> show amount) pure []
   | otherwise = do
       addr <-
         maybe

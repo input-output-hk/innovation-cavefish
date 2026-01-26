@@ -188,10 +188,10 @@ satisfies dsl txAbs =
         and
           [ satisfiesMaxFee intent (Api.txFee txBody)
           , satisfiesPayTo intent (Api.txOuts txBody)
+          , satisfiesChangeTo intent (Api.txOuts txBody)
+          , satisfiesSpendFrom intent txBody
           , satisfiesMint intent (Api.txMintValue txBody)
           , satisfiesMaxInterval intent txBody
-          , satisfiesSpendFrom intent (Api.txOuts txBody)
-          , satisfiesChangeTo intent (Api.txOuts txBody)
           ]
 
 -- | Convert an interval to a closed finite interval, if possible.
@@ -216,28 +216,22 @@ satisfiesMaxInterval CanonicalIntent {maxInterval} tx =
       Nothing -> False
       Just (_lo, _hi) -> _hi - _lo <= i
 
-satisfiesSpendFrom :: CanonicalIntent -> [Api.TxOut Api.CtxTx Api.ConwayEra] -> Bool
-satisfiesSpendFrom CanonicalIntent {spendFrom} txout =
-  case fmap Set.fromList (traverse txOutPubKey txout) of
-    Nothing -> False
-    Just keys -> hasSigners keys (unAdressConwayEra <$> spendFrom)
+satisfiesSpendFrom :: CanonicalIntent -> Api.TxBodyContent build era -> Bool
+satisfiesSpendFrom CanonicalIntent {spendFrom} txbody = True
+
+hasSigners :: Set.Set PlutusLedgerApi.V1.PubKeyHash -> [PlutusLedgerApi.V1.PubKeyHash] -> Bool
+hasSigners sigs spendFrom =
+  Set.isProperSubsetOf (Set.fromList spendFrom) sigs
 
 satisfiesChangeTo :: CanonicalIntent -> [Api.TxOut Api.CtxTx Api.ConwayEra] -> Bool
-satisfiesChangeTo CanonicalIntent {changeTo} txouts = case changeTo of
-  Nothing -> False
-  Just (AdressConwayEra address) ->
-    address `elem` fmap (\(Api.TxOut aie _ _ _) -> aie) txouts
+satisfiesChangeTo CanonicalIntent {changeTo} txouts =
+  case changeTo of
+    Nothing -> False
+    Just (AdressConwayEra address) ->
+      address `elem` fmap (\(Api.TxOut aie _ _ _) -> aie) txouts
 
-txOutPubKey :: Api.TxOut ctx era -> Maybe PlutusLedgerApi.V1.PubKeyHash
-txOutPubKey (Api.TxOut aie _ _ _) = cardanoPubKeyHash aie
-
-hasSigners :: Set.Set PlutusLedgerApi.V1.PubKeyHash -> [Api.AddressInEra Api.ConwayEra] -> Bool
-hasSigners sigs = any hasSigner
-  where
-    hasSigner addr =
-      case cardanoPubKeyHash addr of
-        Nothing -> False
-        Just pkh -> pkh `elem` sigs
+txOutPubKey :: Api.TxOut ctx era -> Api.AddressInEra era
+txOutPubKey (Api.TxOut aie _ _ _) = aie
 
 -- |
 --  Intent Specs meet mustMint specs.

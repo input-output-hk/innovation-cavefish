@@ -5,11 +5,13 @@
 module Core.IntentSpecs (tests) where
 
 import Cardano.Api (lovelaceToValue, serialiseAddress)
+import Cardano.Api qualified as Api
 import Cavefish.Services.TxBuilding (ServiceFee (ServiceFee, amount, paidTo))
 import Control.Monad.IO.Class (MonadIO (..))
 import Cooked (knownWallets)
+import Cooked qualified
 import Cooked.MockChain.BlockChain
-import Core.IntentDSLGen (distributionFromList, genDSL)
+import Core.IntentDSLGen (genDSL)
 import Data.Default
 import Data.Either (isLeft)
 import Data.List.NonEmpty (fromList)
@@ -23,14 +25,16 @@ import Intent.Example.DSL (
   toCanonicalIntent,
   unAdressConwayEra,
  )
+import Ledger.CardanoWallet qualified
 import Plutus.Script.Utils.Value (ada)
+import Plutus.Script.Utils.Value qualified as Script
 import Sp.Emulator
 import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Hedgehog (testPropertyNamed)
 import Test.Tasty.Hspec (testSpec)
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (KeyPair, PaymentAddess (PaymentAddess), Wallet (Wallet, paymentAddress), generateWallet)
-import WBPS.Core.Registration.Artefacts.Keys.Ed25519 qualified as Ed25519 (generateWallet)
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 qualified as Ed25519
 import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (AbstractUnsignedTx (AbstractUnsignedTx))
 
 tests :: IO ()
@@ -47,21 +51,31 @@ properties =
 
 propIntentDSL :: Property
 propIntentDSL = property $ do
-  (dsl, wallets) <- forAll genDSL
-  liftIO $ putStrLn "++++++++++++++++++++++++"
-  liftIO $ print wallets
-  liftIO $ putStrLn "$$$$$$$$$$$$$$$$$$$$$$$$"
+  dsl <- forAll genDSL
   let
-    initDistList = distributionFromList (fmap (\w -> (w, [ada 100_000_000])) wallets)
-  provider@Wallet {paymentAddress} <- generateWallet
-  let servicefee = ServiceFee {amount = 10, paidTo = paymentAddress}
+    alice = (Cooked.wallet 1, [Script.ada 110, Script.ada 200])
+    mary = (Cooked.wallet 1, [Script.ada 110, Script.ada 200])
+    bob = (Cooked.wallet 1, [Script.ada 110, Script.ada 200])
+    provider = (Cooked.wallet 1, [Script.ada 110, Script.ada 200])
+
+    initialDistribution -- found all wallets
+      =
+      Cooked.distributionFromList [alice, mary, bob, provider]
+
+  let paymentAddress =
+        Ed25519.PaymentAddess
+          . Api.serialiseAddress
+          . Ledger.CardanoWallet.mockWalletAddress
+          $ Cooked.wallet 6
+  let servicefee = ServiceFee {amount = 7, paidTo = paymentAddress}
+
   let intent = toCanonicalIntent dsl
   case intent of
     Left err -> do
       footnote ("IntentDSL to CanonicalIntent conversion Error: " <> Text.unpack err)
       assert False
     Right _ -> do
-      absTx <- buildWithCooked initDistList servicefee dsl
+      absTx <- buildWithCooked initialDistribution servicefee dsl
       assert $ satisfies dsl (AbstractUnsignedTx absTx)
 
 specs :: Spec
