@@ -33,7 +33,7 @@ import Plutus.Script.Utils.Address (
   ToAddress (toAddress),
   ToPubKeyHash (toPubKeyHash),
  )
-import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (AbstractUnsignedTx)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (AbstractUnsignedTx)
 
 type ChangeDelta = Api.Value
 

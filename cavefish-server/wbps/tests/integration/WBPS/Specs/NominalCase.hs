@@ -12,10 +12,12 @@ import Test.QuickCheck (Gen, counterexample, forAll, ioProperty, property, (.&&.
 import Test.Tasty (TestTree)
 import Test.Tasty.QuickCheck (testProperty)
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (KeyPair, userWalletPK)
-import WBPS.Core.Registration.FetchAccounts (loadAccounts)
+import WBPS.Core.Registration.FetchAccounts (loadAllRegistered)
 import WBPS.Core.Registration.Register (register)
-import WBPS.Core.Session.Demonstration.Demonstrate (demonstrate)
+import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId))
 import WBPS.Core.Session.FetchSession (loadSessions)
+import WBPS.Core.Session.Session (Session (Demonstrated))
+import WBPS.Core.Session.Steps.Demonstration.Demonstrate (demonstrate)
 import WBPS.Core.Setup.Circuit.FileScheme (
   defaultFileScheme,
  )
@@ -57,14 +59,15 @@ specs =
           fileScheme
           ( do
               accountsCreated <- NL.toList <$> mapM (register . userWalletPK) userWalletKeyPairs
-              accountsLoaded <- filter (`elem` accountsCreated) <$> loadAccounts
+              accountsLoaded <- filter (`elem` accountsCreated) <$> loadAllRegistered
               anUnsignedTx <- liftIO (readFixture . unsignedTxFixture . commitmentFixtures $ rootFolders)
-              commitmentsDemonstrated <- NL.toList <$> mapM (flip demonstrate anUnsignedTx . userWalletPK) userWalletKeyPairs
-              sessionsLoaded <- filter (`elem` commitmentsDemonstrated) <$> loadSessions
-              pure (accountsCreated, accountsLoaded, commitmentsDemonstrated, sessionsLoaded)
+              demonstrationHistories <- NL.toList <$> mapM (flip demonstrate anUnsignedTx . RegistrationId . userWalletPK) userWalletKeyPairs
+              let demonstratedSessions = Demonstrated . snd <$> demonstrationHistories
+              sessionsLoaded <- filter (`elem` demonstratedSessions) <$> loadSessions
+              pure (accountsCreated, accountsLoaded, demonstratedSessions, sessionsLoaded)
           )
           <&> \case
-            Right (accountsCreated, accountsLoaded, commitmentsDemonstrated, sessionsLoaded) ->
+            Right (accountsCreated, accountsLoaded, demonstratedSessions, sessionsLoaded) ->
               counterexample "Loaded accounts mismatch" (Sets.fromList accountsCreated === Sets.fromList accountsLoaded)
-                .&&. counterexample "Loaded sessions mismatch" (Sets.fromList sessionsLoaded === Sets.fromList commitmentsDemonstrated)
-            Left failures -> counterexample ("LoadAccounts failed: " <> show failures) (property False)
+                .&&. counterexample "Loaded sessions mismatch" (Sets.fromList sessionsLoaded === Sets.fromList demonstratedSessions)
+            Left failures -> counterexample ("LoadAllRegistered failed: " <> show failures) (property False)

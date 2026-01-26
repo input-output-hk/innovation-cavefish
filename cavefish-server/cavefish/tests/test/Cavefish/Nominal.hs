@@ -14,17 +14,19 @@ import Adapter.Cavefish.Client (
   UserToolkitAPI (UserToolkitAPI, assertProofIsValid, signBlindly),
   WriteAPI (
     WriteAPI,
-    askCommitmentProof,
-    demonstrateCommitment,
-    register
+    demonstrate,
+    prove,
+    register,
+    submit
   ),
   setupCavefish,
  )
 import Cardano.Api (lovelaceToValue)
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
-import Cavefish.Endpoints.Write.AskCommitmentProof qualified as AskCommitmentProof
-import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 import Cavefish.Endpoints.Write.Register qualified as Register
+import Cavefish.Endpoints.Write.Session.Demonstrate qualified as Demonstrate
+import Cavefish.Endpoints.Write.Session.Prove qualified as Prove
+import Cavefish.Endpoints.Write.Session.Submit qualified as Submit
 import Data.Coerce (coerce)
 import Data.List.NonEmpty qualified as NE
 import Intent.Example.DSL (AddressW (AddressW), IntentDSL (AndExpsW, PayToW, SpendFromW), satisfies)
@@ -36,10 +38,10 @@ import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (
   paymentAddress,
   publicKey,
  )
-import WBPS.Core.Session.BlindSigning.ThetaStatement (rebuildThetaStatement)
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment (Commitment (Commitment, id, payload))
-import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (PublicMessage (PublicMessage))
-import WBPS.Core.Session.Demonstration.Artefacts.R qualified as R
+import WBPS.Core.Session.Steps.BlindSigning.ThetaStatement (rebuildThetaStatement)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (Commitment (Commitment, payload))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (PublicMessage (PublicMessage))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.R qualified as R
 
 spec :: Spec
 spec = do
@@ -53,7 +55,7 @@ spec = do
             \Setup
                { serviceProvider =
                  ServiceProviderAPI
-                   { write = WriteAPI {register, demonstrateCommitment, askCommitmentProof}
+                   { write = WriteAPI {register, demonstrate, prove, submit}
                    , read = ReadAPI {fetchAccount}
                    }
                , userToolkit = UserToolkitAPI {assertProofIsValid, signBlindly}
@@ -67,22 +69,21 @@ spec = do
                             , PayToW (lovelaceToValue 10_000_000) (coerce . paymentAddress $ bob)
                             ]
                         )
-                Register.Outputs {publicVerificationContext, ek} <- register . Register.Inputs . publicKey $ alice
+                Register.Outputs {registrationId, publicVerificationContext, ek} <- register . Register.Inputs . publicKey $ alice
 
-                DemonstrateCommitment.Outputs {commitment = commitment@Commitment {id = commitmentId, payload}, txAbs} <-
-                  demonstrateCommitment
-                    . DemonstrateCommitment.Inputs (publicKey alice)
+                Demonstrate.Outputs {sessionId, commitment = commitment@Commitment {payload}, txAbs} <-
+                  demonstrate
+                    . Demonstrate.Inputs registrationId
                     $ intent
 
                 satisfies intent txAbs `shouldBe` True
 
                 (r, bigR) <- R.generateKeyTuple
 
-                AskCommitmentProof.Outputs {challenge, proof} <-
-                  askCommitmentProof
-                    AskCommitmentProof.Inputs
-                      { userWalletPublicKey = publicKey alice
-                      , commitmentId
+                Prove.Outputs {challenge, proof} <-
+                  prove
+                    Prove.Inputs
+                      { sessionId
                       , bigR = bigR
                       }
 
@@ -93,7 +94,14 @@ spec = do
 
                 signature <- signBlindly (keyPair alice) r challenge
 
-                FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs . publicKey $ alice
+                Submit.Outputs {txId} <-
+                  submit
+                    Submit.Inputs
+                      { sessionId
+                      , signature
+                      }
+
+                FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs $ registrationId
 
                 accountMaybe
-                  `shouldBe` Just FetchAccount.Account {userWalletPublicKey = publicKey alice, ek, publicVerificationContext}
+                  `shouldBe` Just FetchAccount.Account {registrationId, ek, publicVerificationContext}

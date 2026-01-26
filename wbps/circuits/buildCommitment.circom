@@ -78,8 +78,8 @@ template BuildCommitment(message_size, commitment_limb_size, nb_commitment_limbs
 }
 
 // Sizing targets the mean tx_body size observed on Cardano mainnet history.
-// We round mean (~785B) to 800B and include a 32B nonce, then pad to 254-bit limbs:
-//   (800B + 32B) * 8 = 6,656 bits -> 27 * 254 = 6,858 bits (202 bits padding).
+// We bump the mean (~785B) to a 857B tx_body target and include a 32B nonce:
+//   (857B + 32B) * 8 = 7,112 bits = 28 * 254 (byte-aligned, no limb padding).
 // Using 254-bit limbs matches wbps_cardano.
 // See wbps/README.md for the full size distribution stats.
-component main = BuildCommitment(27*254, 254, 27);
+component main = BuildCommitment(28*254, 254, 28);

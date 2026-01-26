@@ -24,7 +24,8 @@ import WBPS.Core.Registration.Artefacts.Groth16.Setup (
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey)
 import WBPS.Core.Registration.Artefacts.Keys.ElGamal qualified as ElGamal (KeyPair (KeyPair, ek))
-import WBPS.Core.Registration.Registered (Registered (Registered, setup))
+import WBPS.Core.Registration.Registered (Registered (Registered, registrationId, setup))
+import WBPS.Core.Registration.RegistrationId (RegistrationId)
 
 newtype Inputs = Inputs
   { userWalletPublicKey :: UserWalletPublicKey
@@ -32,7 +33,8 @@ newtype Inputs = Inputs
   deriving newtype (Eq, Show, ToJSON, FromJSON)
 
 data Outputs = Outputs
-  { ek :: EncryptionKey
+  { registrationId :: RegistrationId
+  , ek :: EncryptionKey
   , publicVerificationContext :: PublicVerificationContextAsJSON
   }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -45,7 +47,8 @@ handle Inputs {userWalletPublicKey} = do
 toOutputs :: Registered -> Outputs
 toOutputs
   Registered
-    { setup =
+    { registrationId
+    , setup =
       Setup
         { publicVerificationContext = PublicVerificationContext {asJson = publicVerificationContext}
         , encryptionKeys = ElGamal.KeyPair {ek}

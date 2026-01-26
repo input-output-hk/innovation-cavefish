@@ -5,11 +5,11 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 import WBPS.Adapter.Math.AffinePoint (AffinePoint (AffinePoint, x, y))
 import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey (EncryptionKey))
-import WBPS.Core.Session.Demonstration.Artefacts.Rho (mkRho)
-import WBPS.Core.Session.Demonstration.Artefacts.Scalars (
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Rho (mkRho)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars (
   Scalars (Scalars, ekPowRho, gPowRho),
  )
-import WBPS.Core.Session.Demonstration.Artefacts.Scalars.Compute (compute)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars.Compute (compute)
 
 specs :: TestTree
 specs =

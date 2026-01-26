@@ -10,9 +10,10 @@ module Adapter.Cavefish.Client (
 import Cavefish.Api.ServerConfiguration (ServerConfiguration (ServerConfiguration, httpServer, serviceProviderFee, transactionExpiry, wbps))
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount (Inputs, Outputs)
 import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts (Outputs)
-import Cavefish.Endpoints.Write.AskCommitmentProof qualified as AskCommitmentProof
-import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment (Inputs, Outputs)
 import Cavefish.Endpoints.Write.Register qualified as Register (Inputs, Outputs)
+import Cavefish.Endpoints.Write.Session.Demonstrate qualified as Demonstrate (Inputs, Outputs)
+import Cavefish.Endpoints.Write.Session.Prove qualified as Prove
+import Cavefish.Endpoints.Write.Session.Submit qualified as Submit
 import Cavefish.Services.TxBuilding (ServiceFee (ServiceFee, amount, paidTo))
 import Control.Monad ((>=>))
 import Cooked (InitialDistribution (InitialDistribution), Payable (Value), receives)
@@ -32,12 +33,12 @@ import Sp.Server (Cavefish, mkServer)
 import Test.Hspec (expectationFailure)
 import WBPS.Core.Registration.Artefacts.Groth16.Setup (PublicVerificationContextAsJSON)
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (KeyPair, Wallet (Wallet, paymentAddress), generateWallet)
-import WBPS.Core.Session.BlindSigning.Sign (BlindSignature, sign)
-import WBPS.Core.Session.BlindSigning.ThetaStatement (ThetaStatement)
-import WBPS.Core.Session.BlindSigning.VerifyProof qualified as VerifyProof
-import WBPS.Core.Session.Demonstration.Artefacts.R (RSecret)
-import WBPS.Core.Session.Proving.Artefacts.Challenge (Challenge)
-import WBPS.Core.Session.Proving.Artefacts.Proof (Proof)
+import WBPS.Core.Session.Steps.BlindSigning.BlindSignature (BlindSignature, sign)
+import WBPS.Core.Session.Steps.BlindSigning.ThetaStatement (ThetaStatement)
+import WBPS.Core.Session.Steps.BlindSigning.VerifyProof qualified as VerifyProof
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.R (RSecret)
+import WBPS.Core.Session.Steps.Proving.Artefacts.Challenge (Challenge)
+import WBPS.Core.Session.Steps.Proving.Artefacts.Proof (Proof)
 import WBPS.Core.Setup.Circuit.FileScheme (FileScheme, mkFileSchemeFromRoot)
 import WBPS.WBPS (runWBPS)
 
@@ -46,8 +47,9 @@ getServiceProviderAPI fee port = do
   manager <- newManager defaultManagerSettings {managerResponseTimeout = responseTimeoutMicro 300_000_000}
   let baseUrl = BaseUrl SC.Http "127.0.0.1" port ""
       ( register
-          :<|> demonstrateCommitment
-          :<|> askCommitmentProof
+          :<|> demonstrate
+          :<|> prove
+          :<|> submit
           :<|> fetchAccount
           :<|> fetchAccounts
         ) = SC.client (Proxy @Cavefish)
@@ -57,8 +59,9 @@ getServiceProviderAPI fee port = do
       , write =
           WriteAPI
             { register = runClientOrFail (SC.mkClientEnv manager baseUrl) . register
-            , demonstrateCommitment = runClientOrFail (SC.mkClientEnv manager baseUrl) . demonstrateCommitment
-            , askCommitmentProof = runClientOrFail (SC.mkClientEnv manager baseUrl) . askCommitmentProof
+            , demonstrate = runClientOrFail (SC.mkClientEnv manager baseUrl) . demonstrate
+            , prove = runClientOrFail (SC.mkClientEnv manager baseUrl) . prove
+            , submit = runClientOrFail (SC.mkClientEnv manager baseUrl) . submit
             }
       , read =
           ReadAPI
@@ -82,8 +85,9 @@ data ServiceProviderAPI
 
 data WriteAPI = WriteAPI
   { register :: Register.Inputs -> IO Register.Outputs
-  , demonstrateCommitment :: DemonstrateCommitment.Inputs -> IO DemonstrateCommitment.Outputs
-  , askCommitmentProof :: AskCommitmentProof.Inputs -> IO AskCommitmentProof.Outputs
+  , demonstrate :: Demonstrate.Inputs -> IO Demonstrate.Outputs
+  , prove :: Prove.Inputs -> IO Prove.Outputs
+  , submit :: Submit.Inputs -> IO Submit.Outputs
   }
 
 data ReadAPI = ReadAPI

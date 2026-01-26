@@ -12,21 +12,22 @@ import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import WBPS.Adapter.Math.AffinePoint (AffinePoint)
 import WBPS.Core.Failure (WBPSFailure)
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (generateKeyPair, userWalletPK)
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment (
+import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (
   CommitmentPayload (unPayload),
   MessageLimbs (unMessageLimbs),
   payload,
  )
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment.Build (
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment.Build (
   Context (nbCommitmentLimbs),
   Input (Input, ekPowRho, messageBits),
   build,
  )
-import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage.Prepare (toBitsPaddedToMaxSize)
-import WBPS.Core.Session.Demonstration.Artefacts.Scalars (
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage.Prepare (toBitsPaddedToMaxSize)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars (
   Scalars (Scalars, ekPowRho),
  )
-import WBPS.Core.Session.Demonstration.Artefacts.Scalars.Compute (compute)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars.Compute (compute)
 import WBPS.Core.Setup.Circuit.FileScheme (FileScheme, defaultFileScheme)
 import WBPS.Specs.Adapter.Fixture (
   CommitmentFixtures (CommitmentFixtures, commitmentFixture, messageBitsFixture, unsignedTxFixture),
@@ -66,6 +67,7 @@ commitmentMatchesCircuit = do
       m ([Integer], AffinePoint)
     runCommitmentFlow CommitmentFixtures {unsignedTxFixture, messageBitsFixture, commitmentFixture} = do
       userWalletPublicKey <- liftIO (userWalletPK <$> generateKeyPair)
+      let registrationId = RegistrationId userWalletPublicKey
       Scalars {ekPowRho} <- compute sampleEncryptionKey sampleRho
       message <- liftIO (readFixture unsignedTxFixture)
       messageBitsFromFixture <- liftIO (readFixture messageBitsFixture)
@@ -75,7 +77,7 @@ commitmentMatchesCircuit = do
 
       commitmentPayload <-
         unPayload . payload
-          <$> build userWalletPublicKey Input {ekPowRho, messageBits = messageBitsFromFixture}
+          <$> build registrationId Input {ekPowRho, messageBits = messageBitsFromFixture}
 
       whenMismatch "Commitment payload fixture" (commitmentPayload == expectedCommitmentBits)
 

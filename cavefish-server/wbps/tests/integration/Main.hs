@@ -7,6 +7,7 @@ import WBPS.Specs.NominalCase qualified as Register.Nominal.Case
 import WBPS.Specs.Session.BlindSigning.Sign qualified as BlindSigning.Sign
 import WBPS.Specs.Session.BlindSigning.ThetaStatement qualified as BlindSigning.ThetaStatement
 import WBPS.Specs.Session.Demonstration.Commitment.Build qualified as Commitment.BuildCommitment
+import WBPS.Specs.Session.Submitting.Submit qualified as Submitting.Submit
 
 main :: IO ()
 main =
@@ -19,5 +20,6 @@ main =
           , Commitment.BuildCommitment.specs
           , BlindSigning.ThetaStatement.specs
           , BlindSigning.Sign.specs
+          , Submitting.Submit.specs
           ]
       ]

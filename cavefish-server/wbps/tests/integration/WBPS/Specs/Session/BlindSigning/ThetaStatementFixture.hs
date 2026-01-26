@@ -7,14 +7,14 @@ import Data.String (fromString)
 import Data.Text (Text)
 import System.FilePath ((</>))
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment (Commitment)
-import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (PreparedMessage)
-import WBPS.Core.Session.Demonstration.Artefacts.R (R)
-import WBPS.Core.Session.Demonstration.Artefacts.Scalars (Scalars)
-import WBPS.Core.Session.Demonstration.Demonstrated (
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (Commitment)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (PreparedMessage)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.R (R)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars (Scalars)
+import WBPS.Core.Session.Steps.Demonstration.Demonstrated (
   CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage, scalars),
  )
-import WBPS.Core.Session.Proving.Artefacts.Challenge (Challenge)
+import WBPS.Core.Session.Steps.Proving.Artefacts.Challenge (Challenge)
 import WBPS.Specs.Adapter.FixtureIO (assertFileExists, findRepoRoot, readJson)
 
 data ThetaStatementFixture = ThetaStatementFixture

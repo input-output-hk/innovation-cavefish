@@ -18,7 +18,7 @@ import Path (Abs, File, Path, parent, reldir, relfile, toFilePath, (</>))
 import WBPS.Adapter.Math.AffinePoint (AffinePoint (AffinePoint))
 import WBPS.Core.Failure (WBPSFailure (BuildCommitmentFailed))
 import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey (EncryptionKey))
-import WBPS.Core.Session.Demonstration.Artefacts.Rho (Rho, mkRho)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Rho (Rho, mkRho)
 import WBPS.Core.Setup.Circuit.FileScheme (RootFolders (RootFolders, input))
 
 data CommitmentFixtures = CommitmentFixtures

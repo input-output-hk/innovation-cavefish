@@ -11,9 +11,10 @@ module Sp.Server (
 import Cavefish (CavefishServerM, CavefishServices, runCavefishMonad)
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
 import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
-import Cavefish.Endpoints.Write.AskCommitmentProof qualified as AskCommitmentProof
-import Cavefish.Endpoints.Write.DemonstrateCommitment qualified as DemonstrateCommitment
 import Cavefish.Endpoints.Write.Register qualified as Register
+import Cavefish.Endpoints.Write.Session.Demonstrate qualified as Demonstrate
+import Cavefish.Endpoints.Write.Session.Prove qualified as Prove
+import Cavefish.Endpoints.Write.Session.Submit qualified as Submit
 import Network.Wai (Application, Middleware)
 import Network.Wai.Middleware.Cors (
   CorsResourcePolicy (corsMethods, corsRequestHeaders),
@@ -34,23 +35,28 @@ import Servant.API ((:<|>) ((:<|>)), (:>))
 
 type Cavefish =
   Register
-    :<|> DemonstrateCommitment
-    :<|> AskCommitmentProof
-    -- :<|> "askSubmission" :> ReqBody '[JSON] AskSubmission.Inputs :> Post '[JSON] AskSubmission.Outputs
+    :<|> Demonstrate
+    :<|> Prove
+    :<|> Submit
     :<|> FetchAccount
     :<|> FetchAccounts
 
 type Register = "register" :> ReqBody '[JSON] Register.Inputs :> Post '[JSON] Register.Outputs
 
-type DemonstrateCommitment =
-  "demonstrateCommitment"
-    :> ReqBody '[JSON] DemonstrateCommitment.Inputs
-    :> Post '[JSON] DemonstrateCommitment.Outputs
+type Demonstrate =
+  "demonstrate"
+    :> ReqBody '[JSON] Demonstrate.Inputs
+    :> Post '[JSON] Demonstrate.Outputs
 
-type AskCommitmentProof =
-  "askCommitmentProof"
-    :> ReqBody '[JSON] AskCommitmentProof.Inputs
-    :> Post '[JSON] AskCommitmentProof.Outputs
+type Prove =
+  "prove"
+    :> ReqBody '[JSON] Prove.Inputs
+    :> Post '[JSON] Prove.Outputs
+
+type Submit =
+  "submit"
+    :> ReqBody '[JSON] Submit.Inputs
+    :> Post '[JSON] Submit.Outputs
 
 type FetchAccount =
   "fetchAccount" :> ReqBody '[JSON] FetchAccount.Inputs :> Post '[JSON] FetchAccount.Outputs
@@ -77,8 +83,8 @@ mkServer cavefishMiddleware env =
 server :: ServerT Cavefish CavefishServerM
 server =
   Register.handle
-    :<|> DemonstrateCommitment.handle
-    :<|> AskCommitmentProof.handle
-    -- :<|> AskSubmission.handle
+    :<|> Demonstrate.handle
+    :<|> Prove.handle
+    :<|> Submit.handle
     :<|> FetchAccount.handle
     :<|> FetchAccounts.handle
