@@ -10,6 +10,7 @@ module Adapter.Cavefish.Client (
 import Cavefish.Api.ServerConfiguration (ServerConfiguration (ServerConfiguration, httpServer, serviceProviderFee, transactionExpiry, wbps))
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount (Inputs, Outputs)
 import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts (Outputs)
+import Cavefish.Endpoints.Read.FetchTxStatus qualified as FetchTxStatus (Inputs, Outputs)
 import Cavefish.Endpoints.Write.Register qualified as Register (Inputs, Outputs)
 import Cavefish.Endpoints.Write.Session.Demonstrate qualified as Demonstrate (Inputs, Outputs)
 import Cavefish.Endpoints.Write.Session.Prove qualified as Prove
@@ -52,6 +53,7 @@ getServiceProviderAPI fee port = do
           :<|> submit
           :<|> fetchAccount
           :<|> fetchAccounts
+          :<|> fetchTxStatus
         ) = SC.client (Proxy @Cavefish)
   return
     ServiceProviderAPI
@@ -67,6 +69,7 @@ getServiceProviderAPI fee port = do
           ReadAPI
             { fetchAccount = runClientOrFail (SC.mkClientEnv manager baseUrl) . fetchAccount
             , fetchAccounts = runClientOrFail (SC.mkClientEnv manager baseUrl) fetchAccounts
+            , fetchTxStatus = runClientOrFail (SC.mkClientEnv manager baseUrl) . fetchTxStatus
             }
       }
 
@@ -93,6 +96,7 @@ data WriteAPI = WriteAPI
 data ReadAPI = ReadAPI
   { fetchAccount :: FetchAccount.Inputs -> IO FetchAccount.Outputs
   , fetchAccounts :: IO FetchAccounts.Outputs
+  , fetchTxStatus :: FetchTxStatus.Inputs -> IO FetchTxStatus.Outputs
   }
 
 runClientOrFail :: SC.ClientEnv -> SC.ClientM a -> IO a
@@ -106,13 +110,14 @@ mkTestCavefishMonad ::
   FileScheme ->
   InitialDistribution ->
   ServerConfiguration ->
-  Application
-mkTestCavefishMonad wbpsScheme initialDistribution serverConfiguration =
-  mkServer errStatusTraceMiddleware $
+  IO Application
+mkTestCavefishMonad wbpsScheme initialDistribution serverConfiguration = do
+  env <-
     mkServerContext
       initialDistribution
       wbpsScheme
       serverConfiguration
+  pure $ mkServer errStatusTraceMiddleware env
 
 setupCavefish :: Path Rel Dir -> (Setup -> IO a) -> IO a
 setupCavefish folderLabel actions = do
@@ -139,21 +144,20 @@ setupCavefish folderLabel actions = do
                   Right signature -> pure signature
           }
   Warp.testWithApplication
-    ( pure $
-        mkTestCavefishMonad
-          wbpsScheme
-          ( distributionFromList
-              [ (alice, [ada 100])
-              , (bob, [ada 200])
-              , (provider, [ada 10])
-              ]
-          )
-          ServerConfiguration
-            { httpServer = def
-            , wbps = def
-            , serviceProviderFee = servicefee
-            , transactionExpiry = def
-            }
+    ( mkTestCavefishMonad
+        wbpsScheme
+        ( distributionFromList
+            [ (alice, [ada 100])
+            , (bob, [ada 200])
+            , (provider, [ada 10])
+            ]
+        )
+        ServerConfiguration
+          { httpServer = def
+          , wbps = def
+          , serviceProviderFee = servicefee
+          , transactionExpiry = def
+          }
     )
     (getServiceProviderAPI servicefee >=> \serviceProvider -> actions Setup {..})
 

@@ -52,11 +52,11 @@ main = withTracer (Verbose "SP.Server") $ \tr -> do
 
   wbpsScheme <- liftIO $ mkFileSchemeFromRoot [reldir|production|]
   let HttpServer {port} = httpServer config
-      env =
-        mkServerContext
-          def
-          wbpsScheme
-          config
+  env <-
+    mkServerContext
+      def
+      wbpsScheme
+      config
 
   liftIO $
     Warp.run

@@ -8,7 +8,7 @@
 module Cavefish.Nominal (spec) where
 
 import Adapter.Cavefish.Client (
-  ReadAPI (ReadAPI, fetchAccount),
+  ReadAPI (ReadAPI, fetchTxStatus),
   ServiceProviderAPI (ServiceProviderAPI, read, write),
   Setup (Setup, alice, bob, serviceProvider, userToolkit),
   UserToolkitAPI (UserToolkitAPI, assertProofIsValid, signBlindly),
@@ -22,18 +22,18 @@ import Adapter.Cavefish.Client (
   setupCavefish,
  )
 import Cardano.Api (lovelaceToValue)
-import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
+import Cavefish.Endpoints.Read.FetchTxStatus qualified as FetchTxStatus
 import Cavefish.Endpoints.Write.Register qualified as Register
 import Cavefish.Endpoints.Write.Session.Demonstrate qualified as Demonstrate
 import Cavefish.Endpoints.Write.Session.Prove qualified as Prove
 import Cavefish.Endpoints.Write.Session.Submit qualified as Submit
-import Data.Coerce (coerce)
+import Cavefish.Services.TxBuilding (TxStatus (TxStatusSubmitted))
 import Data.List.NonEmpty qualified as NE
 import Intent.Example.DSL (AddressW (AddressW), IntentDSL (AndExpsW, PayToW, SpendFromW), satisfies)
 import Path (reldir)
 import Test.Hspec (Spec, describe, it, shouldBe)
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (
-  PaymentAddess (PaymentAddess),
+  PaymentAddess (unPaymentAddess),
   keyPair,
   paymentAddress,
   publicKey,
@@ -48,7 +48,7 @@ spec = do
   describe "[Cavefish Server - Integration Spec]" $
     describe "Nominal Cases" $ do
       it
-        "register, demonstrate, prove, verify, blindly-sign and end up with signed transaction"
+        "register, demonstrate, prove, verify, blindly-sign and end up with signed transaction submitted on emulator"
         $ do
           setupCavefish
             [reldir|integration-cavefish-nominal-flow|]
@@ -56,7 +56,7 @@ spec = do
                { serviceProvider =
                  ServiceProviderAPI
                    { write = WriteAPI {register, demonstrate, prove, submit}
-                   , read = ReadAPI {fetchAccount}
+                   , read = ReadAPI {fetchTxStatus}
                    }
                , userToolkit = UserToolkitAPI {assertProofIsValid, signBlindly}
                , alice
@@ -65,11 +65,12 @@ spec = do
                 let intent =
                       AndExpsW
                         ( NE.fromList
-                            [ SpendFromW (coerce . paymentAddress $ alice)
-                            , PayToW (lovelaceToValue 10_000_000) (coerce . paymentAddress $ bob)
+                            [ SpendFromW (toAddress alice)
+                            , PayToW (lovelaceToValue 10_000_000) (toAddress bob)
                             ]
                         )
-                Register.Outputs {registrationId, publicVerificationContext, ek} <- register . Register.Inputs . publicKey $ alice
+                    toAddress = AddressW . unPaymentAddess . paymentAddress
+                Register.Outputs {registrationId, publicVerificationContext} <- register . Register.Inputs . publicKey $ alice
 
                 Demonstrate.Outputs {sessionId, commitment = commitment@Commitment {payload}, txAbs} <-
                   demonstrate
@@ -101,7 +102,5 @@ spec = do
                       , signature
                       }
 
-                FetchAccount.Outputs {accountMaybe} <- fetchAccount . FetchAccount.Inputs $ registrationId
-
-                accountMaybe
-                  `shouldBe` Just FetchAccount.Account {registrationId, ek, publicVerificationContext}
+                FetchTxStatus.Outputs {status} <- fetchTxStatus . FetchTxStatus.Inputs $ txId
+                status `shouldBe` TxStatusSubmitted

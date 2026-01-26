@@ -67,6 +67,7 @@ library
     Cavefish.Api.ServerConfiguration
     Cavefish.Endpoints.Read.FetchAccount
     Cavefish.Endpoints.Read.FetchAccounts
+    Cavefish.Endpoints.Read.FetchTxStatus
     Cavefish.Endpoints.Write.Register
     Cavefish.Endpoints.Write.Session.Demonstrate
     Cavefish.Endpoints.Write.Session.Prove
@@ -85,6 +86,7 @@ library
     , async
     , bytestring
     , cardano-api
+    , cardano-node-emulator
     , clock
     , containers
     , contra-tracer
@@ -96,6 +98,7 @@ library
     , mtl
     , path
     , plutus-ledger
+    , plutus-ledger-api
     , plutus-script-utils
     , say
     , servant
@@ -104,6 +107,7 @@ library
     , text
     , time
     , toml-parser
+    , transformers
     , wai
     , wai-cors
     , wbps

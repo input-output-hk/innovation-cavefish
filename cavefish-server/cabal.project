@@ -40,7 +40,7 @@ package cardano-crypto-praos
   flags: -external-libsodium-vrf
 
 constraints:
-  cardano-api == 10.18.0.0
+  cardano-api == 10.18.1.0
 
 source-repository-package
     type: git
@@ -55,7 +55,7 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/tweag/cooked-validators
-    tag: b6ada83b1ac02afd09c1f6838a626f38ed062640
-    --sha256: 1fq0ybhksz7wns5grpkla9cwmkzk39wllkv4wshm8qmnhaxripyf
+    tag: v8.0.0
+    --sha256: 02hpvb4d41kv43n90lhn0kddkgdhdq5f0kfin3bf1bzzcrkpyirc
     subdir:
       .

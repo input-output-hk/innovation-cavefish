@@ -1,6 +1,7 @@
 module Cavefish.Services.TxBuilding (
   TxBuilding (..),
   ServiceFee (..),
+  TxStatus (..),
 ) where
 
 import Cardano.Api (
@@ -10,6 +11,7 @@ import Cardano.Api (
   MonadIO,
   ToJSON,
   Tx,
+  TxId,
  )
 import Data.Default (Default (def))
 import GHC.Generics (Generic)
@@ -23,12 +25,18 @@ data TxBuilding = TxBuilding
   { fees :: ServiceFee
   , build :: forall m. (MonadIO m, MonadError ServerError m) => IntentDSL -> m UnsignedTx
   , submit :: forall m. (MonadIO m, MonadError ServerError m) => Tx ConwayEra -> m ()
+  , txStatus :: forall m. (MonadIO m, MonadError ServerError m) => TxId -> m TxStatus
   }
 
 data ServiceFee = ServiceFee
   { amount :: Integer
   , paidTo :: PaymentAddess
   }
+  deriving (Show, Eq, Generic, ToJSON, FromJSON)
+
+data TxStatus
+  = TxStatusUnknown
+  | TxStatusSubmitted
   deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
 instance FromValue ServiceFee where

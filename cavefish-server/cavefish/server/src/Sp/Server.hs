@@ -11,6 +11,7 @@ module Sp.Server (
 import Cavefish (CavefishServerM, CavefishServices, runCavefishMonad)
 import Cavefish.Endpoints.Read.FetchAccount qualified as FetchAccount
 import Cavefish.Endpoints.Read.FetchAccounts qualified as FetchAccounts
+import Cavefish.Endpoints.Read.FetchTxStatus qualified as FetchTxStatus
 import Cavefish.Endpoints.Write.Register qualified as Register
 import Cavefish.Endpoints.Write.Session.Demonstrate qualified as Demonstrate
 import Cavefish.Endpoints.Write.Session.Prove qualified as Prove
@@ -40,6 +41,7 @@ type Cavefish =
     :<|> Submit
     :<|> FetchAccount
     :<|> FetchAccounts
+    :<|> FetchTxStatus
 
 type Register = "register" :> ReqBody '[JSON] Register.Inputs :> Post '[JSON] Register.Outputs
 
@@ -62,6 +64,9 @@ type FetchAccount =
   "fetchAccount" :> ReqBody '[JSON] FetchAccount.Inputs :> Post '[JSON] FetchAccount.Outputs
 
 type FetchAccounts = "fetchAccounts" :> Get '[JSON] FetchAccounts.Outputs
+
+type FetchTxStatus =
+  "fetchTxStatus" :> ReqBody '[JSON] FetchTxStatus.Inputs :> Post '[JSON] FetchTxStatus.Outputs
 
 cavefishApi :: Proxy Cavefish
 cavefishApi = Proxy
@@ -88,3 +93,4 @@ server =
     :<|> Submit.handle
     :<|> FetchAccount.handle
     :<|> FetchAccounts.handle
+    :<|> FetchTxStatus.handle
