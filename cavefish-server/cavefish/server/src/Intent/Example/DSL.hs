@@ -23,12 +23,12 @@ import Control.Applicative (Alternative ((<|>)))
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
 import Control.Monad.Writer (Writer, runWriter, tell)
 import Data.Default (Default (def))
+import Data.List (uncons)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
 import Data.Text (Text)
-import Debug.Trace qualified as Debug
 import GHC.Generics (Generic)
 import GHC.IsList qualified
 import GHC.List qualified
@@ -183,7 +183,7 @@ satisfies dsl txAbs =
     txBody = Api.getTxBodyContent (txUnsigned . abstractTxUnsigned $ txAbs)
    in
     case toCanonicalIntent dsl of
-      Left e -> Debug.trace ("**** error: " <> show e) False
+      Left _ -> False
       Right intent ->
         and
           [ satisfiesMaxFee intent (Api.txFee txBody)
@@ -216,6 +216,10 @@ satisfiesMaxInterval CanonicalIntent {maxInterval} tx =
       Nothing -> False
       Just (_lo, _hi) -> _hi - _lo <= i
 
+-- | TODO
+-- Not sure how to implement this function.
+-- This function is based on the cavefish paper section 5.1, figure 2.  The formula is:
+-- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
 satisfiesSpendFrom :: CanonicalIntent -> Api.TxBodyContent build era -> Bool
 satisfiesSpendFrom CanonicalIntent {spendFrom} txbody = True
 
@@ -224,14 +228,15 @@ hasSigners sigs spendFrom =
   Set.isProperSubsetOf (Set.fromList spendFrom) sigs
 
 satisfiesChangeTo :: CanonicalIntent -> [Api.TxOut Api.CtxTx Api.ConwayEra] -> Bool
-satisfiesChangeTo CanonicalIntent {changeTo} txouts =
+satisfiesChangeTo CanonicalIntent {spendFrom, changeTo} txouts =
   case changeTo of
-    Nothing -> False
+    Nothing ->
+      maybe
+        False
+        (\(AdressConwayEra address, _) -> address `elem` fmap (\(Api.TxOut aie _ _ _) -> aie) txouts)
+        (uncons spendFrom)
     Just (AdressConwayEra address) ->
       address `elem` fmap (\(Api.TxOut aie _ _ _) -> aie) txouts
-
-txOutPubKey :: Api.TxOut ctx era -> Api.AddressInEra era
-txOutPubKey (Api.TxOut aie _ _ _) = aie
 
 -- |
 --  Intent Specs meet mustMint specs.

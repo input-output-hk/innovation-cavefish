@@ -40,7 +40,6 @@ import Cooked (
  )
 import Cooked.MockChain.GenerateTx.Body (txSkelToTxBody)
 import Data.Map.Strict qualified as Map (fromList)
-import Data.Maybe (fromJust)
 import Data.Text qualified as Text (unpack)
 import Debug.Trace qualified as Debug
 import Intent.Example.DSL (
@@ -75,9 +74,11 @@ buildTx CanonicalIntent {..} serviceFee = do
           , txSkelOuts = payOuts <> feeOuts
           , txSkelMints = mempty -- N.H todo
           -- Balance with 1st signer is default. See [BlancingPolicy](https://github.com/tweag/cooked-validators/blob/main/doc/BALANCING.md#balancing-policy)
-          , txSkelSignatories = map signatoryPubKey (fromJust changeTo : spendFrom)
-          , -- , txSkelSignatories = map signatoryPubKey spendFrom
-            txSkelValidityRange = validityRange
+          , txSkelSignatories =
+              map
+                signatoryPubKey
+                (maybe spendFrom (: spendFrom) changeTo)
+          , txSkelValidityRange = validityRange
           , txSkelOpts = opts
           }
 
