@@ -107,6 +107,8 @@ include "../vendor/circomlib/circuits/bitify.circom";
 // Cardano EdDSA SHA-512 (bitwise)
 include "hashing/sha2/sha512/sha512_hash_bits.circom";
 
+include "hashing/blake2/blake2b.circom";
+
 // ======================================================================
 // 1) RebuildMessage — P0
 // ----------------------------------------------------------------------
@@ -269,21 +271,22 @@ template RebuildCommitment(message_size, commitment_limb_size, nb_commitment_lim
 // Inputs:
 //   in_commitment_point[256] : R bits (nonce commitment g^ρ), byte-wise bit-reversed per EdDSA
 //   in_signer_key[256]       : X bits (signer key), byte-wise bit-reversed per EdDSA
-//   in_message[message_size]   : μ_bits
+//   txId[256]                : txId bits (256 bits as the Blake2b-256 hash of tx_body_cbor)
 // Output:
 //   out_challenge[64]        : digest
 //
 // Property (P3):
-//   RebuildChallenge(R, X, μ) → digest and assert challenge == digest
-//   (digest = SHA512(R || X || μ_bits) with per-byte bit-reversal for R, X)
+//   RebuildChallenge(R, X, txId) → digest and assert challenge == digest
+//   (digest = SHA512(R || X || txId) with per-byte bit-reversal for R, X)
 // ======================================================================
 template RebuildChallenge(message_size) {
     signal input  in_commitment_point[256];
     signal input  in_signer_key[256];
-    signal input  in_message[message_size];
+    signal input  txId[256];
     signal output out_challenge[64];
 
-    component hash = Sha512_hash_bits_digest(message_size + 512);
+    // Compute EdDSA challenge with Sha512. Input len = 512 bits for (R || X) and 256 bits for (txId)
+    component hash = Sha512_hash_bits_digest(512 + 256);
 
     var i;
     var j;
@@ -294,8 +297,8 @@ template RebuildChallenge(message_size) {
             hash.inp_bits[256 + i + j] <== in_signer_key[i + (7 - j)];
         }
     }
-    for (i = 0; i < message_size; i++) {
-        in_message[i] ==> hash.inp_bits[512 + i];
+    for (i = 0; i < 256; i++) {
+        txId[i] ==> hash.inp_bits[512 + i];
     }
 
     for (i = 0; i < 64; i++) {
@@ -306,18 +309,55 @@ template RebuildChallenge(message_size) {
 }
 
 // ======================================================================
+// X) ComputeTxId
+// ----------------------------------------------------------------------
+// Inputs:
+//   in_message[message_size]   : μ_bits
+// Output:
+//   txId[256]        : Blake2b-256 digest
+//
+// Property (P3):
+//   ComputeTxId(μ) → txId
+//   (txId = Blake2b-256(μ_bytes))
+// ======================================================================
+template ComputeTxId(message_size) {
+    signal input in_message[message_size];
+    signal output txId[256];
+
+    // Convert message (tx_body) from bits to bytes
+    assert(message_size % 8 == 0);
+    var message_size_bytes = message_size \ 8;
+
+    component to_bytes[message_size_bytes];
+    signal in_message_bytes[message_size_bytes];
+
+    for (var i = 0; i < message_size_bytes; i++) {
+        to_bytes[i] = Bits2Num(8);
+        for (var j = 0; j < 8; j++) {
+            to_bytes[i].in[j] <== in_message[i*8 + j];
+        }
+        to_bytes[i].out ==> in_message_bytes[i];
+    }
+
+    // Compute txId = Blake2b-256(tx_body_cbor)
+    component blake2b_hash = Blake2b_bytes(message_size_bytes);
+    blake2b_hash.inp_bytes <== in_message_bytes;
+
+    txId <== blake2b_hash.hash_bits;
+}
+
+
+// ======================================================================
 // 5) Top-level — CardanoWBPS(message_size, message_private_part_size, message_private_part_offset)
 // ----------------------------------------------------------------------
 // Orchestration (explicit):
 //   - P0: RebuildMessage(m_pub, m_priv) → μ
 //   - P1: CommitmentScalars(ek, ρ) → (ek^ρ, g^ρ) and assert commitment_point_affine == g^ρ
 //   - P2: RebuildCommitment(ek^ρ, μ) → (μ̂, PRF, μ̂+PRF) and assert Cmsg[i] == μ̂[i] + PRF[i]
-//   - P3: RebuildChallenge(R, X, μ) → digest and assert challenge == digest
+//   - P3: RebuildChallenge(R, X, txId) → digest and assert challenge == digest
 // ======================================================================
 template CardanoWBPS(message_size, message_private_part_size, message_private_part_offset) {
-    var commitment_limb_size = 254;
-    assert(message_size % commitment_limb_size == 0);
-    var nb_commitment_limbs = message_size \ commitment_limb_size;
+    var nb_commitment_limbs = 256 \ 128;
 
     // External inputs
     signal input signer_key[256];
@@ -334,12 +374,16 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
 
     // P0
     component rebuildMessage = RebuildMessage(message_size, message_private_part_size, message_private_part_offset);
-    for (var i = 0; i < message_size; i++) {
+    for (var i = 0; i < message_size ; i++) {
         rebuildMessage.in_message_public_part[i] <== message_public_part[i];
     }
     for (var j = 0; j < message_private_part_size; j++) {
         rebuildMessage.in_message_private_part[j] <== message_private_part[j];
     }
+
+    // PX
+    component computeTxId = ComputeTxId(message_size);
+    computeTxId.in_message <== rebuildMessage.out_message;
 
     // P1
     component commitmentScalars = CommitmentScalars();
@@ -354,12 +398,11 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
     commitment_point_affine[1] === commitmentScalars.out_commitment_g_rho[1];
 
     // P2
-    component rebuildCommitment = RebuildCommitment(message_size, commitment_limb_size, nb_commitment_limbs);
+    // Use 128 for limbs instead of commitment_limb_size
+    component rebuildCommitment = RebuildCommitment(256, 128, nb_commitment_limbs);
     rebuildCommitment.in_seed_x <== commitmentScalars.out_solver_encryption_key_pow_rho[0];
     rebuildCommitment.in_seed_y <== commitmentScalars.out_solver_encryption_key_pow_rho[1];
-    for (var t = 0; t < message_size; t++) {
-        rebuildCommitment.in_message[t] <== rebuildMessage.out_message[t];
-    }
+    rebuildCommitment.in_message <== computeTxId.txId;
     for (var k = 0; k < nb_commitment_limbs; k++) {
         rebuildCommitment.in_commitment_payload[k] <== commitment_payload[k];
     }
@@ -374,9 +417,8 @@ template CardanoWBPS(message_size, message_private_part_size, message_private_pa
         rebuildChallenge.in_commitment_point[r] <== commitment_point_bits[r];
         rebuildChallenge.in_signer_key[r]       <== signer_key[r];
     }
-    for (var m = 0; m < message_size; m++) {
-        rebuildChallenge.in_message[m] <== rebuildMessage.out_message[m];
-    }
+        
+    rebuildChallenge.txId <== computeTxId.txId;
 
     for (var d = 0; d < 64; d++) {
         challenge[d] === rebuildChallenge.out_challenge[d];
@@ -398,4 +440,4 @@ component main { public [
     commitment_payload, // Com_tx   
     challenge, // c
     message_public_part // TxAbs
-] } = CardanoWBPS(27*254, 333, 32);
+] } = CardanoWBPS(8*128, 333, 32);

@@ -61,6 +61,8 @@ library
   hs-source-dirs:  lib
   exposed-modules:
     WBPS.Adapter.CardanoCryptoClass.Crypto
+    WBPS.Adapter.CLI.Wrapped.Circom
+    WBPS.Adapter.CLI.Wrapped.Snarkjs
     WBPS.Adapter.Data
     WBPS.Adapter.Data.Aeson
     WBPS.Adapter.Data.ByteString
@@ -70,43 +72,49 @@ library
     WBPS.Adapter.Monad.Control
     WBPS.Adapter.Path
     WBPS.Core.Failure
-    WBPS.Core.Primitives.Circom
-    WBPS.Core.Primitives.Snarkjs
-    WBPS.Core.Primitives.SnarkjsOverFileScheme
     WBPS.Core.Registration.Artefacts.Groth16.Setup
     WBPS.Core.Registration.Artefacts.Keys.Ed25519
     WBPS.Core.Registration.Artefacts.Keys.ElGamal
     WBPS.Core.Registration.FetchAccounts
-    WBPS.Core.Registration.FileScheme
-    WBPS.Core.Registration.FileScheme.Directories
+    WBPS.Core.Registration.Persistence.FileScheme
+    WBPS.Core.Registration.Persistence.FileScheme.Directories
+    WBPS.Core.Registration.Persistence.SnarkJs.OverFileSchemeAndShh
+    WBPS.Core.Registration.Persistence.SnarkJs.OverShh
     WBPS.Core.Registration.Register
     WBPS.Core.Registration.Registered
-    WBPS.Core.Registration.SnarkJs.OverFileSchemeAndShh
-    WBPS.Core.Registration.SnarkJs.OverShh
-    WBPS.Core.Session.BlindSigning.Sign
-    WBPS.Core.Session.BlindSigning.ThetaStatement
-    WBPS.Core.Session.BlindSigning.VerifyProof
-    WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx
-    WBPS.Core.Session.Demonstration.Artefacts.Commitment
-    WBPS.Core.Session.Demonstration.Artefacts.Commitment.Build
-    WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage
-    WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage.Prepare
-    WBPS.Core.Session.Demonstration.Artefacts.R
-    WBPS.Core.Session.Demonstration.Artefacts.Rho
-    WBPS.Core.Session.Demonstration.Artefacts.Scalars
-    WBPS.Core.Session.Demonstration.Artefacts.Scalars.Compute
-    WBPS.Core.Session.Demonstration.Demonstrate
-    WBPS.Core.Session.Demonstration.Demonstrated
+    WBPS.Core.Registration.RegistrationId
     WBPS.Core.Session.FetchSession
-    WBPS.Core.Session.FileScheme
-    WBPS.Core.Session.FileScheme.Directories
-    WBPS.Core.Session.Proving.Artefacts.Challenge
-    WBPS.Core.Session.Proving.Artefacts.Proof
-    WBPS.Core.Session.Proving.Artefacts.Proof.Generate
-    WBPS.Core.Session.Proving.Artefacts.Witness
-    WBPS.Core.Session.Proving.Prove
-    WBPS.Core.Session.Proving.Proved
+    WBPS.Core.Session.Persistence.FileScheme
+    WBPS.Core.Session.Persistence.FileScheme.Directories
     WBPS.Core.Session.Session
+    WBPS.Core.Session.SessionId
+    WBPS.Core.Session.Steps.BlindSigning.BlindSignature
+    WBPS.Core.Session.Steps.BlindSigning.ThetaStatement
+    WBPS.Core.Session.Steps.BlindSigning.VerifyProof
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment.Build
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage.Prepare
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.R
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.Rho
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars
+    WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars.Compute
+    WBPS.Core.Session.Steps.Demonstration.Demonstrate
+    WBPS.Core.Session.Steps.Demonstration.Demonstrated
+    WBPS.Core.Session.Steps.Demonstration.Persistence.Events
+    WBPS.Core.Session.Steps.Proving.Artefacts.Challenge
+    WBPS.Core.Session.Steps.Proving.Artefacts.Proof
+    WBPS.Core.Session.Steps.Proving.Artefacts.Proof.Generate
+    WBPS.Core.Session.Steps.Proving.Artefacts.Witness
+    WBPS.Core.Session.Steps.Proving.Persistence.Events
+    WBPS.Core.Session.Steps.Proving.Prove
+    WBPS.Core.Session.Steps.Proving.Proved
+    WBPS.Core.Session.Steps.Submitting.Artefacts.SubmittedTx
+    WBPS.Core.Session.Steps.Submitting.Artefacts.TxSignature
+    WBPS.Core.Session.Steps.Submitting.Persistence.Events
+    WBPS.Core.Session.Steps.Submitting.Submit
+    WBPS.Core.Session.Steps.Submitting.Submitted
     WBPS.Core.Setup.Circuit.FileScheme
     WBPS.Core.Setup.Circuit.Parameters
     WBPS.WBPS
@@ -115,9 +123,11 @@ library
     , aeson
     , bytestring
     , cardano-api
+    , cardano-binary
     , cardano-crypto-class
     , cardano-ledger-api
-    , cardano-ledger-core   ^>=1.17.0.0
+    , cardano-ledger-core        ^>=1.17.0.0
+    , cardano-strict-containers
     , containers
     , cooked-validators
     , cryptonite
@@ -125,6 +135,7 @@ library
     , filepath
     , hex-text
     , memory
+    , microlens
     , mtl
     , path
     , path-io
@@ -151,6 +162,7 @@ test-suite wbps-unit-tests
   build-depends:
     , aeson
     , bytestring
+    , data-default
     , mtl
     , QuickCheck
     , tasty
@@ -175,6 +187,7 @@ test-suite wbps-integration-tests
     WBPS.Specs.Session.BlindSigning.ThetaStatement
     WBPS.Specs.Session.BlindSigning.ThetaStatementFixture
     WBPS.Specs.Session.Demonstration.Commitment.Build
+    WBPS.Specs.Session.Submitting.Submit
 
   build-depends:
     , aeson

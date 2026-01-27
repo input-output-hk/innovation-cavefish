@@ -67,9 +67,10 @@ library
     Cavefish.Api.ServerConfiguration
     Cavefish.Endpoints.Read.FetchAccount
     Cavefish.Endpoints.Read.FetchAccounts
-    Cavefish.Endpoints.Write.AskCommitmentProof
-    Cavefish.Endpoints.Write.DemonstrateCommitment
     Cavefish.Endpoints.Write.Register
+    Cavefish.Endpoints.Write.Session.Demonstrate
+    Cavefish.Endpoints.Write.Session.Prove
+    Cavefish.Endpoints.Write.Session.Submit
     Cavefish.Performance.LogEvent
     Cavefish.Services.TxBuilding
     Cavefish.Services.WBPS

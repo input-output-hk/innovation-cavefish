@@ -2,18 +2,18 @@ module WBPS.Specs.Session.BlindSigning.ThetaStatement (specs) where
 
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, testCase, (@?=))
-import WBPS.Core.Session.BlindSigning.ThetaStatement (
+import WBPS.Core.Session.Steps.BlindSigning.ThetaStatement (
   ThetaStatement (ThetaStatement),
   rebuildThetaStatement,
  )
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment (
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (
   Commitment (Commitment, payload),
  )
-import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (
   MessageParts (MessageParts, public),
   PreparedMessage (PreparedMessage, parts),
  )
-import WBPS.Core.Session.Demonstration.Demonstrated (
+import WBPS.Core.Session.Steps.Demonstration.Demonstrated (
   CommitmentDemonstrated (CommitmentDemonstrated, commitment, preparedMessage),
  )
 import WBPS.Specs.Session.BlindSigning.ThetaStatementFixture (

@@ -6,37 +6,38 @@ module WBPS.Core.Failure (
 ) where
 
 import Control.Monad.Except (MonadError (throwError))
-
--- Keep lightweight aliases here to avoid cyclic imports between Failure and
--- session/registration modules that define the real types.
-type AccountId = String
-
-type SessionId = String
-
-type CommitmentId = String
-
-type UserWalletPublicKey = String
+import WBPS.Core.Registration.RegistrationId (RegistrationId)
+import WBPS.Core.Session.SessionId (SessionId)
 
 toWBPSFailure :: MonadError [WBPSFailure] m => Either String a -> m a
 toWBPSFailure = either (throwError . pure . BuildCommitmentFailed) pure
 
 data WBPSFailure
-  = AccountIdInvalidToCreateAFolder AccountId
-  | VerificationNotFound UserWalletPublicKey
-  | EncryptionKeysNotFound UserWalletPublicKey
-  | AccountAlreadyRegistered UserWalletPublicKey
-  | AccountNotFound UserWalletPublicKey
-  | BuildCommitmentFailed String
+  = -- Account/registration failures
+    RegistrationIdInvalid RegistrationId
+  | VerificationNotFound RegistrationId
+  | EncryptionKeysNotFound RegistrationId
+  | AccountAlreadyRegistered RegistrationId
+  | AccountNotFound RegistrationId
+  | -- Commitment/circuit failures
+    BuildCommitmentFailed String
   | CircuitMessageDecodeFailed String
-  | TxBuiltTooLarge String
+  | -- Transaction assembly failures
+    TxBuiltTooLarge String
   | TxInputsCountMismatch String
-  | SessionIdInvalidToCreateAFolder SessionId
-  | SessionNotFound UserWalletPublicKey CommitmentId
-  | SessionMessageNotFound UserWalletPublicKey CommitmentId
-  | SessionRhoNotFound UserWalletPublicKey CommitmentId
-  | SessionScalarsNotFound UserWalletPublicKey CommitmentId
-  | SessionCommitmentNotFound UserWalletPublicKey CommitmentId
-  | SessionProofNotFound UserWalletPublicKey CommitmentId
-  | ProofVerificationFailed String
-  | BlindSignatureFailed String
+  | -- Session directory/session lookup failures
+    SessionIdInvalidToCreateAFolder SessionId
+  | SessionNotFound SessionId
+  | -- Session artefact persistence failures
+    SessionPreparedMessageNotFound SessionId
+  | SessionRhoNotFound SessionId
+  | SessionScalarsNotFound SessionId
+  | SessionCommitmentNotFound SessionId
+  | SessionProofNotFound SessionId
+  | SessionBlindSignatureNotFound SessionId
+  | SessionTxSignatureNotFound SessionId
+  | SessionSubmittedTxNotFound SessionId
+  | -- Proof/signature failures
+    ProofVerificationFailed String
+  | SessionSubmittingFailed String
   deriving (Show, Eq)

@@ -2,24 +2,31 @@
 
 module WBPS.Specs.Session.Demonstration.PreparedMessage.Prepare (specs) where
 
+import Control.Exception (IOException, try)
 import Control.Monad.Except (runExceptT)
 import Data.Aeson (eitherDecode)
 import Data.ByteString.Lazy.Char8 qualified as BL8
+import Data.Default (def)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertFailure, testCase)
-import Test.Tasty.QuickCheck (Gen, Property, counterexample, elements, forAll, ioProperty, testProperty, (===))
+import Test.Tasty.QuickCheck (Gen, Property, counterexample, forAll, ioProperty, testProperty, (===))
 import WBPS.Core.Failure (WBPSFailure (TxBuiltTooLarge, TxInputsCountMismatch))
-import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (PrivateTxInputs (PrivateTxInputs), UnsignedTx, extractPrivateElements)
-import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (
+  PrivateTxInputs (PrivateTxInputs),
+  UnsignedTx,
+  extractPrivateElements,
+  randomizeTxAndPadItToCircuitMessageSize,
+ )
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (
   PreparedMessage (PreparedMessage, circuit),
  )
-import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage.Prepare (
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage.Prepare (
   prepare,
   recompose,
  )
 import WBPS.Core.Setup.Circuit.Parameters (
   CircuitMessageMaxSize (CircuitMessageMaxSize),
-  CircuitParameters (CircuitParameters, messageSize, txInputSize),
+  CircuitParameters (messageSize, txInputSize),
   mkCircuitTxInputSize,
  )
 
@@ -51,16 +58,13 @@ infoPreservedWhenPreparedAndRecomposed =
 prepareWithInputMismatch :: Assertion
 prepareWithInputMismatch =
   assertPrepareFailure
-    (mkParams 800 fixtureMismatchedInputCount)
+    (mkParams fixtureMismatchedInputCount)
     isTxInputsCountMismatch
     "TxInputsCountMismatch"
 
 prepareWithMessageTooLarge :: Assertion
 prepareWithMessageTooLarge =
-  assertPrepareFailure
-    (mkParams 50 fixtureInputCount)
-    isTxBuiltTooLarge
-    "TxBuiltTooLarge"
+  assertPrepareTooLarge (mkParams fixtureInputCount)
 
 assertPrepareFailure ::
   CircuitParameters ->
@@ -84,11 +88,10 @@ isTxBuiltTooLarge = \case
   TxBuiltTooLarge _ -> True
   _ -> False
 
-mkParams :: Int -> Int -> CircuitParameters
-mkParams messageSizeBytes inputCount =
-  CircuitParameters
-    { messageSize = CircuitMessageMaxSize (messageSizeBytes * 8)
-    , txInputSize =
+mkParams :: Int -> CircuitParameters
+mkParams inputCount =
+  (def :: CircuitParameters)
+    { txInputSize =
         either
           (error . ("mkParams: " <>))
           id
@@ -97,11 +100,37 @@ mkParams messageSizeBytes inputCount =
 
 genCircuitParameters :: Gen CircuitParameters
 genCircuitParameters =
-  mkParams <$> elements [400, 800, 1200] <*> pure fixtureInputCount
+  pure (mkParams fixtureInputCount)
+
+assertPrepareTooLarge :: CircuitParameters -> Assertion
+assertPrepareTooLarge params = do
+  unsignedTx <- loadFixtureUnsignedTx
+  oversizedTx <- buildOversizedTx params unsignedTx
+  result <- try (runExceptT (prepare params oversizedTx)) :: IO (Either IOException (Either [WBPSFailure] PreparedMessage))
+  case result of
+    Left _ -> pure ()
+    Right (Left [failure]) | isTxBuiltTooLarge failure -> pure ()
+    Right failures -> assertFailure ("Expected prepare to fail with TxBuiltTooLarge, got: " <> show failures)
+
+buildOversizedTx :: CircuitParameters -> UnsignedTx -> IO UnsignedTx
+buildOversizedTx params unsignedTx =
+  let CircuitMessageMaxSize baseBits = messageSize params
+      messageSizeMultipleBits = 1016
+      candidates = [baseBits + messageSizeMultipleBits * n | n <- [1 .. 3]]
+   in go candidates
+  where
+    go [] =
+      ioError . userError $
+        "Unable to build an oversized tx for prepareWithMessageTooLarge."
+    go (targetBits : rest) = do
+      result <- try (randomizeTxAndPadItToCircuitMessageSize targetBits unsignedTx) :: IO (Either IOException UnsignedTx)
+      case result of
+        Left _ -> go rest
+        Right paddedTx -> pure paddedTx
 
 fixtureUnsignedTxJson :: BL8.ByteString
 fixtureUnsignedTxJson =
-  "{\"cborHex\":\"84a300d9010281825820010101010101010101010101010101010101010101010101010101010101010100018182581d611cca48da7f291b81a09ddc0e132fce0c5a1ef3410e5a70f9fcd5f777010200a0f5f6\",\"description\":\"\",\"type\":\"TxBodyConway\"}"
+  "{\"cborHex\":\"84a300d9010281825820000000000000000000000000000000000000000000000000000000000000000000018182581d618b218424ad74df25d35c2ea8e094a4c5c5aeb2cbb4424193315693131a000f42400200a0f5f6\",\"description\":\"\",\"type\":\"TxBodyConway\"}"
 
 fixtureUnsignedTx :: UnsignedTx
 fixtureUnsignedTx =

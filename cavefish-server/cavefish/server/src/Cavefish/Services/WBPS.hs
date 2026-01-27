@@ -9,12 +9,16 @@ import Cardano.Api (
 import Servant.Server.Internal.ServerError (ServerError)
 import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (UserWalletPublicKey)
 import WBPS.Core.Registration.Registered (Registered)
-import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx)
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment (CommitmentId)
-import WBPS.Core.Session.Demonstration.Artefacts.R (R)
-import WBPS.Core.Session.Demonstration.Demonstrated (CommitmentDemonstrated)
-import WBPS.Core.Session.Proving.Proved (CommitmentProved)
+import WBPS.Core.Registration.RegistrationId (RegistrationId)
 import WBPS.Core.Session.Session (Session)
+import WBPS.Core.Session.SessionId (SessionId)
+import WBPS.Core.Session.Steps.BlindSigning.BlindSignature (BlindSignature)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.R (R)
+import WBPS.Core.Session.Steps.Demonstration.Demonstrated (CommitmentDemonstrated)
+import WBPS.Core.Session.Steps.Proving.Proved (CommitmentProved)
+import WBPS.Core.Session.Steps.Submitting.Artefacts.SubmittedTx (SubmitTx)
+import WBPS.Core.Session.Steps.Submitting.Submitted (CommitmentSubmitted)
 
 data WBPS = WBPS
   { register ::
@@ -25,25 +29,29 @@ data WBPS = WBPS
   , demonstrate ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      UserWalletPublicKey -> UnsignedTx -> m Session
+      RegistrationId -> UnsignedTx -> m (SessionId, CommitmentDemonstrated)
   , prove ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      UserWalletPublicKey -> CommitmentId -> R -> m CommitmentProved
-  , loadAccount ::
+      SessionId -> R -> m CommitmentProved
+  , submit ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      UserWalletPublicKey -> m (Maybe Registered)
-  , loadAccounts ::
+      SessionId -> SubmitTx m -> BlindSignature -> m CommitmentSubmitted
+  , loadRegisteredMaybe ::
+      forall m.
+      (MonadIO m, MonadError ServerError m) =>
+      RegistrationId -> m (Maybe Registered)
+  , loadAllRegistered ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
       m [Registered]
   , loadSession ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      UserWalletPublicKey -> CommitmentId -> m Session
+      SessionId -> m Session
   , loadCommitmentDemonstrationEvents ::
       forall m.
       (MonadIO m, MonadError ServerError m) =>
-      UserWalletPublicKey -> CommitmentId -> m (Registered, CommitmentDemonstrated)
+      SessionId -> m (Registered, CommitmentDemonstrated)
   }

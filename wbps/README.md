@@ -113,12 +113,13 @@ This logs step-by-step Poseidon and encryption parameters used to produce cipher
 ## Message sizing (tx_body)
 
 We size the circuits around a representative tx_body length derived from mainnet
-history. The mean is ~785 bytes, which we round to 800 bytes for sizing, add a 32B
-nonce, and then pad to 254-bit limbs:
+history. The mean is ~785 bytes; we bump the tx_body target to 857 bytes so that
+with the 32B nonce the total is 889 bytes, which is exactly 28*254 bits:
 
-- tx_body target: 800 bytes (mean ~785 bytes)
-- payload: 800B + 32B nonce = 832B = 6,656 bits
-- limb packing: 27 * 254 = 6,858 bits (202 bits of zero padding)
+- tx_body target: 857 bytes (mean ~785 bytes)
+- payload: 857B + 32B nonce = 889B = 7,112 bits
+- limb packing: 28 * 254 = 7,112 bits (exact, no limb padding)
+  - Note: 28 * 254 is divisible by 8, so the message size is byte-aligned and compatible with `ComputeTxId` (Blake2b over bytes).
 
 Observed tx_body distribution (mainnet history):
 
@@ -137,6 +138,15 @@ Average tx parts (bytes / share):
 - Witnesses: 1089 bytes (54.6%)
 - Aux data: 117 bytes (5.9%)
 - Other: 3 bytes (0.1%)
+
+---
+
+## Circuit changelog (recent)
+
+- Challenge input now uses `txId = Blake2b-256(tx_body)` and hashes `R || X || txId` instead of raw `mu` bits.
+- Commitment payload still encrypts the full `mu` packed into 254-bit limbs (P2 unchanged).
+- `solver_encryption_key_pow_rho` remains an input and is checked against the internally computed `ek^rho` value.
+- Top-level `main` parameters remain `message_size = 28*254`, `message_private_part_size = 320`, `message_private_part_offset = 24`.
 
 ---
 

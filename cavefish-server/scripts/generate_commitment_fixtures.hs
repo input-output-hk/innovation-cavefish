@@ -12,20 +12,24 @@ import Data.Default (def)
 import Path (reldir, relfile, (</>))
 import qualified Path
 import qualified Path.IO as P
-import System.Random (mkStdGen)
 import WBPS.Adapter.Math.AffinePoint (AffinePoint (..))
+import WBPS.Core.Registration.Artefacts.Keys.Ed25519 (generateKeyPair, userWalletPK)
 import WBPS.Core.Registration.Artefacts.Keys.ElGamal (EncryptionKey (..))
-import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx (UnsignedTx))
-import WBPS.Core.Session.Demonstration.Artefacts.Commitment.Build (Commitment (..), CommitmentPayload (..), Input (..), build)
-import WBPS.Core.Session.Demonstration.Artefacts.PreparedMessage (Message (Message), toBitsPaddedToMaxSize)
-import WBPS.Core.Session.Demonstration.Artefacts.Rho (mkRho)
-import WBPS.Core.Session.Demonstration.Artefacts.Scalars (Scalars (Scalars, ekPowRho), compute)
+import WBPS.Core.Registration.RegistrationId (RegistrationId (RegistrationId))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (UnsignedTx (UnsignedTx))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment (Commitment (..), CommitmentPayload (..))
+import qualified WBPS.Core.Session.Steps.Demonstration.Artefacts.Commitment.Build as CommitmentBuild
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage (Message (Message))
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.PreparedMessage.Prepare (toBitsPaddedToMaxSize)
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Rho (mkRho)
+import qualified WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars as Scalars
+import WBPS.Core.Session.Steps.Demonstration.Artefacts.Scalars.Compute (compute)
 import WBPS.Core.Setup.Circuit.FileScheme (RootFolders (..), defaultFileScheme)
 import WBPS.WBPS (runWBPS)
 
 main :: IO ()
 main = do
-  txBody <- either (error . show) pure createBody
+  txBody <- createBody
   let unsignedTx = UnsignedTx txBody
       message = Message unsignedTx
       messageBits = toBitsPaddedToMaxSize def message
@@ -43,25 +47,26 @@ main = do
             6230067313654301039366684823404445124569608018144478198755770506579514903435
       rho = either (error . show) Prelude.id (mkRho 1234567890123456789012345678901234567890)
 
+  registrationId <- RegistrationId . userWalletPK <$> generateKeyPair
   tmpRoot <- P.getTempDir
   P.withTempDir tmpRoot "wbps-fixture" $ \outDir -> do
     cwd <- P.getCurrentDir
     let scheme = defaultFileScheme RootFolders {input = cwd </> [reldir|wbps|] </> [reldir|setup|], output = outDir}
     res <- runWBPS scheme $ do
-      cs@Scalars {ekPowRho = ekPowRho'} <- compute ek rho
-      build Input {ekPowRho = ekPowRho', messageBits}
+      Scalars.Scalars {Scalars.ekPowRho = ekPowRho'} <- compute ek rho
+      CommitmentBuild.build registrationId CommitmentBuild.Input {CommitmentBuild.ekPowRho = ekPowRho', CommitmentBuild.messageBits = messageBits}
     case res of
       Left e -> error (show e)
       Right Commitment {payload = CommitmentPayload payload'} ->
         BL8.writeFile (Path.toFilePath (fixturesDir </> [relfile|commitment.json|])) (encode payload')
 
-createBody :: Either Api.TxBodyError (Api.TxBody Api.ConwayEra)
-createBody =
-  let dummyTxId = case Api.deserialiseFromRawBytes Api.AsTxId (BS.replicate 32 1) of
-        Right v -> v
-        Left err -> error (show err)
-      (dummySk, _) = Api.generateInsecureSigningKey (mkStdGen 42) Api.AsPaymentKey
-      dummyVk = Api.getVerificationKey dummySk
+createBody :: IO (Api.TxBody Api.ConwayEra)
+createBody = do
+  dummyTxId <- case Api.deserialiseFromRawBytes Api.AsTxId (BS.replicate 32 1) of
+    Right v -> pure v
+    Left err -> fail (show err)
+  dummySk <- Api.generateSigningKey Api.AsPaymentKey
+  let dummyVk = Api.getVerificationKey dummySk
       dummyAddr =
         Api.makeShelleyAddressInEra
           Api.ShelleyBasedEraConway
@@ -80,4 +85,6 @@ createBody =
                   Api.ReferenceScriptNone
               ]
           }
-   in Api.createTransactionBody Api.ShelleyBasedEraConway txBodyContent
+  case Api.createTransactionBody Api.ShelleyBasedEraConway txBodyContent of
+    Left err -> fail (show err)
+    Right body -> pure body
