@@ -1,7 +1,6 @@
 module Main (main) where
 
-import Spec qualified
-import Test.Hspec (hspec)
+import Core.IntentSpecs qualified as IntentSpecs
 
 main :: IO ()
-main = hspec Spec.spec
+main = IntentSpecs.tests

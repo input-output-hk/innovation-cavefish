@@ -3,11 +3,11 @@
     "CHaP": {
       "flake": false,
       "locked": {
-        "lastModified": 1758547838,
-        "narHash": "sha256-QvqwgT4yN+52SWxQWQ3cS5V64C1rQrQKaLCYRZH7bC4=",
+        "lastModified": 1767613196,
+        "narHash": "sha256-+YMGLWk1IKQms4XbwwJUsW+n/LXm74H2MgBeuZSpnD8=",
         "owner": "IntersectMBO",
         "repo": "cardano-haskell-packages",
-        "rev": "6174af87848e7b5e652bb19035f658e10f094299",
+        "rev": "d78f79845cfcde6497c0afef650a51a1cff01777",
         "type": "github"
       },
       "original": {
@@ -313,15 +313,14 @@
         "pre-commit-hooks": "pre-commit-hooks"
       },
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-j8kz9lEDMxmFr6x7Q0VWdmr8HWRF3+QNQUBchcZgHaA=",
         "path": "./cavefish-server",
         "type": "path"
       },
       "original": {
         "path": "./cavefish-server",
         "type": "path"
-      }
+      },
+      "parent": []
     },
     "customConfig": {
       "locked": {
@@ -548,11 +547,11 @@
     "hackage": {
       "flake": false,
       "locked": {
-        "lastModified": 1758689234,
-        "narHash": "sha256-3j/INEx33XSXQJIDV0cbYmCmwX61kZmNf+Xa+dpBJVQ=",
+        "lastModified": 1768294085,
+        "narHash": "sha256-8UX8c3wUMveijJk+OzliLje/tj8Lj2bmFq12xB+0hI8=",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "e31651ebea5226989a63d5f4f61d77bb8303ab34",
+        "rev": "289451d09d817400cb61c9e19ec39619e55efa6c",
         "type": "github"
       },
       "original": {

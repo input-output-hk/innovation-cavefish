@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | Module      : Intent.Example.DSL
 --   Description : Core definitions for transaction intents.
 --     This module defines the data structures and functions related to transaction
@@ -9,9 +11,6 @@ module Intent.Example.DSL (
   AddressW (..),
   AdressConwayEra (..),
   ChangeDelta,
-  emptyIntent,
-  normalizeIntent,
-  toIntentExpr,
   toCanonicalIntent,
   satisfies,
   outExactly,
@@ -20,20 +19,37 @@ module Intent.Example.DSL (
 
 import Cardano.Api (FromJSON, ToJSON, Value)
 import Cardano.Api qualified as Api
+import Control.Applicative (Alternative ((<|>)))
+import Control.Monad.Except (ExceptT, runExceptT, throwError)
+import Control.Monad.Writer (Writer, runWriter, tell)
+import Data.Default (Default (def))
+import Data.List (uncons)
 import Data.List.NonEmpty (NonEmpty)
+import Data.Map (Map)
 import Data.Map qualified as Map
+import Data.Set qualified as Set
 import Data.Text (Text)
-import GHC.Exts (IsList (toList))
 import GHC.Generics (Generic)
+import GHC.IsList qualified
+import GHC.List qualified
 import Ledger (
-  Slot,
+  Slot (getSlot),
   cardanoPubKeyHash,
  )
 import Plutus.Script.Utils.Address (
   ToAddress (toAddress),
   ToPubKeyHash (toPubKeyHash),
  )
-import WBPS.Core.Session.Steps.Demonstration.Artefacts.Cardano.UnsignedTx (AbstractUnsignedTx)
+import PlutusLedgerApi.V1 qualified
+import PlutusLedgerApi.V1.Interval (
+  Extended (Finite),
+  Interval (Interval),
+  LowerBound (LowerBound),
+  UpperBound (UpperBound),
+  from,
+  interval,
+ )
+import WBPS.Core.Session.Demonstration.Artefacts.Cardano.UnsignedTx (AbstractUnsignedTx, abstractTxUnsigned, txUnsigned)
 
 type ChangeDelta = Api.Value
 
@@ -49,8 +65,6 @@ instance ToPubKeyHash AdressConwayEra where
     case cardanoPubKeyHash addr of
       Just pkh -> pkh
       Nothing -> error "toPubKeyHash: address is not backed by a payment key hash"
-
--- Result of building a transaction
 
 -- Wallet address as represented in the API
 newtype AddressW = AddressW Text
@@ -93,21 +107,6 @@ data IntentDSL
 
     We don't really need this type anymore, but I'm keeping it around for parity with the paper.
  -}
-data InternalIntentDSL
-  = -- | Must mint this value
-    MustMint Value
-  | -- | Spend from this source
-    SpendFrom AdressConwayEra
-  | -- | Maximum validity interval in slots
-    MaxInterval Slot
-  | -- | Pay this value to this address
-    PayTo Value AdressConwayEra
-  | -- | Send change to this address
-    ChangeTo AdressConwayEra
-  | -- | Maximum fee
-    MaxFee Integer
-  | AndExps (NonEmpty InternalIntentDSL)
-  deriving (Eq, Show, Generic)
 
 data CanonicalIntent = CanonicalIntent
   { spendFrom :: [AdressConwayEra]
@@ -123,140 +122,155 @@ data CanonicalIntent = CanonicalIntent
   , maxInterval :: Maybe Slot
   -- ^ Maximum validity interval in slots
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
-emptyIntent :: CanonicalIntent
-emptyIntent =
-  CanonicalIntent
-    { spendFrom = []
-    , payTo = []
-    , mustMint = []
-    , changeTo = Nothing
-    , maxFee = Nothing
-    , maxInterval = Nothing
-    }
+instance Semigroup CanonicalIntent where
+  CanonicalIntent _spendFrom _payTo _mustMint _changeTo _maxFee _maxInterval
+    <> CanonicalIntent _spendFrom' _payTo' _mustMint' _changeTo' _maxFee' _maxInterval' =
+      CanonicalIntent
+        (_spendFrom <> _spendFrom')
+        (_payTo <> _payTo')
+        (_mustMint <> _mustMint')
+        (_changeTo' <|> _changeTo)
+        (min _maxFee _maxFee')
+        (min _maxInterval _maxInterval')
 
--- | Normalize an InternalIntentDSL into a Canonical Intent
-normalizeIntent :: InternalIntentDSL -> CanonicalIntent
-normalizeIntent = go emptyIntent
-  where
-    go acc = \case
-      MustMint v -> acc {mustMint = v : mustMint acc}
-      SpendFrom s -> acc {spendFrom = s : spendFrom acc}
-      MaxInterval i -> acc {maxInterval = Just (maybe i (min i) (maxInterval acc))}
-      PayTo v a -> acc {payTo = (v, a) : payTo acc}
-      ChangeTo a -> acc {changeTo = Just a}
-      MaxFee f -> acc {maxFee = Just (maybe f (min f) (maxFee acc))}
-      AndExps xs -> foldl go acc xs
+instance Monoid CanonicalIntent where
+  mempty = def
 
-toIntentExpr :: IntentDSL -> Either Text InternalIntentDSL
-toIntentExpr = \case
-  MustMintW v -> Right (MustMint v)
-  SpendFromW walletAddr -> SpendFrom <$> parseAddr walletAddr
-  MaxIntervalW w -> Right (MaxInterval (fromInteger w))
-  PayToW v a -> PayTo v <$> parseAddr a
-  ChangeToW a -> ChangeTo <$> parseAddr a
-  MaxFeeW i -> Right (MaxFee i)
-  AndExpsW xs -> AndExps <$> traverse toInt xs
-  where
-    parseAddr :: AddressW -> Either Text AdressConwayEra
-    parseAddr (AddressW addr) =
-      maybe
-        (Left ("invalid address : " <> addr))
-        (Right . AdressConwayEra)
-        (Api.deserialiseAddress (Api.AsAddressInEra Api.AsConwayEra) addr)
-    toInt :: IntentDSL -> Either Text InternalIntentDSL
-    toInt = \case
-      MustMintW v -> Right (MustMint v)
-      SpendFromW walletAddr -> SpendFrom <$> parseAddr walletAddr
-      MaxIntervalW w -> Right (MaxInterval (fromInteger w))
-      PayToW v a -> PayTo v <$> parseAddr a
-      ChangeToW a -> ChangeTo <$> parseAddr a
-      MaxFeeW i -> Right (MaxFee i)
-      AndExpsW ys -> AndExps <$> traverse toInt ys
+instance Default CanonicalIntent where
+  def = CanonicalIntent def def def def def def
+
+type EvalDSL a = ExceptT Text (Writer CanonicalIntent) a
+
+runDSLTransformer :: IntentDSL -> (Either Text (), CanonicalIntent)
+runDSLTransformer dsl = runWriter (runExceptT (evalIntentDSL dsl))
 
 toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent
-toCanonicalIntent :: IntentDSL -> Either Text CanonicalIntent =
-  fmap normalizeIntent . toIntentExpr
+toCanonicalIntent dsl = case runDSLTransformer dsl of
+  (Left e, _) -> Left e
+  (Right (), intent) -> Right intent
 
+evalIntentDSL :: IntentDSL -> EvalDSL ()
+evalIntentDSL dsl = do
+  case dsl of
+    MustMintW v -> tell mempty {mustMint = [v]}
+    SpendFromW w@(AddressW walletAddr) -> case parseAddr w of
+      Nothing ->
+        throwError $ "invalid SpendFromW address for SpendFromW : " <> walletAddr
+      Just addr -> tell mempty {spendFrom = [addr]}
+    MaxIntervalW w -> tell mempty {maxInterval = Just $ fromInteger w}
+    PayToW value w@(AddressW walletAddr) -> case parseAddr w of
+      Nothing ->
+        throwError $ "invalid PayToW address : " <> walletAddr
+      Just addr -> tell mempty {payTo = [(value, addr)]}
+    ChangeToW a -> tell mempty {changeTo = parseAddr a}
+    MaxFeeW i -> tell mempty {maxFee = Just i}
+    AndExpsW ys -> mapM_ evalIntentDSL ys
+  where
+    parseAddr :: AddressW -> Maybe AdressConwayEra
+    parseAddr (AddressW addr) =
+      fmap
+        AdressConwayEra
+        (Api.deserialiseAddress (Api.AsAddressInEra Api.AsConwayEra) addr)
+
+-- |
+-- The function that checks that a given abstract transaction matches the intent specification
+-- See Section 5.1, sentence 3.69 for detail
 satisfies :: IntentDSL -> AbstractUnsignedTx -> Bool
-satisfies _ _ = True
+satisfies dsl txAbs =
+  let
+    txBody = Api.getTxBodyContent (txUnsigned . abstractTxUnsigned $ txAbs)
+   in
+    case toCanonicalIntent dsl of
+      Left _ -> False
+      Right intent ->
+        and
+          [ satisfiesMaxFee intent (Api.txFee txBody)
+          , satisfiesPayTo intent (Api.txOuts txBody)
+          , satisfiesChangeTo intent (Api.txOuts txBody)
+          , satisfiesSpendFrom intent txBody
+          , satisfiesMint intent (Api.txMintValue txBody)
+          , satisfiesMaxInterval intent txBody
+          ]
 
--- and
---   [ -- MustMint: v ≤ tx.mint
---     let need = Map.fromList . toList $ mconcat mustMint
---         have = Map.fromList (toList tx.absMint)
---      in Map.isSubmapOfBy (<=) need have
---   , -- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
---     -- TODO WG: Not really sure how to do this right now (in a way that's fully coherent)
---     all (hasSigner tx.sigKeys . unAdressConwayEra) spendFrom
---   , -- MaxInterval (if any): (tx.validityInterval.snd - tx.validityInterval.fst) ≤ i
---     case maxInterval of
---       Nothing -> True
---       Just i -> case toClosedFinite tx.validityInterval of
---         Nothing -> False
---         Just (lo, hi) -> (hi - lo) <= i
---   , -- PayTo: (s, v) ∈ tx.outputs
---     all (\(value, addr) -> any (outMatches addr value) tx.outputs) payTo
---   , -- ChangeTo: (s,consumed − produced) ∈ tx.outputs
---     case changeTo of
---       Nothing -> True
---       Just addr -> any (outMatchesChange addr) tx.outputs
---   , -- not (valuePositive cd) || any (outMatchesChange addr) tx.outputs
---     -- MaxFee (if any): tx.fee ≤ f
---     maybe True (\f -> tx.absFee <= f) maxFee
---   ]
--- where
---   hasSigner :: Set.Set PubKey -> Api.AddressInEra Api.ConwayEra -> Bool
---   hasSigner sigs addr =
---     case cardanoPubKeyHash addr of
---       Nothing -> False
---       Just pkh -> any ((== pkh) . pubKeyHash) (Set.toList sigs)
+-- | Convert an interval to a closed finite interval, if possible.
+toClosedFinite :: (Num a, Ord a) => Interval a -> Maybe (a, a)
+toClosedFinite (Interval (LowerBound loE loC) (UpperBound hiE hiC)) = do
+  lo <- case loE of Finite x -> Just x; _ -> Nothing
+  hi <- case hiE of Finite x -> Just x; _ -> Nothing
+  let lo' = if loC then lo else lo + 1
+      hi' = if hiC then hi else hi - 1
+  if hi' >= lo' then Just (lo', hi') else Nothing
+
+satisfiesMaxInterval :: CanonicalIntent -> Api.TxBodyContent build era -> Bool
+satisfiesMaxInterval CanonicalIntent {maxInterval} tx =
+  maybe True (flip member txValidityInterval . Api.SlotNo . fromInteger . getSlot) maxInterval
+  where
+    (Api.TxValidityLowerBound _ lo) = Api.txValidityLowerBound tx
+    (Api.TxValidityUpperBound _ hi) = Api.txValidityUpperBound tx
+    txValidityInterval :: Interval Api.SlotNo
+    txValidityInterval = maybe (from lo) (interval lo) hi
+    member :: (Num a, Ord a) => a -> Interval a -> Bool
+    member i _interval = case toClosedFinite _interval of
+      Nothing -> False
+      Just (_lo, _hi) -> _hi - _lo <= i
+
+-- | TODO
+-- Not sure how to implement this function.
+-- This function is based on the cavefish paper section 5.1, figure 2.  The formula is:
+-- SpendFrom: s(dom (tx.sigs), tx.validityInterval)
+satisfiesSpendFrom :: CanonicalIntent -> Api.TxBodyContent build era -> Bool
+satisfiesSpendFrom CanonicalIntent {spendFrom} txbody = True
+
+hasSigners :: Set.Set PlutusLedgerApi.V1.PubKeyHash -> [PlutusLedgerApi.V1.PubKeyHash] -> Bool
+hasSigners sigs spendFrom =
+  Set.isProperSubsetOf (Set.fromList spendFrom) sigs
+
+satisfiesChangeTo :: CanonicalIntent -> [Api.TxOut Api.CtxTx Api.ConwayEra] -> Bool
+satisfiesChangeTo CanonicalIntent {spendFrom, changeTo} txouts =
+  case changeTo of
+    Nothing ->
+      maybe
+        False
+        (\(AdressConwayEra address, _) -> address `elem` fmap (\(Api.TxOut aie _ _ _) -> aie) txouts)
+        (uncons spendFrom)
+    Just (AdressConwayEra address) ->
+      address `elem` fmap (\(Api.TxOut aie _ _ _) -> aie) txouts
+
+-- |
+--  Intent Specs meet mustMint specs.
+--  See Section 5.1 figure-2 of the cavefish paper for details
+satisfiesMint :: CanonicalIntent -> Api.TxMintValue b e -> Bool
+satisfiesMint intent Api.TxMintNone = GHC.List.null $ mustMint intent
+satisfiesMint intent mintValue =
+  let
+    expected :: Map Api.AssetId Api.Quantity = Map.fromList . GHC.IsList.toList . Api.txMintValueToValue $ mintValue
+    actual :: Map.Map Api.AssetId Api.Quantity = Map.fromList . concatMap GHC.IsList.toList . mustMint $ intent
+   in
+    Map.isSubmapOfBy (<=) actual expected
 
 valueLeq :: Api.Value -> Api.Value -> Bool
 valueLeq need have =
   Map.isSubmapOfBy
     (<=)
-    (Map.fromList (toList need))
-    (Map.fromList (toList have))
-
-valueEq :: Api.Value -> Api.Value -> Bool
-valueEq a b = valueLeq a b && valueLeq b a
+    (Map.fromList (GHC.IsList.toList need))
+    (Map.fromList (GHC.IsList.toList have))
 
 valuePositive :: Api.Value -> Bool
-valuePositive = any (\(_, Api.Quantity q) -> q > 0) . toList
+valuePositive = any (\(_, Api.Quantity q) -> q > 0) . GHC.IsList.toList
 
--- outMatches ::
---   AdressConwayEra ->
---   Api.Value ->
---   Api.TxOut Api.CtxTx Api.ConwayEra ->
---   Bool
--- outMatches addrReq vReq (Api.TxOut addr vOut _ _) =
---   addrReq == AdressConwayEra addr && valueLeq vReq (Api.txOutValueToValue vOut)
-
-outExactly ::
-  AdressConwayEra ->
-  Api.Value ->
-  Api.TxOut Api.CtxTx Api.ConwayEra ->
-  Bool
+outExactly :: AdressConwayEra -> Api.Value -> Api.TxOut Api.CtxTx Api.ConwayEra -> Bool
 outExactly addrReq vReq (Api.TxOut addr vOut _ _) =
-  addrReq == AdressConwayEra addr && valueEq vReq (Api.txOutValueToValue vOut)
+  addrReq == AdressConwayEra addr && valueLeq vReq (Api.txOutValueToValue vOut)
 
--- outMatchesChange ::
---   AdressConwayEra ->
---   Api.TxOut Api.CtxTx Api.ConwayEra ->
---   Bool
--- outMatchesChange addrReq (Api.TxOut addr vOut _ _) =
---   addrReq == AdressConwayEra addr && valueIsPlaceholder (Api.txOutValueToValue vOut)
+satisfiesMaxFee :: CanonicalIntent -> Api.TxFee era -> Bool
+satisfiesMaxFee CanonicalIntent {maxFee} (Api.TxFeeExplicit _ (Api.Coin coin)) =
+  maybe
+    True
+    (== coin)
+    maxFee
 
--- valueIsPlaceholder :: Api.Value -> Bool
--- valueIsPlaceholder = valueEq mempty
-
--- | Convert an interval to a closed finite interval, if possible.
--- toClosedFinite :: (Num a, Ord a) => Interval a -> Maybe (a, a)
--- toClosedFinite (Interval (LowerBound loE loC) (UpperBound hiE hiC)) = do
---   lo <- case loE of Finite x -> Just x; _ -> Nothing
---   hi <- case hiE of Finite x -> Just x; _ -> Nothing
---   let lo' = if loC then lo else lo + 1
---       hi' = if hiC then hi else hi - 1
---   if hi' >= lo' then Just (lo', hi') else Nothing
+satisfiesPayTo :: CanonicalIntent -> [Api.TxOut Api.CtxTx Api.ConwayEra] -> Bool
+satisfiesPayTo CanonicalIntent {payTo} txOuts =
+  all (\(value, addr) -> any (outExactly addr value) txOuts) payTo

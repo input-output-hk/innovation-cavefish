@@ -96,6 +96,7 @@ library
     , mtl
     , path
     , plutus-ledger
+    , plutus-ledger-api
     , plutus-script-utils
     , say
     , servant
@@ -135,12 +136,22 @@ test-suite test
   main-is:        Main.hs
   hs-source-dirs: test
   other-modules:
+    Core.IntentDSLGen
     Core.IntentSpecs
-    Spec
 
   build-depends:
     , cardano-api
+    , cardano-api-gen
     , cavefish-server
+    , cooked-validators
+    , data-default
+    , hedgehog
     , hspec
+    , plutus-ledger
+    , plutus-ledger-api
+    , plutus-script-utils
+    , tasty
+    , tasty-hedgehog
+    , tasty-hspec
     , text
     , wbps
